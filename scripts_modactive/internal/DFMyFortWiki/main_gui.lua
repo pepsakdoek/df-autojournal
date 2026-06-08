@@ -56,18 +56,25 @@ function WikiScreen:init()
                     frame_style = gui.GREY_LINE_FRAME,
                     subviews = {
                         widgets.Label{
-                            frame = {t = 0, l = 0},
-                            -- add space in fron for the [ ] that surrounds the 'pages'
-                            text = " Index"
+                            frame = {t = 0, l = 1},
+                            text = "Index"
                         },
                         widgets.List{
                             view_id = 'page_list',
                             frame = {t = 2, l = 0, b = 2},
-                            on_select = function(idx, item) self:go_to_page(item.full_text) end,
-                            on_submit = function(idx, item) self:go_to_page(item.full_text) end,
+                            on_select = function(idx, item) 
+                                if item and item.full_text then 
+                                    self:go_to_page(item.full_text) 
+                                end 
+                            end,
+                            on_submit = function(idx, item) 
+                                if item and item.full_text then 
+                                    self:go_to_page(item.full_text) 
+                                end 
+                            end,
                         },
                         widgets.TextButton{
-                            frame = {b = 1, l = 0},
+                            frame = {b = 0, l = 0},
                             text = "New Page",
                             on_click = function() self:add_random_page() end
                         }
@@ -89,11 +96,10 @@ function WikiScreen:init()
                             view_id = 'scroll_container',
                             frame = {t = 2, l = 0, r = 2, b = 0},
                             subviews = {
-                                widgets.TextArea{
+                                widgets.WrappedLabel{
                                     view_id = 'page_content',
                                     frame = {t = 0, l = 0, r = 0},
-                                    text = "",
-                                    text_to_wrap = true
+                                    text = ""
                                 }
                             }
                         },
@@ -127,8 +133,8 @@ function WikiScreen:refresh_page_list()
     table.sort(sorted_keys)
 
     for _, k in ipairs(sorted_keys) do
-        -- Keeping user style: ' ' .. k
-        local display_text = ' ' .. k
+        -- Ensure text starts with a space for alignment, but store original in full_text
+        local display_text = " " .. k
         table.insert(list_items, {text = display_text, full_text = k})
     end
     self.subviews.page_list:setChoices(list_items)
@@ -137,42 +143,42 @@ end
 function WikiScreen:go_to_page(page_name)
     if self.in_go_to_page then return end
     local page = self.pages[page_name]
-    if not page then return end
+    if not page then 
+        print("Wiki: Page not found - " .. tostring(page_name))
+        return 
+    end
 
+    print("Wiki: Navigating to - " .. tostring(page_name))
     self.in_go_to_page = true
     self.current_page = page_name
-    self.subviews.page_title:setText(page.title)
     
-    local content_label = self.subviews.page_content
-    content_label:setText(page.content)
+    -- Update visuals
+    self.subviews.page_title:setText(page.title)
+    self.subviews.page_content:setText(page.content)
     
     -- Reset scroll
-    content_label.frame.t = 0
+    self.subviews.page_content.frame.t = 0
     if self.subviews.content_scrollbar.scrollTo then
         self.subviews.content_scrollbar:scrollTo(0)
     else
         self.subviews.content_scrollbar.val = 0
     end
 
-    -- Update layout to calculate new height
-    self:updateLayout()
-    
-    -- Configure scrollbar
-    local container_h = self.subviews.scroll_container.frame.h or 1
-    local content_h = content_label.frame.h or 0
-    self.subviews.content_scrollbar:setPageSize(container_h)
-    self.subviews.content_scrollbar:setRange(0, math.max(0, content_h - container_h))
-
-    -- Update list selection
-    for i, item in ipairs(self.subviews.page_list:getChoices()) do
+    -- Update list selection visuals (silent update)
+    local list = self.subviews.page_list
+    for i, item in ipairs(list:getChoices()) do
         if item.full_text == page_name then
-            if self.subviews.page_list:getSelected() ~= i then
-                self.subviews.page_list:setSelected(i)
+            if list:getSelected() ~= i then
+                list:setSelected(i)
             end
             break
         end
     end
+
     self.in_go_to_page = false
+    
+    -- Force a full layout and redraw
+    self:updateLayout()
 end
 
 function WikiScreen:add_random_page()
@@ -203,6 +209,10 @@ function WikiScreen:onInput(keys)
         self:dismiss()
         return true
     end
+    -- Support scrollwheel for the content area even if list is focused
+    if keys._MOUSE_L or keys._MOUSE_R then
+        -- This helps capture mouse focus for panels
+    end
     return WikiScreen.super.onInput(self, keys)
 end
 
@@ -214,3 +224,5 @@ end
 if not dfhack_flags.module then
     show_wiki()
 end
+
+return _ENV
