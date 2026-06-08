@@ -1,0 +1,8 @@
+[ID:my_fort_wiki]
+[NUMERIC_ID:123456]
+[NAME:My Fort Wiki]
+[AUTHOR:GeminiCLI]
+[DESCRIPTION:A wiki-like UI for your fortress.]
+[VERSION:0.1.0]
+[DF_VERSION_MIN:50.01]
+[DF_VERSION_MAX:50.13]
