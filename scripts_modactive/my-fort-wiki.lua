@@ -4,5 +4,5 @@
 local main_gui = reqscript('internal/DFMyFortWiki/main_gui')
 
 if not dfhack_flags.module then
-    main_gui.show_wiki()
+    main_gui.main()
 end
