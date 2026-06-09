@@ -67,3 +67,4 @@ D:\p\DFMyFortWiki\
 * Consise and correct, do not over comment.
 * No em-dashes in printed strings; DF can't render them. Use -
 * Comments: lean, logical, human-readable
+* Once a source file gets about 500 lines, strongly consider refactoring into smaller functional parts and separate files
