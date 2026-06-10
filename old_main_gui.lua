@@ -397,7 +397,7 @@ function WikiWindow:ensurePanelsRelSize()
     local x = wiki_toc.frame.w
     wiki_divider.frame.l = x
     x = x + 1
-
+    
     shifter.frame.l = x
     if journal_toc.visible then
         journal_toc.frame.l = x
@@ -405,7 +405,7 @@ function WikiWindow:ensurePanelsRelSize()
         journal_divider.frame.l = x
         x = x + 1
     end
-
+    
     editor.frame.l = x
 end
 
@@ -458,9 +458,9 @@ WikiScreen.ATTRS {
 function WikiScreen:init()
     self.context = WikiContext{}
     self.current_page_id = 'fort'
-
+    
     local content = self.context:load_content(self.current_page_id)
-
+    
     self:addviews{
         WikiWindow{
             view_id='wiki_window',
@@ -470,7 +470,7 @@ function WikiScreen:init()
             on_text_change=self:callback('onTextChange'),
         }
     }
-
+    
     -- Load initial page
     if content.text[1] == '' then
         content.text[1] = "# Fort\n\nWelcome to your fortress wiki page."
@@ -482,7 +482,7 @@ end
 function WikiScreen:onInitialize()
     local initialized = dfhack.persistent.getSiteData(self.context.save_prefix .. 'initialized')
     if initialized then
-        gui.showYesNoPrompt('Re-initialize Wiki?',
+        gui.showYesNoPrompt('Re-initialize Wiki?', 
             'The wiki has already been initialized. Re-initializing will overwrite existing pages. Continue?',
             COLOR_LIGHTRED,
             function() self:performInitialization() end
@@ -494,26 +494,21 @@ end
 
 function WikiScreen:performInitialization()
     logger.log("Starting Wiki initialization...")
-    
     -- 1. Citizens
     local citizens = {}
-    local fortress_units = dfhack.units.getUnitsInFortress()
-    logger.log("Found " .. #fortress_units .. " total units in fortress.")
-    
-    for _, unit in ipairs(fortress_units) do
+    for _, unit in ipairs(dfhack.units.getUnitsInFortress()) do
         if dfhack.units.isCitizen(unit) then
             local name = dfhack.units.getReadableName(unit)
             local id = 'citizen:' .. tostring(unit.id)
             table.insert(citizens, {name=name, id=id})
-
+            
             local content = "# " .. name .. "\n\n" ..
                             "Occupation: " .. (unit.profession or "None") .. "\n" ..
                             "Gender: " .. (unit.sex == 0 and "Female" or (unit.sex == 1 and "Male" or "Unknown")) .. "\n"
             self.context:save_content(id, content, 1)
         end
     end
-    logger.log("Processed " .. #citizens .. " citizens.")
-
+    
     local citizen_root_content = "# Citizens\n\nTotal Citizens: " .. #citizens .. "\n\n"
     for _, c in ipairs(citizens) do
         citizen_root_content = citizen_root_content .. "* [" .. c.name .. "](" .. c.id .. ")\n"
@@ -521,21 +516,19 @@ function WikiScreen:performInitialization()
     self.context:save_content('citizens', citizen_root_content, 1)
 
     -- 2. Artifacts
-    logger.log("Processing artifacts...")
     local artifacts = {}
     for _, art in ipairs(df.global.world.artifacts.all) do
         if art.item then
             local name = dfhack.df2console(dfhack.items.getReadableDescription(art.item))
             local id = 'artifact:' .. tostring(art.id)
             table.insert(artifacts, {name=name, id=id})
-
+            
             local content = "# " .. name .. "\n\n" ..
                             "Type: " .. df.item_type[art.item:getType()] .. "\n"
             self.context:save_content(id, content, 1)
         end
     end
-    logger.log("Processed " .. #artifacts .. " artifacts.")
-
+    
     local artifact_root_content = "# Artifacts\n\nTotal Artifacts: " .. #artifacts .. "\n\n"
     for _, a in ipairs(artifacts) do
         artifact_root_content = artifact_root_content .. "* [" .. a.name .. "](" .. a.id .. ")\n"
@@ -548,10 +541,10 @@ function WikiScreen:performInitialization()
 
     -- Set initialized flag
     dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
-
+    
     -- Refresh current page if needed
     self:onPageChange(self.current_page_id, true)
-
+    
     dfhack.gui.showAnnouncement("Wiki initialized successfully!", COLOR_LIGHTGREEN)
 end
 
@@ -562,16 +555,16 @@ function WikiScreen:onPageChange(page_id, no_save)
         local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
         self.context:save_content(self.current_page_id, text, cursor)
     end
-
+    
     -- Load new page
     self.current_page_id = page_id
     local content = self.context:load_content(page_id)
-
+    
     -- Default placeholder if page is new
     if content.text[1] == '' then
         content.text[1] = "# " .. page_id:gsub("^%l", string.upper) .. "\n\nThis is a placeholder for the " .. page_id .. " page."
     end
-
+    
     self.subviews.wiki_window:setPageContent(content.text[1], content.cursor[1])
 end
 
