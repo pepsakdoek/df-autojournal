@@ -17,4 +17,10 @@ function log(msg)
     dfhack.println("DFMyFortWiki: " .. tostring(msg))
 end
 
+function log_error(msg)
+    local trace = debug.traceback()
+    log("ERROR: " .. tostring(msg) .. "\n" .. trace)
+    dfhack.printerr("DFMyFortWiki Error: " .. tostring(msg))
+end
+
 return _ENV
