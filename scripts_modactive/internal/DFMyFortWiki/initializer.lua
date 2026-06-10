@@ -60,24 +60,30 @@ function WikiInitializer:perform(screen)
         -- 2. Artifacts
         logger.log("Processing artifacts...")
         local artifacts = {}
-        if df.global.world and df.global.world.items.other.ANY_ARTIFACT then
-            for _, art in ipairs(df.global.world.items.other.ANY_ARTIFACT) do
-                local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
-                if art_ref then
-                    local art = df.artifact_record.find(art_ref.artifact_id)
-                    local name = sanitize(dfhack.items.getReadableDescription(art.item))
-                    local id = 'artifact:' .. tostring(art.id)
-                    table.insert(artifacts, {name=name, id=id})
+        local artifact_items = df.global.world.items.other.ANY_ARTIFACT
+        if artifact_items then
+            for _, item in ipairs(artifact_items) do
+                -- Only process if the item is actually on the map (on-site)
+                if dfhack.items.getPosition(item) then
+                    local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
+                    if art_ref then
+                        local art_record = df.artifact_record.find(art_ref.artifact_id)
+                        if art_record then
+                            local name = sanitize(dfhack.items.getReadableDescription(item))
+                            local id = 'artifact:' .. tostring(art_record.id)
+                            table.insert(artifacts, {name=name, id=id})
 
-                    local itype = art.item:getType()
-                    local type_name = df.item_type[itype] or "Unknown"
-                    local content = "# " .. name .. "\n\n" ..
-                                    "Type: " .. type_name .. "\n"
-                    self.context:save_content(id, content, 1)
+                            local itype = item:getType()
+                            local type_name = df.item_type[itype] or "Unknown"
+                            local content = "# " .. name .. "\n\n" ..
+                                            "Type: " .. type_name .. "\n"
+                            self.context:save_content(id, content, 1)
+                        end
+                    end
                 end
             end
         else
-            logger.log("Warning: Could not access artifacts list")
+            logger.log("Warning: Could not access ANY_ARTIFACT list")
         end
         logger.log("Processed " .. #artifacts .. " artifacts.")
 
