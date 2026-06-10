@@ -213,11 +213,11 @@ end
 
 WikiContext = defclass(WikiContext)
 WikiContext.ATTRS{
-    save_prefix = 'dfmyfortwiki:',
+    save_prefix = 'mfw:',
 }
 
 function WikiContext:get_key(page_id)
-    return self.save_prefix .. 'page:' .. page_id
+    return self.save_prefix .. 'p:' .. page_id
 end
 
 function WikiContext:save_content(page_id, text, cursor)
@@ -241,6 +241,18 @@ function WikiContext:load_content(page_id)
     return {text={''}, cursor={1}}
 end
 
+function WikiContext:get_dynamic_pages()
+    if not dfhack.isWorldLoaded() then return {} end
+    local data = dfhack.persistent.getSiteData(self.save_prefix .. 'dynamic_pages') or {}
+    return data.pages or {}
+end
+
+function WikiContext:save_dynamic_pages(pages)
+    if dfhack.isWorldLoaded() then
+        dfhack.persistent.saveSiteData(self.save_prefix .. 'dynamic_pages', {pages=pages})
+    end
+end
+
 WikiScreen = defclass(WikiScreen, gui.ZScreen)
 WikiScreen.ATTRS {
     focus_path='my-fort-wiki',
@@ -249,8 +261,6 @@ WikiScreen.ATTRS {
 function WikiScreen:init()
     self.context = WikiContext{}
     self.current_page_id = 'fort'
-
-    local content = self.context:load_content(self.current_page_id)
 
     self:addviews{
         WikiWindow{
@@ -262,12 +272,30 @@ function WikiScreen:init()
         }
     }
 
-    -- Load initial page
-    if content.text[1] == '' then
-        content.text[1] = "# Fort\n\nWelcome to your fortress wiki page."
+    self:refreshPageList()
+    self:onPageChange(self.current_page_id, true)
+end
+
+function WikiScreen:refreshPageList()
+    local pages = {}
+    for _, p in ipairs(PAGES) do
+        table.insert(pages, p)
     end
-    self.subviews.wiki_window:setPageContent(content.text[1], content.cursor[1])
-    self.subviews.wiki_window.subviews.wiki_page_list:setSelected(2) -- Select 'Fort'
+    
+    local dynamic = self.context:get_dynamic_pages()
+    for _, p in ipairs(dynamic) do
+        table.insert(pages, p)
+    end
+    
+    self.subviews.wiki_window.subviews.wiki_page_list:setChoices(pages)
+    
+    -- Restore selection
+    for idx, p in ipairs(pages) do
+        if p.id == self.current_page_id then
+            self.subviews.wiki_window.subviews.wiki_page_list:setSelected(idx)
+            break
+        end
+    end
 end
 
 function WikiScreen:onInitialize()
@@ -293,6 +321,7 @@ function WikiScreen:performInitialization()
     local initializer = wiki_initializer.WikiInitializer{
         context = self.context,
         on_complete = function()
+            self:refreshPageList()
             self:onPageChange(self.current_page_id, true)
         end
     }
@@ -315,7 +344,17 @@ function WikiScreen:onPageChange(page_id, no_save)
 
     -- Default placeholder if page is new
     if content.text[1] == '' then
-        content.text[1] = "# " .. page_id:gsub("^%l", string.upper) .. "\n\nThis is a placeholder for the " .. page_id .. " page."
+        local title = page_id:gsub("^%l", string.upper)
+        -- Try to find name in PAGES or dynamic pages
+        for _, p in ipairs(PAGES) do
+            if p.id == page_id then title = p.text break end
+        end
+        local dynamic = self.context:get_dynamic_pages()
+        for _, p in ipairs(dynamic) do
+            if p.id == page_id then title = p.text break end
+        end
+
+        content.text[1] = "# " .. title .. "\n\nWelcome to the " .. title .. " page."
     end
 
     self.subviews.wiki_window:setPageContent(content.text[1], content.cursor[1])

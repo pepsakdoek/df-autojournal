@@ -8,25 +8,37 @@ function WikiInitializer:init(args)
     self.on_complete = args.on_complete
 end
 
+local function sanitize(str)
+    if not str then return "" end
+    -- Convert from DF's internal encoding to UTF-8
+    local utf8_str = dfhack.df2utf(str)
+    -- Project mandate: replace em-dashes and en-dashes with -
+    -- em-dash (—) is \xE2\x80\x94 in UTF-8
+    -- en-dash (–) is \xE2\x80\x93 in UTF-8
+    utf8_str = utf8_str:gsub("\226\128\148", "-"):gsub("\226\128\147", "-")
+    return utf8_str
+end
+
 function WikiInitializer:perform(screen)
     local ok, err = xpcall(function()
         logger.log("Starting Wiki initialization inner...")
         
         -- 1. Citizens
         local citizens = {}
+        local dynamic_pages = {}
         logger.log("Fetching units...")
         
-        -- Using dfhack.units.getUnits() and filtering for citizens
-        local units = dfhack.units.getUnits()
+        local units = df.global.world.units.active
         logger.log("Found " .. #units .. " total units in world/site.")
         
         for _, unit in ipairs(units) do
             if dfhack.units.isCitizen(unit) then
-                local name = dfhack.units.getReadableName(unit)
+                local name = sanitize(dfhack.units.getReadableName(unit))
                 local id = 'citizen:' .. tostring(unit.id)
                 table.insert(citizens, {name=name, id=id})
+                table.insert(dynamic_pages, {text="  " .. name, id=id})
 
-                local prof = dfhack.units.getProfessionName(unit) or "None"
+                local prof = sanitize(dfhack.units.getProfessionName(unit)) or "None"
                 local sex = "Unknown"
                 if unit.sex == 0 then sex = "Female"
                 elseif unit.sex == 1 then sex = "Male" end
@@ -48,10 +60,12 @@ function WikiInitializer:perform(screen)
         -- 2. Artifacts
         logger.log("Processing artifacts...")
         local artifacts = {}
-        if df.global.world and df.global.world.artifacts and df.global.world.artifacts.all then
-            for _, art in ipairs(df.global.world.artifacts.all) do
-                if art.item then
-                    local name = dfhack.df2console(dfhack.items.getReadableDescription(art.item))
+        if df.global.world and df.global.world.items.other.ANY_ARTIFACT then
+            for _, art in ipairs(df.global.world.items.other.ANY_ARTIFACT) do
+                local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
+                if art_ref then
+                    local art = df.artifact_record.find(art_ref.artifact_id)
+                    local name = sanitize(dfhack.items.getReadableDescription(art.item))
                     local id = 'artifact:' .. tostring(art.id)
                     table.insert(artifacts, {name=name, id=id})
 
@@ -72,6 +86,9 @@ function WikiInitializer:perform(screen)
             artifact_root_content = artifact_root_content .. "* [" .. a.name .. "](" .. a.id .. ")\n"
         end
         self.context:save_content('artifacts', artifact_root_content, 1)
+
+        -- Save the dynamic page list
+        self.context:save_dynamic_pages(dynamic_pages)
 
         -- 3. Events (Simple list for now)
         local events_root_content = "# Events\n\nEvents will be listed here.\n"
