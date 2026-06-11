@@ -7,6 +7,7 @@ local json = require('json')
 local logger = reqscript('internal/DFMyFortWiki/logger')
 local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
 local wiki_initializer = reqscript('internal/DFMyFortWiki/initializer')
+local wiki_settings = reqscript('internal/DFMyFortWiki/settings_gui')
 
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic
@@ -69,7 +70,7 @@ function WikiWindow:init()
                     frame={b=4, l=0},
                     label='Settings',
                     key='CUSTOM_ALT_S',
-                    on_activate=function() logger.log("Settings opened") end,
+                    on_activate=function() wiki_settings.show_settings() end,
                 },
                 widgets.HotkeyLabel{
                     frame={b=2, l=0},

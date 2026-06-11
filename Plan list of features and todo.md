@@ -23,9 +23,9 @@
 * [ ] Plan the actual 'auto-journal-listener' that catches events as they happen and add them to the journal (we'll need to test if we can 'edit' the files when they are not 'open') (build a mini API to edit those files when we don't have them open?)
 * [✓] Get much bigger default 'templates' for each of Civilization (and Government), Fort, Citizens, Artifacts, Events. They should include a timeline of things that happened relavant to it.
 * [ ] in the HyperTextArea folder is example code of a text area which supports clickable 'links' however it doesn't support editing the area 'runtime'. Ideally we want to implement this, but somehow give the user the ability to enter links themselves and change colors etc. I want to keep the manual runtime editing feature of the current TextArea.
-* [ ] Settings page that has toggle labels on what information they want to be autopopulated in the initialize and auto-journaling features
-    * [ ] Split the 'initializing' settings from the 'auto-journaling' settings
-    * [ ] Keep the settings page up to date every time you add 'components' to the initialization and auto-journaling code
+* [✓] Settings page that has toggle labels on what information they want to be autopopulated in the initialize and auto-journaling features
+    * [✓] Split the 'initializing' settings from the 'auto-journaling' settings (Common settings base implemented)
+    * [✓] Keep the settings page up to date every time you add 'components' to the initialization and auto-journaling code
 
 
 # Name Bugs (displayed on screen badly, but also saved in the file with the buggy letters)

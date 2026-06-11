@@ -1,7 +1,9 @@
 --@ module = true
 local utils = reqscript('internal/DFMyFortWiki/utils')
+local mfw_settings = reqscript('internal/DFMyFortWiki/settings')
 
 local function get_artifact_template(item)
+    local settings = mfw_settings.get_settings().artifact
     local name = utils.sanitize(dfhack.items.getReadableDescription(item))
     local itype = item:getType()
     local type_name = tostring(df.item_type[itype]):gsub("_", " "):lower():gsub("^%l", string.upper)
@@ -23,38 +25,40 @@ local function get_artifact_template(item)
     local value = dfhack.items.getValue(item)
     content = content .. "**Estimated Value:** " .. tostring(value) .. "☼\n\n"
 
-    content = content .. "## Description\n"
-    local long_desc = utils.sanitize(dfhack.items.getDescription(item, 0))
-    content = content .. long_desc .. "\n\n"
+    if settings.description then
+        content = content .. "## Description\n"
+        local long_desc = utils.sanitize(dfhack.items.getDescription(item, 0))
+        content = content .. long_desc .. "\n\n"
+    end
 
-    content = content .. "## History\n"
-    -- Try to find creator
-    local creator_link = nil
-    if artifact_record then
-        for _, event_id in ipairs(artifact_record.events) do
-            -- This is too deep to parse all events here, but usually creator is in world history
-        end
-        -- Simpler: check item creators
-        local creator_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.UNIT_CREATOR)
-        if creator_ref then
-            local unit = df.unit.find(creator_ref.unit_id)
-            if unit then
-                local unit_name = utils.sanitize(dfhack.units.getReadableName(unit))
-                creator_link = "[" .. unit_name .. "](citizen:" .. tostring(unit.id) .. ")"
+    if settings.history then
+        content = content .. "## History\n"
+        -- Try to find creator
+        local creator_link = nil
+        if artifact_record and settings.creator then
+            local creator_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.UNIT_CREATOR)
+            if creator_ref then
+                local unit = df.unit.find(creator_ref.unit_id)
+                if unit then
+                    local unit_name = utils.sanitize(dfhack.units.getReadableName(unit))
+                    creator_link = "[" .. unit_name .. "](citizen:" .. tostring(unit.id) .. ")"
+                end
             end
         end
-    end
 
-    if creator_link then
-        content = content .. "Created by " .. creator_link .. ".\n"
-    elseif artifact_record and artifact_record.name then
-        content = content .. "Named " .. utils.sanitize(dfhack.df2utf(dfhack.TranslateName(artifact_record.name))) .. " by its creator.\n"
+        if creator_link then
+            content = content .. "Created by " .. creator_link .. ".\n"
+        elseif artifact_record and artifact_record.name then
+            content = content .. "Named " .. utils.sanitize(dfhack.df2utf(dfhack.TranslateName(artifact_record.name))) .. " by its creator.\n"
+        end
     end
     
-    content = content .. "\n## Location & Holder\n"
-    local pos = dfhack.items.getPosition(item)
-    if pos then
-        content = content .. "Location: (" .. pos.x .. ", " .. pos.y .. ", " .. pos.z .. ")\n"
+    if settings.location then
+        content = content .. "\n## Location & Holder\n"
+        local pos = dfhack.items.getPosition(item)
+        if pos then
+            content = content .. "Location: (" .. pos.x .. ", " .. pos.y .. ", " .. pos.z .. ")\n"
+        end
     end
 
     return content

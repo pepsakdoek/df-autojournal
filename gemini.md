@@ -43,24 +43,31 @@ Keep the file structure updated as we add more files (like the templates etc).
 ```text
 D:\p\DFMyFortWiki\
 ├───CurrentJournal\          # Reference copy of standard DFHack journal
-│   ├───journal.lua
-│   └───internal\
-│       └───journal\
-│           ├───journal_context.lua
-│           ├───shifter.lua
-│           ├───table_of_contents.lua
-│           └───contexts\
-│               ├───adventure.lua
-│               ├───dummy.lua
-│               └───fortress.lua
+├───HyperTextArea\           # Example code for rich text and clickable links (Future features)
 ├───scripts_modactive\       # Active mod scripts
-│   ├───my-fort-wiki.lua
+│   ├───my-fort-wiki.lua     # Very small entry file into the mod
 │   └───internal\
 │       └───DFMyFortWiki\
-│           └───main_gui.lua
+│           ├───initializer.lua
+│           ├───logger.lua
+│           ├───main_gui.lua
+│           ├───settings.lua
+│           ├───settings_gui.lua
+│           ├───utils.lua
+│           ├───widgets.lua
+│           └───templates\
+│               ├───artifact.lua
+│               ├───citizen.lua
+│               ├───civilization.lua
+│               ├───event.lua
+│               └───fort.lua
 └───togglelabelExample\      # UI Toggle Button implementation example
     └───spectate.lua
 ```
+
+# Mandates
+
+* **Settings Synchronization:** The settings page must be kept strictly up to date as both Initializing and Auto-Journaling features are expanded. Every new data component or event type added to templates must have a corresponding toggle in the settings.
 
 # Coding practices
 

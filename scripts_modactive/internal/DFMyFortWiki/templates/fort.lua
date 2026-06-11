@@ -1,7 +1,9 @@
 --@ module = true
 local utils = reqscript('internal/DFMyFortWiki/utils')
+local mfw_settings = reqscript('internal/DFMyFortWiki/settings')
 
 local function get_fort_template()
+    local settings = mfw_settings.get_settings().fort
     local site_name = "Unknown Fort"
     local site = dfhack.world.getCurrentSite()
     if site then
@@ -19,34 +21,53 @@ local function get_fort_template()
     end
     content = content .. "**Population:** " .. citizens .. " Citizens\n"
     
-    -- Wealth (if available)
-    if df.global.ui.tasks and df.global.ui.tasks.wealth then
+    if settings.wealth and df.global.ui.tasks and df.global.ui.tasks.wealth then
         local w = df.global.ui.tasks.wealth
         content = content .. "**Total Wealth:** " .. tostring(w.total) .. "☼\n"
-        content = content .. "* Imported: " .. tostring(w.imported) .. "☼\n"
-        content = content .. "* Exported: " .. tostring(w.exported) .. "☼\n"
     end
     
-    content = content .. "\n## Local Government\n"
-    -- Try to find the site government entity
-    if site and site.entity_links then
-        for _, link in ipairs(site.entity_links) do
-            local entity = df.historical_entity.find(link.entity_id)
-            if entity and entity.type == df.historical_entity_type.SiteGovernment then
-                content = content .. "Government: " .. utils.sanitize(dfhack.df2utf(dfhack.TranslateName(entity.name))) .. "\n"
+    if settings.gov then
+        content = content .. "\n## Local Government\n"
+        if site and site.entity_links then
+            for _, link in ipairs(site.entity_links) do
+                local entity = df.historical_entity.find(link.entity_id)
+                if entity and entity.type == df.historical_entity_type.SiteGovernment then
+                    content = content .. "Government: " .. utils.sanitize(dfhack.df2utf(dfhack.TranslateName(entity.name))) .. "\n"
+                end
             end
         end
     end
 
-    content = content .. "\n## Infrastructure & Districts\n"
-    content = content .. "*Log important areas of your fort here.*\n\n"
+    if settings.links then
+        content = content .. "\n## Economic & Political Links\n"
+        -- This is a bit complex, but we can look for trade agreements or linked sites
+        local found_link = false
+        if site then
+            -- Check for linked sites in world data
+            for _, other_site in ipairs(df.global.world.world_data.sites) do
+                -- Simplified check for proximity or shared entity
+                -- Real economic links are in entities
+            end
+        end
+        if not found_link then
+            content = content .. "No major economic links established yet.\n"
+        end
+    end
 
-    content = content .. "## Goals & Projects\n"
-    content = content .. "*   [ ] Finish the tavern\n"
-    content = content .. "*   [ ] Build the magma forge\n\n"
+    if settings.districts then
+        content = content .. "\n## Infrastructure & Districts\n"
+        content = content .. "*Log important areas of your fort here.*\n\n"
+    end
 
-    content = content .. "## Defense Status\n"
-    content = content .. "Describe your military and traps here.\n"
+    if settings.timeline then
+        content = content .. "## History & Timeline\n"
+        content = content .. "* Founding of " .. site_name .. " in year " .. tostring(df.global.cur_year) .. "\n"
+    end
+
+    if settings.defense then
+        content = content .. "\n## Defense Status\n"
+        content = content .. "Describe your military and traps here.\n"
+    end
 
     return content
 end
