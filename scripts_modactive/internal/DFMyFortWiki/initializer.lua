@@ -1,5 +1,13 @@
 --@ module = true
 local logger = reqscript('internal/DFMyFortWiki/logger')
+local utils = reqscript('internal/DFMyFortWiki/utils')
+
+-- Templates
+local get_citizen_template = reqscript('internal/DFMyFortWiki/templates/citizen')
+local get_artifact_template = reqscript('internal/DFMyFortWiki/templates/artifact')
+local get_fort_template = reqscript('internal/DFMyFortWiki/templates/fort')
+local get_civ_template = reqscript('internal/DFMyFortWiki/templates/civilization')
+local get_event_template = reqscript('internal/DFMyFortWiki/templates/event')
 
 WikiInitializer = defclass(WikiInitializer)
 
@@ -8,21 +16,15 @@ function WikiInitializer:init(args)
     self.on_complete = args.on_complete
 end
 
-local function sanitize(str)
-    if not str then return "" end
-    -- Convert from DF's internal encoding to UTF-8
-    local utf8_str = dfhack.df2utf(str)
-    -- Project mandate: replace em-dashes and en-dashes with -
-    -- em-dash (—) is \xE2\x80\x94 in UTF-8
-    -- en-dash (–) is \xE2\x80\x93 in UTF-8
-    utf8_str = utf8_str:gsub("\226\128\148", "-"):gsub("\226\128\147", "-")
-    return utf8_str
-end
-
 function WikiInitializer:perform(screen)
     local ok, err = xpcall(function()
-        logger.log("Starting Wiki initialization inner...")
+        logger.log("Starting Wiki initialization...")
         
+        -- 0. Civ & Fort
+        logger.log("Initializing Civ and Fort pages...")
+        self.context:save_content('civ', get_civ_template(), 1)
+        self.context:save_content('fort', get_fort_template(), 1)
+
         -- 1. Citizens
         local citizens = {}
         local dynamic_pages = {}
@@ -34,20 +36,12 @@ function WikiInitializer:perform(screen)
         for _, unit in ipairs(units) do
             if dfhack.units.isCitizen(unit) then
                 local name = dfhack.units.getReadableName(unit)
-                -- name = dfhack.df2utf(name)
-
                 local id = 'citizen:' .. tostring(unit.id)
+                
                 table.insert(citizens, {name=name, id=id})
                 table.insert(dynamic_pages, {text="  " .. name, id=id})
 
-                local prof = sanitize(dfhack.units.getProfessionName(unit)) or "None"
-                local sex = "Unknown"
-                if unit.sex == 0 then sex = "Female"
-                elseif unit.sex == 1 then sex = "Male" end
-
-                local content = "# " .. name .. "\n\n" ..
-                                "Occupation: " .. prof .. "\n" ..
-                                "Gender: " .. sex .. "\n"
+                local content = get_citizen_template(unit)
                 self.context:save_content(id, content, 1)
             end
         end
@@ -71,14 +65,11 @@ function WikiInitializer:perform(screen)
                     if art_ref then
                         local art_record = df.artifact_record.find(art_ref.artifact_id)
                         if art_record then
-                            local name = sanitize(dfhack.items.getReadableDescription(item))
+                            local name = utils.sanitize(dfhack.items.getReadableDescription(item))
                             local id = 'artifact:' .. tostring(art_record.id)
                             table.insert(artifacts, {name=name, id=id})
 
-                            local itype = item:getType()
-                            local type_name = df.item_type[itype] or "Unknown"
-                            local content = "# " .. name .. "\n\n" ..
-                                            "Type: " .. type_name .. "\n"
+                            local content = get_artifact_template(item)
                             self.context:save_content(id, content, 1)
                         end
                     end
