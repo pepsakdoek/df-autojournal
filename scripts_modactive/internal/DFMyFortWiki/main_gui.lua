@@ -8,6 +8,7 @@ local logger = reqscript('internal/DFMyFortWiki/logger')
 local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
 local wiki_initializer = reqscript('internal/DFMyFortWiki/initializer')
 local wiki_settings = reqscript('internal/DFMyFortWiki/settings_gui')
+local chronicle = reqscript('internal/DFMyFortWiki/chronicle')
 
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic
@@ -63,8 +64,14 @@ function WikiWindow:init()
                     frame={b=6, l=0},
                     label='Auto-Journaling ',
                     key='CUSTOM_ALT_A',
-                    initial_option=false,
-                    on_change=function(val) logger.log("Auto-Journaling toggled: " .. tostring(val)) end,
+                    initial_option=function()
+                        local data = dfhack.persistent.getSiteData('mfw:auto_journal_enabled')
+                        return data and data.val and data.val[1] == 1
+                    end,
+                    on_change=function(val) 
+                        logger.log("Auto-Journaling toggled: " .. tostring(val))
+                        dfhack.persistent.saveSiteData('mfw:auto_journal_enabled', {val={val and 1 or 0}})
+                    end,
                 },
                 widgets.HotkeyLabel{
                     frame={b=4, l=0},
@@ -257,11 +264,15 @@ end
 WikiScreen = defclass(WikiScreen, gui.ZScreen)
 WikiScreen.ATTRS {
     focus_path='my-fort-wiki',
+    pass_pause=false,
 }
 
 function WikiScreen:init()
     self.context = WikiContext{}
     self.current_page_id = 'fort'
+
+    -- Start background chronicle if not already running
+    chronicle.start_background_task(self.context)
 
     self:addviews{
         WikiWindow{

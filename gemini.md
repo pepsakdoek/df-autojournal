@@ -42,12 +42,15 @@ Keep the file structure updated as we add more files (like the templates etc).
 
 ```text
 D:\p\DFMyFortWiki\
+├───AUTO_JOURNAL_PLAN.md      # Detailed plan for the Auto-Journal-Listener
 ├───CurrentJournal\          # Reference copy of standard DFHack journal
 ├───HyperTextArea\           # Example code for rich text and clickable links (Future features)
 ├───scripts_modactive\       # Active mod scripts
 │   ├───my-fort-wiki.lua     # Very small entry file into the mod
 │   └───internal\
 │       └───DFMyFortWiki\
+│           ├───chronicle.lua
+│           ├───event_parser.lua
 │           ├───initializer.lua
 │           ├───logger.lua
 │           ├───main_gui.lua
