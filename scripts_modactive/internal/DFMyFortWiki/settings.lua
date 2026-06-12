@@ -41,8 +41,10 @@ local DEFAULT_SETTINGS = {
 }
 
 function get_settings()
-    local data = dfhack.persistent.getSiteData(SETTINGS_KEY)
-    if data and data.val then
+    local ok, data = pcall(function()
+        return dfhack.persistent.getSiteData(SETTINGS_KEY)
+    end)
+    if ok and data and data.val then
         return data.val
     end
     return DEFAULT_SETTINGS

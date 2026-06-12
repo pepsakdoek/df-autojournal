@@ -2,15 +2,25 @@
 
 local utils = {}
 
+-- Sanitize converts from DF's internal CP437 to UTF-8 for storage/JSON
 function utils.sanitize(str)
     if not str then return "" end
-    -- Convert from DF's internal encoding to UTF-8
     local utf8_str = dfhack.df2utf(str)
     -- Project mandate: replace em-dashes and en-dashes with -
-    -- em-dash (—) is \xE2\x80\x94 in UTF-8
-    -- en-dash (–) is \xE2\x80\x93 in UTF-8
     utf8_str = utf8_str:gsub("\226\128\148", "-"):gsub("\226\128\147", "-")
     return utf8_str
+end
+
+-- Convert UTF-8 (from storage) to CP437 (for UI display)
+function utils.to_ui(str)
+    if not str then return "" end
+    return dfhack.utf2df(str)
+end
+
+-- Convert CP437 (from UI) to UTF-8 (for storage)
+function utils.from_ui(str)
+    if not str then return "" end
+    return dfhack.df2utf(str)
 end
 
 function utils.get_date_str()

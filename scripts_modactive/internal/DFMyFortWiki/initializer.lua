@@ -35,7 +35,8 @@ function WikiInitializer:perform(screen)
         
         for _, unit in ipairs(units) do
             if dfhack.units.isCitizen(unit) then
-                local name = dfhack.units.getReadableName(unit)
+                local raw_name = dfhack.units.getReadableName(unit)
+                local name = utils.sanitize(raw_name)
                 local id = 'citizen:' .. tostring(unit.id)
                 
                 table.insert(citizens, {name=name, id=id})

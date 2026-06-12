@@ -4,7 +4,7 @@ local mfw_settings = reqscript('internal/DFMyFortWiki/settings')
 
 local function get_citizen_template(unit)
     local settings = mfw_settings.get_settings().citizen
-    local name = dfhack.units.getReadableName(unit)
+    local name = utils.sanitize(dfhack.units.getReadableName(unit))
     local prof = utils.sanitize(dfhack.units.getProfessionName(unit))
     local sex = "Unknown"
     if unit.sex == 0 then sex = "Female"

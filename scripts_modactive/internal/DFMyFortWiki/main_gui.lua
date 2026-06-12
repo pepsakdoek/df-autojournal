@@ -9,6 +9,7 @@ local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
 local wiki_initializer = reqscript('internal/DFMyFortWiki/initializer')
 local wiki_settings = reqscript('internal/DFMyFortWiki/settings_gui')
 local chronicle = reqscript('internal/DFMyFortWiki/chronicle')
+local mfw_utils = reqscript('internal/DFMyFortWiki/utils')
 
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic
@@ -239,7 +240,12 @@ end
 
 function WikiContext:load_content(page_id)
     if dfhack.isWorldLoaded() then
-        local data = dfhack.persistent.getSiteData(self:get_key(page_id)) or {}
+        local ok, data = pcall(function()
+            return dfhack.persistent.getSiteData(self:get_key(page_id)) or {}
+        end)
+        if not ok or not data then
+            data = {}
+        end
         if not data.text then
             data.text = {''}
         end
@@ -251,7 +257,10 @@ end
 
 function WikiContext:get_dynamic_pages()
     if not dfhack.isWorldLoaded() then return {} end
-    local data = dfhack.persistent.getSiteData(self.save_prefix .. 'dynamic_pages') or {}
+    local ok, data = pcall(function()
+        return dfhack.persistent.getSiteData(self.save_prefix .. 'dynamic_pages') or {}
+    end)
+    if not ok or not data then return {} end
     return data.pages or {}
 end
 
@@ -272,7 +281,8 @@ function WikiScreen:init()
     self.current_page_id = 'fort'
 
     -- Start background chronicle if not already running
-    chronicle.start_background_task(self.context)
+    -- Uncomment for now, because I'm testing other things, but the chronicles is currently crashing
+    -- chronicle.start_background_task(self.context)
 
     self:addviews{
         WikiWindow{
@@ -347,7 +357,7 @@ function WikiScreen:onPageChange(page_id, no_save)
     if not no_save then
         local text = self.subviews.wiki_window.subviews.editor:getText()
         local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
-        self.context:save_content(self.current_page_id, text, cursor)
+        self.context:save_content(self.current_page_id, mfw_utils.from_ui(text), cursor)
     end
 
     -- Load new page
@@ -369,12 +379,12 @@ function WikiScreen:onPageChange(page_id, no_save)
         content.text[1] = "# " .. title .. "\n\nWelcome to the " .. title .. " page."
     end
 
-    self.subviews.wiki_window:setPageContent(content.text[1], content.cursor[1])
+    self.subviews.wiki_window:setPageContent(mfw_utils.to_ui(content.text[1]), content.cursor[1])
 end
 
 function WikiScreen:onTextChange(text)
     local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
-    self.context:save_content(self.current_page_id, text, cursor)
+    self.context:save_content(self.current_page_id, mfw_utils.from_ui(text), cursor)
 end
 
 function WikiScreen:onDismiss()

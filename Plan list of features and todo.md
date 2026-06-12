@@ -28,14 +28,8 @@
     * [✓] Keep the settings page up to date every time you add 'components' to the initialization and auto-journaling code
 
 
-# Name Bugs (displayed on screen badly, but also saved in the file with the buggy letters)
+# Name Bugs (addressed via UTF-8/CP437 transcription)
 Note that Dwarf Fortress is in CP437, I am unsure if TextArea is UTF-8 or CP437 (or something else).
 
-* [ ] ├╣shrir Tomusbomrek "Shovewhipped", broker -- the buggy letter is: ù
-* [ ] Limul K├╗bukarzes "Lanceknight", Dwarven Child -- the buggy letter is: û
-* [ ] Monom ├Ñblelnish "Busttrades", Dwarven Child -- the buggy letter is: Å
-* [ ] Astesh Bardum├¿rith "Fightlabor", Miner -- the buggy letter is: è
-* [ ] Fath Umstizzunt├«r "Sizzledanvil", Metalsmith -- the buggy letter is: î
-* [ ] Id ├│rathel "Drinkring", Metalsmith -- the buggy letter is: é
-* [ ] B├½mbul Oddomasd├╗g "Cloisterdrum", chief medical dwarf -- the buggy letters are: ë,û
+* [✓] Fixed display of special characters (ù, û, Å, è, î, é, ë) by implementing `to_ui` (utf2df) and `from_ui` (df2utf) transcription.
 

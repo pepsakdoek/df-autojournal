@@ -6,8 +6,10 @@ local Chronicle = {}
 local CHRONICLE_KEY = 'mfw:chronicle_state'
 
 function Chronicle.get_state()
-    local data = dfhack.persistent.getSiteData(CHRONICLE_KEY)
-    if data and data.val then
+    local ok, data = pcall(function()
+        return dfhack.persistent.getSiteData(CHRONICLE_KEY)
+    end)
+    if ok and data and data.val then
         return data.val
     end
     return {
