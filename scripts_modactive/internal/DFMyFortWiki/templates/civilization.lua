@@ -29,32 +29,32 @@ function render()
         if civ then
             content = content .. "**Type:** " .. tostring(df.historical_entity_type[civ.type]) .. "\n"
             
-            if settings.leadership then
-                content = content .. "\n## Hierarchy & Leadership\n"
-                -- Find the monarch/leaders
-                local found_leader = false
-                if civ.positions and civ.positions.assignments then
-                    for _, assignment in ipairs(civ.positions.assignments) do
-                        local position = find_position_by_id(civ, assignment.position_id)
-                        if position then
-                            local pos_name = position.name[0] or position.code or "Leader"
-                            if position.responsibilities.DETERMINE_GOVERNMENT_TYPE or position.code == "MONARCH" or pos_name:lower() == "monarch" then
-                                if assignment.histfig_id ~= -1 then
-                                    local hf = df.historical_figure.find(assignment.histfig_id)
-                                    if hf then
-                                        local leader_name = utils.get_readable_name(hf.name)
-                                        content = content .. "* " .. pos_name .. ": " .. leader_name .. "\n"
-                                        found_leader = true
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-                if not found_leader then
-                    content = content .. "No clear leader identified in current records.\n"
-                end
-            end 
+            -- if settings.leadership then
+            --     content = content .. "\n## Hierarchy & Leadership\n"
+            --     -- Find the monarch/leaders
+            --     local found_leader = false
+            --     if civ.positions and civ.positions.assignments then
+            --         for _, assignment in ipairs(civ.positions.assignments) do
+            --             local position = find_position_by_id(civ, assignment.position_id)
+            --             if position then
+            --                 local pos_name = position.name[0] or position.code or "Leader"
+            --                 if position.responsibilities.DETERMINE_GOVERNMENT_TYPE or position.code == "MONARCH" or pos_name:lower() == "monarch" then
+            --                     if assignment.histfig_id ~= -1 then
+            --                         local hf = df.historical_figure.find(assignment.histfig_id)
+            --                         if hf then
+            --                             local leader_name = utils.get_readable_name(hf.name)
+            --                             content = content .. "* " .. pos_name .. ": " .. leader_name .. "\n"
+            --                             found_leader = true
+            --                         end
+            --                     end
+            --                 end
+            --             end
+            --         end
+            --     end
+            --     if not found_leader then
+            --         content = content .. "No clear leader identified in current records.\n"
+            --     end
+            -- end 
 
             if (settings.relations or settings.wars) and civ.relations then
                 content = content .. "\n## Diplomatic Relations\n"
