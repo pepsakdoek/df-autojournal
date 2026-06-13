@@ -19,8 +19,8 @@ function translate_name(name)
     if not name then return "" end
     local translated = ""
     -- Use dfhack.TranslateName if available (standard)
-    if dfhack.TranslateName then
-        translated = dfhack.TranslateName(name)
+    if dfhack.translation then
+        translated = dfhack.translation.translateName(name, true)
     elseif dfhack.names and dfhack.names.translateName then
         translated = dfhack.names.translateName(name)
     else

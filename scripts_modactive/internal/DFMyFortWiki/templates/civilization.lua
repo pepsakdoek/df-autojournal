@@ -3,6 +3,16 @@ local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 local logger = reqscript('internal/DFMyFortWiki/logger')
 
+local function find_position_by_id(civ, position_id)
+    if not civ or not civ.positions or not civ.positions.own then return nil end
+    for _, pos in ipairs(civ.positions.own) do
+        if pos.id == position_id then
+            return pos
+        end
+    end
+    return nil
+end
+
 function render()
     local content = ""
     local ok, err = xpcall(function()
@@ -25,14 +35,17 @@ function render()
                 local found_leader = false
                 if civ.positions and civ.positions.assignments then
                     for _, assignment in ipairs(civ.positions.assignments) do
-                        local position = civ.positions.own[assignment.position_id]
-                        if position and (position.responsibilities.DETERMINE_GOVERNMENT_TYPE or position.name == "monarch") then
-                            if assignment.histfig_id ~= -1 then
-                                local hf = df.historical_figure.find(assignment.histfig_id)
-                                if hf then
-                                    local leader_name = utils.get_readable_name(hf.name)
-                                    content = content .. "* " .. position.name .. ": " .. leader_name .. "\n"
-                                    found_leader = true
+                        local position = find_position_by_id(civ, assignment.position_id)
+                        if position then
+                            local pos_name = position.name[0] or position.code or "Leader"
+                            if position.responsibilities.DETERMINE_GOVERNMENT_TYPE or position.code == "MONARCH" or pos_name:lower() == "monarch" then
+                                if assignment.histfig_id ~= -1 then
+                                    local hf = df.historical_figure.find(assignment.histfig_id)
+                                    if hf then
+                                        local leader_name = utils.get_readable_name(hf.name)
+                                        content = content .. "* " .. pos_name .. ": " .. leader_name .. "\n"
+                                        found_leader = true
+                                    end
                                 end
                             end
                         end
@@ -41,7 +54,7 @@ function render()
                 if not found_leader then
                     content = content .. "No clear leader identified in current records.\n"
                 end
-            end
+            end 
 
             if (settings.relations or settings.wars) and civ.relations then
                 content = content .. "\n## Diplomatic Relations\n"

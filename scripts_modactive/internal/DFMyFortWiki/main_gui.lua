@@ -1,7 +1,6 @@
 --@ module = true
 local gui = require('gui')
 local widgets = require('gui.widgets')
--- local utils = require('utils')
 local json = require('json')
 
 local logger = reqscript('internal/DFMyFortWiki/logger')
