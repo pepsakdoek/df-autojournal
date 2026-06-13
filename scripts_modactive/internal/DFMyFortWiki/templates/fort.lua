@@ -1,6 +1,6 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/utils')
-local mfw_settings = reqscript('internal/DFMyFortWiki/settings')
+local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
+local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 
 local function get_fort_template()
     local settings = mfw_settings.get_settings().fort

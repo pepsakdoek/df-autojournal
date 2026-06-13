@@ -1,5 +1,5 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/utils')
+local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 
 local EventParser = {}
 

@@ -54,10 +54,10 @@ D:\p\DFMyFortWiki\
 │           ├───initializer.lua
 │           ├───logger.lua
 │           ├───main_gui.lua
-│           ├───settings.lua
 │           ├───settings_gui.lua
-│           ├───utils.lua
-│           ├───widgets.lua
+│           ├───wiki_settings.lua
+│           ├───wiki_utils.lua
+│           ├───wiki_widgets.lua
 │           └───templates\
 │               ├───artifact.lua
 │               ├───citizen.lua

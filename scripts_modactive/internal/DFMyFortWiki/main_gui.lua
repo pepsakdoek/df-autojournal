@@ -5,11 +5,11 @@ local widgets = require('gui.widgets')
 local json = require('json')
 
 local logger = reqscript('internal/DFMyFortWiki/logger')
-local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
+local wiki_widgets = reqscript('internal/DFMyFortWiki/wiki_widgets')
 local wiki_initializer = reqscript('internal/DFMyFortWiki/initializer')
 local wiki_settings = reqscript('internal/DFMyFortWiki/settings_gui')
 local chronicle = reqscript('internal/DFMyFortWiki/chronicle')
-local utils = reqscript('internal/DFMyFortWiki/utils')
+local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic

@@ -1,5 +1,5 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/utils')
+local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 
 local function get_event_template(event_data)
     local title = event_data and event_data.title or "New Event"

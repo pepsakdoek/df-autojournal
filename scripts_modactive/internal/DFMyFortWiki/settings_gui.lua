@@ -1,8 +1,8 @@
 --@ module = true
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
-local mfw_settings = reqscript('internal/DFMyFortWiki/settings')
+local wiki_widgets = reqscript('internal/DFMyFortWiki/wiki_widgets')
+local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 
 local logger = reqscript('internal/DFMyFortWiki/logger')
 

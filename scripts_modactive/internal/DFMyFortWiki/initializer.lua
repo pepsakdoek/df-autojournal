@@ -1,6 +1,6 @@
 --@ module = true
 local logger = reqscript('internal/DFMyFortWiki/logger')
-local utils = reqscript('internal/DFMyFortWiki/utils')
+local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 
 -- Templates
 local get_citizen_template = reqscript('internal/DFMyFortWiki/templates/citizen')
