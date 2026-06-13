@@ -2,28 +2,16 @@
 
 -- Helper to safely get the current civilization ID
 function get_civ_id()
-    if dfhack.world.getCivId then
-        return dfhack.world.getCivId()
+    if df.global.plotinfo then
+        return df.global.plotinfo.civ_id
     end
-    -- Fallback to plot_info for v50
-    if df.global.plot_info then
-        return df.global.plot_info.civ_id
-    end
-    -- Legacy/Alternative
-    return df.global.ui.civ_id
 end
 
 -- Helper to safely get the current site ID
 function get_site_id()
-    if dfhack.world.getSiteId then
-        return dfhack.world.getSiteId()
+    if df.global.plotinfo then
+        return df.global.plotinfo.site_id
     end
-    -- Fallback to plot_info for v50
-    if df.global.plot_info then
-        return df.global.plot_info.site_id
-    end
-    -- Legacy/Alternative
-    return df.global.ui.site_id
 end
 
 -- Safely translate a DF name structure

@@ -82,3 +82,8 @@ D:\p\DFMyFortWiki\
 # AI Agents
 
 * You may read git diffs, and git show, any READ ONLY git actions, but you do not commit versions.
+
+# Dwarf Fortress and dfhack objects and functions
+
+plotinfo not plot_info
+addviews not add_views

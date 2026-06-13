@@ -23,83 +23,83 @@ function WikiInitializer:perform(screen)
         -- 0. Civ & Fort
         logger.log("Initializing Civ and Fort pages...")
         self.context:save_content('civ', civ_template.render(), 1)
-        self.context:save_content('fort', fort_template.render(), 1)
+        -- self.context:save_content('fort', fort_template.render(), 1)
 
-        -- 1. Citizens
-        local citizens = {}
-        local dynamic_pages = {}
-        logger.log("Fetching units...")
+        -- -- 1. Citizens
+        -- local citizens = {}
+        -- local dynamic_pages = {}
+        -- logger.log("Fetching units...")
         
-        local units = df.global.world.units.active
-        logger.log("Found " .. #units .. " total units in world/site.")
+        -- local units = df.global.world.units.active
+        -- logger.log("Found " .. #units .. " total units in world/site.")
         
-        for _, unit in ipairs(units) do
-            if dfhack.units.isCitizen(unit) then
-                local raw_name = dfhack.units.getReadableName(unit)
-                local name = utils.sanitize(raw_name)
-                local id = 'citizen:' .. tostring(unit.id)
+        -- for _, unit in ipairs(units) do
+        --     if dfhack.units.isCitizen(unit) then
+        --         local raw_name = dfhack.units.getReadableName(unit)
+        --         local name = utils.sanitize(raw_name)
+        --         local id = 'citizen:' .. tostring(unit.id)
                 
-                table.insert(citizens, {name=name, id=id})
-                table.insert(dynamic_pages, {text="  " .. name, id=id})
+        --         table.insert(citizens, {name=name, id=id})
+        --         table.insert(dynamic_pages, {text="  " .. name, id=id})
 
-                local content = citizen_template.render(unit)
-                self.context:save_content(id, content, 1)
-            end
-        end
-        logger.log("Processed " .. #citizens .. " citizens.")
+        --         local content = citizen_template.render(unit)
+        --         self.context:save_content(id, content, 1)
+        --     end
+        -- end
+        -- logger.log("Processed " .. #citizens .. " citizens.")
 
-        local citizen_root_content = "# Citizens\n\nTotal Citizens: " .. #citizens .. "\n\n"
-        for _, c in ipairs(citizens) do
-            citizen_root_content = citizen_root_content .. "* [" .. c.name .. "](" .. c.id .. ")\n"
-        end
-        self.context:save_content('citizens', citizen_root_content, 1)
+        -- local citizen_root_content = "# Citizens\n\nTotal Citizens: " .. #citizens .. "\n\n"
+        -- for _, c in ipairs(citizens) do
+        --     citizen_root_content = citizen_root_content .. "* [" .. c.name .. "](" .. c.id .. ")\n"
+        -- end
+        -- self.context:save_content('citizens', citizen_root_content, 1)
 
-        -- 2. Artifacts
-        logger.log("Processing artifacts...")
-        local artifacts = {}
-        local artifact_items = df.global.world.items.other.ANY_ARTIFACT
-        if artifact_items then
-            for _, item in ipairs(artifact_items) do
-                -- Only process if the item is actually on the map (on-site)
-                if dfhack.items.getPosition(item) then
-                    local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
-                    if art_ref then
-                        local art_record = df.artifact_record.find(art_ref.artifact_id)
-                        if art_record then
-                            local name = utils.sanitize(dfhack.items.getReadableDescription(item))
-                            local id = 'artifact:' .. tostring(art_record.id)
-                            table.insert(artifacts, {name=name, id=id})
+        -- -- 2. Artifacts
+        -- logger.log("Processing artifacts...")
+        -- local artifacts = {}
+        -- local artifact_items = df.global.world.items.other.ANY_ARTIFACT
+        -- if artifact_items then
+        --     for _, item in ipairs(artifact_items) do
+        --         -- Only process if the item is actually on the map (on-site)
+        --         if dfhack.items.getPosition(item) then
+        --             local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
+        --             if art_ref then
+        --                 local art_record = df.artifact_record.find(art_ref.artifact_id)
+        --                 if art_record then
+        --                     local name = utils.sanitize(dfhack.items.getReadableDescription(item))
+        --                     local id = 'artifact:' .. tostring(art_record.id)
+        --                     table.insert(artifacts, {name=name, id=id})
 
-                            local content = artifact_template.render(item)
-                            self.context:save_content(id, content, 1)
-                        end
-                    end
-                end
-            end
-        else
-            logger.log("Warning: Could not access ANY_ARTIFACT list")
-        end
-        logger.log("Processed " .. #artifacts .. " artifacts.")
+        --                     local content = artifact_template.render(item)
+        --                     self.context:save_content(id, content, 1)
+        --                 end
+        --             end
+        --         end
+        --     end
+        -- else
+        --     logger.log("Warning: Could not access ANY_ARTIFACT list")
+        -- end
+        -- logger.log("Processed " .. #artifacts .. " artifacts.")
 
-        local artifact_root_content = "# Artifacts\n\nTotal Artifacts: " .. #artifacts .. "\n\n"
-        for _, a in ipairs(artifacts) do
-            artifact_root_content = artifact_root_content .. "* [" .. a.name .. "](" .. a.id .. ")\n"
-        end
-        self.context:save_content('artifacts', artifact_root_content, 1)
+        -- local artifact_root_content = "# Artifacts\n\nTotal Artifacts: " .. #artifacts .. "\n\n"
+        -- for _, a in ipairs(artifacts) do
+        --     artifact_root_content = artifact_root_content .. "* [" .. a.name .. "](" .. a.id .. ")\n"
+        -- end
+        -- self.context:save_content('artifacts', artifact_root_content, 1)
 
-        -- Save the dynamic page list
-        self.context:save_dynamic_pages(dynamic_pages)
+        -- -- Save the dynamic page list
+        -- self.context:save_dynamic_pages(dynamic_pages)
 
-        -- 3. Events (Simple list for now)
-        local events_root_content = "# Events\n\nEvents will be listed here.\n"
-        self.context:save_content('events', events_root_content, 1)
+        -- -- 3. Events (Simple list for now)
+        -- local events_root_content = "# Events\n\nEvents will be listed here.\n"
+        -- self.context:save_content('events', events_root_content, 1)
 
-        -- Set initialized flag
-        dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
+        -- -- Set initialized flag
+        -- dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
 
-        if self.on_complete then
-            self.on_complete()
-        end
+        -- if self.on_complete then
+        --     self.on_complete()
+        -- end
 
         dfhack.gui.showAnnouncement("Wiki initialized successfully!", COLOR_LIGHTGREEN)
         logger.log("Wiki initialization complete.")
