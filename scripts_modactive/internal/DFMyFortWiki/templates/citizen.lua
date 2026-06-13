@@ -115,7 +115,7 @@ function render(unit)
         content = content .. "* Arrived / Logged on " .. utils.get_date_str() .. "\n"
     end
     
-    return content
+    return utils.sanitize(content)
 end
 
 return _ENV
