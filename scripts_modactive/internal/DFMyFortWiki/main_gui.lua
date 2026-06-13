@@ -1,7 +1,7 @@
 --@ module = true
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local utils = require('utils')
+-- local utils = require('utils')
 local json = require('json')
 
 local logger = reqscript('internal/DFMyFortWiki/logger')
@@ -9,7 +9,7 @@ local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
 local wiki_initializer = reqscript('internal/DFMyFortWiki/initializer')
 local wiki_settings = reqscript('internal/DFMyFortWiki/settings_gui')
 local chronicle = reqscript('internal/DFMyFortWiki/chronicle')
-local mfw_utils = reqscript('internal/DFMyFortWiki/utils')
+local utils = reqscript('internal/DFMyFortWiki/utils')
 
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic
@@ -357,7 +357,7 @@ function WikiScreen:onPageChange(page_id, no_save)
     if not no_save then
         local text = self.subviews.wiki_window.subviews.editor:getText()
         local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
-        self.context:save_content(self.current_page_id, mfw_utils.from_ui(text), cursor)
+        self.context:save_content(self.current_page_id, utils.from_ui(text), cursor)
     end
 
     -- Load new page
@@ -379,12 +379,12 @@ function WikiScreen:onPageChange(page_id, no_save)
         content.text[1] = "# " .. title .. "\n\nWelcome to the " .. title .. " page."
     end
 
-    self.subviews.wiki_window:setPageContent(mfw_utils.to_ui(content.text[1]), content.cursor[1])
+    self.subviews.wiki_window:setPageContent(utils.to_ui(content.text[1]), content.cursor[1])
 end
 
 function WikiScreen:onTextChange(text)
     local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
-    self.context:save_content(self.current_page_id, mfw_utils.from_ui(text), cursor)
+    self.context:save_content(self.current_page_id, utils.from_ui(text), cursor)
 end
 
 function WikiScreen:onDismiss()

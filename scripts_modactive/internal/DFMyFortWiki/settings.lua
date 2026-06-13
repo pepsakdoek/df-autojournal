@@ -40,18 +40,30 @@ local DEFAULT_SETTINGS = {
     }
 }
 
+local logger = reqscript('internal/DFMyFortWiki/logger')
+local json = require('json')
+
 function get_settings()
     local ok, data = pcall(function()
         return dfhack.persistent.getSiteData(SETTINGS_KEY)
     end)
-    if ok and data and data.val then
-        return data.val
+    if ok and data and data.val and data.val ~= "" then
+        local ok_json, decoded = pcall(json.decode, data.val)
+        if ok_json and type(decoded) == "table" then
+            return decoded
+        end
+        logger.log("get_settings: failed to decode JSON or not a table, returning default")
     end
     return DEFAULT_SETTINGS
 end
 
 function save_settings(settings)
-    dfhack.persistent.saveSiteData(SETTINGS_KEY, {val=settings})
+    local ok, encoded = pcall(json.encode, settings)
+    if ok then
+        dfhack.persistent.saveSiteData(SETTINGS_KEY, {val=encoded})
+    else
+        logger.log_error("save_settings: failed to encode settings")
+    end
 end
 
 function set_preset(settings, template, preset)

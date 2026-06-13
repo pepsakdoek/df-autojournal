@@ -29,12 +29,30 @@ ToggleLabel = defclass(ToggleLabel, widgets.ToggleHotkeyLabel)
 
 function ToggleLabel:init()
     ToggleLabel.super.init(self)
-    self.text = self.text or {}
+    
+    -- Ensure self.text is a table of tokens
+    if type(self.text) == 'string' then
+        self.text = {self.text}
+    elseif type(self.text) ~= 'table' then
+        self.text = {}
+    end
+
     local text = self.text
-    local idx = #text > 0 and #text or 1
-    text[idx] =     { tile = function() return self:getOptionValue() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end }
-    text[idx + 1] = { tile = function() return self:getOptionValue() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end }
-    text[idx + 2] = { tile = function() return self:getOptionValue() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end }
+    -- ToggleHotkeyLabel appends an "On"/"Off" token at the end. 
+    -- We want to replace it with our custom icons.
+    -- If there's only one token (the label), we append our icons.
+    local idx = #text
+    if idx > 1 then
+        -- Assume the last token is the "On/Off" text from ToggleHotkeyLabel
+        text[idx] =     { tile = function() return self:getOptionValue() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end }
+        text[idx + 1] = { tile = function() return self:getOptionValue() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end }
+        text[idx + 2] = { tile = function() return self:getOptionValue() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end }
+    else
+        -- Just append if it's just the label or empty
+        table.insert(text, { tile = function() return self:getOptionValue() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end })
+        table.insert(text, { tile = function() return self:getOptionValue() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end })
+        table.insert(text, { tile = function() return self:getOptionValue() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end })
+    end
     self:setText(text)
 end
 

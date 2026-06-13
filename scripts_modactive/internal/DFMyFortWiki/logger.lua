@@ -22,5 +22,3 @@ function log_error(msg)
     log("ERROR: " .. tostring(msg) .. "\n" .. trace)
     dfhack.printerr("DFMyFortWiki Error: " .. tostring(msg))
 end
-
-return _ENV

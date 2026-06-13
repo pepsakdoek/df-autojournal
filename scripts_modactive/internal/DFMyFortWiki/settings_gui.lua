@@ -4,6 +4,8 @@ local widgets = require('gui.widgets')
 local wiki_widgets = reqscript('internal/DFMyFortWiki/widgets')
 local mfw_settings = reqscript('internal/DFMyFortWiki/settings')
 
+local logger = reqscript('internal/DFMyFortWiki/logger')
+
 SettingsWindow = defclass(SettingsWindow, widgets.Window)
 SettingsWindow.ATTRS {
     frame_title='Wiki Settings',
@@ -14,6 +16,10 @@ function SettingsWindow:init()
     self.settings = mfw_settings.get_settings()
 
     local function create_toggle(label, template, key)
+        if not self.settings[template] then
+            logger.log_error("Settings missing template: " .. tostring(template))
+            return widgets.Label{text="Error: " .. tostring(template)}
+        end
         return wiki_widgets.ToggleLabel{
             label=label .. ' ',
             initial_option=self.settings[template][key],
@@ -29,26 +35,29 @@ function SettingsWindow:init()
             frame={h=1},
             subviews={
                 widgets.Label{frame={l=0}, text='Quick: '},
-                widgets.HotkeyLabel{
-                    frame={l=7},
-                    label='All',
-                    on_activate=function()
+                widgets.Label{
+                    frame={l=7, w=3},
+                    text='All',
+                    text_pen=COLOR_LIGHTGREEN,
+                    on_click=function()
                         mfw_settings.set_preset(self.settings, template, 'all')
                         self:update_toggles()
                     end
                 },
-                widgets.HotkeyLabel{
-                    frame={l=14},
-                    label='Min',
-                    on_activate=function()
+                widgets.Label{
+                    frame={l=11, w=3},
+                    text='Min',
+                    text_pen=COLOR_LIGHTRED,
+                    on_click=function()
                         mfw_settings.set_preset(self.settings, template, 'minimal')
                         self:update_toggles()
                     end
                 },
-                widgets.HotkeyLabel{
-                    frame={l=21},
-                    label='Rec',
-                    on_activate=function()
+                widgets.Label{
+                    frame={l=15, w=3},
+                    text='Rec',
+                    text_pen=COLOR_LIGHTCYAN,
+                    on_click=function()
                         mfw_settings.set_preset(self.settings, template, 'recommended')
                         self:update_toggles()
                     end
