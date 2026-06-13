@@ -3,11 +3,11 @@ local logger = reqscript('internal/DFMyFortWiki/logger')
 local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 
 -- Templates
-local get_citizen_template = reqscript('internal/DFMyFortWiki/templates/citizen')
-local get_artifact_template = reqscript('internal/DFMyFortWiki/templates/artifact')
-local get_fort_template = reqscript('internal/DFMyFortWiki/templates/fort')
-local get_civ_template = reqscript('internal/DFMyFortWiki/templates/civilization')
-local get_event_template = reqscript('internal/DFMyFortWiki/templates/event')
+local citizen_template = reqscript('internal/DFMyFortWiki/templates/citizen')
+local artifact_template = reqscript('internal/DFMyFortWiki/templates/artifact')
+local fort_template = reqscript('internal/DFMyFortWiki/templates/fort')
+local civ_template = reqscript('internal/DFMyFortWiki/templates/civilization')
+local event_template = reqscript('internal/DFMyFortWiki/templates/event')
 
 WikiInitializer = defclass(WikiInitializer)
 
@@ -22,8 +22,8 @@ function WikiInitializer:perform(screen)
         
         -- 0. Civ & Fort
         logger.log("Initializing Civ and Fort pages...")
-        self.context:save_content('civ', get_civ_template(), 1)
-        self.context:save_content('fort', get_fort_template(), 1)
+        self.context:save_content('civ', civ_template.render(), 1)
+        self.context:save_content('fort', fort_template.render(), 1)
 
         -- 1. Citizens
         local citizens = {}
@@ -42,7 +42,7 @@ function WikiInitializer:perform(screen)
                 table.insert(citizens, {name=name, id=id})
                 table.insert(dynamic_pages, {text="  " .. name, id=id})
 
-                local content = get_citizen_template(unit)
+                local content = citizen_template.render(unit)
                 self.context:save_content(id, content, 1)
             end
         end
@@ -70,7 +70,7 @@ function WikiInitializer:perform(screen)
                             local id = 'artifact:' .. tostring(art_record.id)
                             table.insert(artifacts, {name=name, id=id})
 
-                            local content = get_artifact_template(item)
+                            local content = artifact_template.render(item)
                             self.context:save_content(id, content, 1)
                         end
                     end

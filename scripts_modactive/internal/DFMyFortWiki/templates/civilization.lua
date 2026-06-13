@@ -3,15 +3,15 @@ local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 local logger = reqscript('internal/DFMyFortWiki/logger')
 
-local function get_civ_template()
+function render()
     local content = ""
     local ok, err = xpcall(function()
         local settings = mfw_settings.get_settings().civ
-        local civ_id = df.global.ui.civ_id
+        local civ_id = utils.get_civ_id()
         local civ = df.historical_entity.find(civ_id)
         local civ_name = "Unknown Civilization"
         if civ then
-            civ_name = utils.sanitize(dfhack.df2utf(dfhack.TranslateName(civ.name)))
+            civ_name = utils.get_readable_name(civ.name)
         end
 
         content = "# Civilization: " .. civ_name .. "\n\n"
@@ -30,7 +30,7 @@ local function get_civ_template()
                             if assignment.histfig_id ~= -1 then
                                 local hf = df.historical_figure.find(assignment.histfig_id)
                                 if hf then
-                                    local leader_name = utils.sanitize(dfhack.df2utf(dfhack.TranslateName(hf.name)))
+                                    local leader_name = utils.get_readable_name(hf.name)
                                     content = content .. "* " .. position.name .. ": " .. leader_name .. "\n"
                                     found_leader = true
                                 end
@@ -49,7 +49,7 @@ local function get_civ_template()
                 for _, rel in ipairs(civ.relations) do
                     local other_civ = df.historical_entity.find(rel.entity_id)
                     if other_civ and other_civ.type == df.historical_entity_type.Civilization then
-                        local other_name = utils.sanitize(dfhack.df2utf(dfhack.TranslateName(other_civ.name)))
+                        local other_name = utils.get_readable_name(other_civ.name)
                         local rel_type = "Neutral"
                         if rel.relation == df.entity_relation_type.War then
                             rel_type = "WAR"
@@ -85,4 +85,4 @@ local function get_civ_template()
     return content
 end
 
-return get_civ_template
+return _ENV

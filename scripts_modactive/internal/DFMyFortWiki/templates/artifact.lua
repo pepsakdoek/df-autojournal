@@ -2,7 +2,7 @@
 local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 
-local function get_artifact_template(item)
+function render(item)
     local settings = mfw_settings.get_settings().artifact
     local name = utils.sanitize(dfhack.items.getReadableDescription(item))
     local itype = item:getType()
@@ -49,7 +49,7 @@ local function get_artifact_template(item)
         if creator_link then
             content = content .. "Created by " .. creator_link .. ".\n"
         elseif artifact_record and artifact_record.name then
-            content = content .. "Named " .. utils.sanitize(dfhack.df2utf(dfhack.TranslateName(artifact_record.name))) .. " by its creator.\n"
+            content = content .. "Named " .. utils.get_readable_name(artifact_record.name) .. " by its creator.\n"
         end
     end
     
@@ -64,4 +64,4 @@ local function get_artifact_template(item)
     return content
 end
 
-return get_artifact_template
+return _ENV

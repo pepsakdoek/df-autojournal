@@ -2,12 +2,12 @@
 local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 
-local function get_fort_template()
+function render()
     local settings = mfw_settings.get_settings().fort
     local site_name = "Unknown Fort"
     local site = dfhack.world.getCurrentSite()
     if site then
-        site_name = utils.sanitize(dfhack.df2utf(dfhack.TranslateName(site.name)))
+        site_name = utils.get_readable_name(site.name)
     end
 
     local content = "# Fort: " .. site_name .. "\n\n"
@@ -32,7 +32,7 @@ local function get_fort_template()
             for _, link in ipairs(site.entity_links) do
                 local entity = df.historical_entity.find(link.entity_id)
                 if entity and entity.type == df.historical_entity_type.SiteGovernment then
-                    content = content .. "Government: " .. utils.sanitize(dfhack.df2utf(dfhack.TranslateName(entity.name))) .. "\n"
+                    content = content .. "Government: " .. utils.get_readable_name(entity.name) .. "\n"
                 end
             end
         end
@@ -72,4 +72,4 @@ local function get_fort_template()
     return content
 end
 
-return get_fort_template
+return _ENV

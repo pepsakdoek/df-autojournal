@@ -47,12 +47,19 @@ function get_settings()
     local ok, data = pcall(function()
         return dfhack.persistent.getSiteData(SETTINGS_KEY)
     end)
-    if ok and data and data.val and data.val ~= "" then
-        local ok_json, decoded = pcall(json.decode, data.val)
-        if ok_json and type(decoded) == "table" then
-            return decoded
+    if ok and data and data.val then
+        if type(data.val) == "string" and data.val ~= "" then
+            local ok_json, decoded = pcall(json.decode, data.val)
+            if ok_json and type(decoded) == "table" then
+                return decoded
+            end
+        elseif type(data.val) == "table" then
+            -- Legacy support: it was already a table
+            -- Migrating to JSON
+            save_settings(data.val)
+            return data.val
         end
-        logger.log("get_settings: failed to decode JSON or not a table, returning default")
+        logger.log("get_settings: failed to decode settings or invalid type, returning default")
     end
     return DEFAULT_SETTINGS
 end

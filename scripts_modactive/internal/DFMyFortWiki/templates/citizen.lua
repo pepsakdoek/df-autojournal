@@ -2,7 +2,7 @@
 local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
 local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
 
-local function get_citizen_template(unit)
+function render(unit)
     local settings = mfw_settings.get_settings().citizen
     local name = utils.sanitize(dfhack.units.getReadableName(unit))
     local prof = utils.sanitize(dfhack.units.getProfessionName(unit))
@@ -78,7 +78,7 @@ local function get_citizen_template(unit)
                     local type = link:getType()
                     local target_hf = df.historical_figure.find(link.target_hf)
                     if target_hf then
-                        local target_name = utils.sanitize(dfhack.df2utf(dfhack.TranslateName(target_hf.name)))
+                        local target_name = utils.get_readable_name(target_hf.name)
                         local target_id = nil
                         local target_unit = df.unit.find(target_hf.unit_id)
                         if target_unit then
@@ -114,4 +114,4 @@ local function get_citizen_template(unit)
     return content
 end
 
-return get_citizen_template
+return _ENV

@@ -15,7 +15,7 @@ end
 function EventParser.get_hf_link(hf_id)
     local hf = df.historical_figure.find(hf_id)
     if hf then
-        local name = utils.sanitize(dfhack.df2utf(dfhack.TranslateName(hf.name)))
+        local name = utils.get_readable_name(hf.name)
         local unit_id = hf.unit_id
         if unit_id ~= -1 then
             return "[" .. name .. "](citizen:" .. tostring(unit_id) .. ")"
