@@ -21,10 +21,11 @@ function render()
     end
     content = content .. "**Population:** " .. citizens .. " Citizens\n"
     
-    if settings.wealth and df.global.ui.tasks and df.global.ui.tasks.wealth then
-        local w = df.global.ui.tasks.wealth
-        content = content .. "**Total Wealth:** " .. tostring(w.total) .. "☼\n"
-    end
+    -- TODO: Fix error here, df.global.ui doesn't exist 
+    -- if settings.wealth and df.global.ui.tasks and df.global.ui.tasks.wealth then
+    --     local w = df.global.ui.tasks.wealth
+    --     content = content .. "**Total Wealth:** " .. tostring(w.total) .. "☼\n"
+    -- end
     
     if settings.gov then
         content = content .. "\n## Local Government\n"
@@ -59,6 +60,7 @@ function render()
         content = content .. "*Log important areas of your fort here.*\n\n"
     end
 
+    -- TODO: this is not cur_year, it must go and find the estiablished year of the fort
     if settings.timeline then
         content = content .. "## History & Timeline\n"
         content = content .. "* Founding of " .. site_name .. " in year " .. tostring(df.global.cur_year) .. "\n"

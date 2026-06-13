@@ -43,15 +43,14 @@ end
 
 -- Sanitize converts from DF's internal CP437 to UTF-8 for storage/JSON
 function sanitize(str)
+    -- DO NOT convert to UTF-8 here! This is to make things not crash
     if not str then return "" end
-    -- Check if str is already a string
-    if type(str) ~= "string" then
-        str = tostring(str)
-    end
-    local utf8_str = dfhack.df2utf(str)
-    -- Project mandate: replace em-dashes and en-dashes with -
-    utf8_str = utf8_str:gsub("\226\128\148", "-"):gsub("\226\128\147", "-")
-    return utf8_str
+    local replacements = {
+        ["ù"]="u", ["û"]="u", ["Å"]="A", ["è"]="e", ["î"]="i", ["é"]="e",
+        ["ë"]="e", ["ï"]="i", ["ô"]="o", ["ö"]="o", ["ò"]="o", ["ü"]="u", ["ÿ"]="y"
+    }
+    str = str:gsub("[%z\128-\255]", replacements)
+    return str
 end
 
 -- Helper that combines translation and sanitization
@@ -61,14 +60,16 @@ end
 
 -- Convert UTF-8 (from storage) to CP437 (for UI display)
 function to_ui(str)
-    if not str then return "" end
-    return dfhack.utf2df(str)
+    -- if not str then return "" end
+    -- return dfhack.utf2df(str)
+    return str
 end
 
 -- Convert CP437 (from UI) to UTF-8 (for storage)
 function from_ui(str)
-    if not str then return "" end
-    return dfhack.df2utf(str)
+    -- if not str then return "" end
+    -- return dfhack.df2utf(str)
+    return str
 end
 
 function get_date_str()

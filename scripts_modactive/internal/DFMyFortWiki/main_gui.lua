@@ -230,8 +230,10 @@ end
 
 function WikiContext:save_content(page_id, text, cursor)
     if dfhack.isWorldLoaded() then
+        local key = self:get_key(page_id)
+        logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ", length: " .. #text .. ")")
         dfhack.persistent.saveSiteData(
-            self:get_key(page_id),
+            key,
             {text={text}, cursor={cursor}}
         )
     end
@@ -239,16 +241,19 @@ end
 
 function WikiContext:load_content(page_id)
     if dfhack.isWorldLoaded() then
+        local key = self:get_key(page_id)
         local ok, data = pcall(function()
-            return dfhack.persistent.getSiteData(self:get_key(page_id)) or {}
+            return dfhack.persistent.getSiteData(key) or {}
         end)
         if not ok or not data then
+            logger.log("WikiContext: Failed to load page " .. page_id .. " or no data found.")
             data = {}
         end
         if not data.text then
             data.text = {''}
         end
         data.cursor = data.cursor or {#data.text[1] + 1}
+        logger.log("WikiContext: Loaded page " .. page_id .. " (length: " .. #data.text[1] .. ")")
         return data
     end
     return {text={''}, cursor={1}}
@@ -260,11 +265,14 @@ function WikiContext:get_dynamic_pages()
         return dfhack.persistent.getSiteData(self.save_prefix .. 'dynamic_pages') or {}
     end)
     if not ok or not data then return {} end
-    return data.pages or {}
+    local pages = data.pages or {}
+    logger.log("WikiContext: Loaded " .. #pages .. " dynamic pages.")
+    return pages
 end
 
 function WikiContext:save_dynamic_pages(pages)
     if dfhack.isWorldLoaded() then
+        logger.log("WikiContext: Saving " .. #pages .. " dynamic pages.")
         dfhack.persistent.saveSiteData(self.save_prefix .. 'dynamic_pages', {pages=pages})
     end
 end
