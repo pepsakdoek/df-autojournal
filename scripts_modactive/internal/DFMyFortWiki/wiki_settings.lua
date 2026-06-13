@@ -1,6 +1,6 @@
 --@ module = true
 
-local SETTINGS_KEY = 'mfw:settings'
+local SETTINGS_KEY = 'mfw_settings'
 
 local DEFAULT_SETTINGS = {
     civ = {

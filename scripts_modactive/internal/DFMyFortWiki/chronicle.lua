@@ -3,7 +3,7 @@ local logger = reqscript('internal/DFMyFortWiki/logger')
 local event_parser = reqscript('internal/DFMyFortWiki/event_parser')
 
 local Chronicle = {}
-local CHRONICLE_KEY = 'mfw:chronicle_state'
+local CHRONICLE_KEY = 'mfw_chronicle_state'
 
 function Chronicle.get_state()
     local ok, data = pcall(function()
@@ -93,7 +93,7 @@ function Chronicle.start_background_task(context)
     local function tick()
         if not dfhack.isWorldLoaded() then return end
         
-        local data = dfhack.persistent.getSiteData('mfw:auto_journal_enabled')
+        local data = dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
         local enabled = data and data.val and data.val[1] == 1
         
         if enabled and dfhack.world.isFortressMode() then

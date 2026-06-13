@@ -65,12 +65,12 @@ function WikiWindow:init()
                     label='Auto-Journaling ',
                     key='CUSTOM_ALT_A',
                     initial_option=function()
-                        local data = dfhack.persistent.getSiteData('mfw:auto_journal_enabled')
+                        local data = dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
                         return data and data.val and data.val[1] == 1
                     end,
                     on_change=function(val) 
                         logger.log("Auto-Journaling toggled: " .. tostring(val))
-                        dfhack.persistent.saveSiteData('mfw:auto_journal_enabled', {val={val and 1 or 0}})
+                        dfhack.persistent.saveSiteData('mfw_auto_journal_enabled', {val={val and 1 or 0}})
                     end,
                 },
                 widgets.HotkeyLabel{
@@ -221,11 +221,11 @@ end
 
 WikiContext = defclass(WikiContext)
 WikiContext.ATTRS{
-    save_prefix = 'mfw:',
+    save_prefix = 'mfw_',
 }
 
 function WikiContext:get_key(page_id)
-    return self.save_prefix .. 'p:' .. page_id
+    return self.save_prefix .. 'p_' .. page_id
 end
 
 function WikiContext:save_content(page_id, text, cursor)
