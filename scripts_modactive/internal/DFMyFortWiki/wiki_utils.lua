@@ -45,6 +45,8 @@ end
 function sanitize(str)
     -- DO NOT convert to UTF-8 here! This is to make things not crash
     if not str then return "" end
+    str = dfhack.df2utf(str)  -- Convert from CP437 to UTF-8
+
     local replacements = {
         -- Lowercase Vowels with Accents
         ["à"]="a", ["á"]="a", ["â"]="a", ["ã"]="a", ["ä"]="a", ["å"]="a", ["æ"]="ae", ["ā"]="a",
@@ -99,6 +101,7 @@ function sanitize(str)
 
     str = str:gsub("[%z\1-\127\194-\244][\128-\191]*", replacements)
 
+    str = dfhack.utf2df(str)  -- Convert back to CP437 for DF storage
     return str
 end
 
