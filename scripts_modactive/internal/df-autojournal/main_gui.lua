@@ -3,12 +3,13 @@ local gui = require('gui')
 local widgets = require('gui.widgets')
 local json = require('json')
 
-local logger = reqscript('internal/DFMyFortWiki/logger')
-local wiki_widgets = reqscript('internal/DFMyFortWiki/wiki_widgets')
-local wiki_initializer = reqscript('internal/DFMyFortWiki/initializer')
-local wiki_settings = reqscript('internal/DFMyFortWiki/settings_gui')
-local chronicle = reqscript('internal/DFMyFortWiki/chronicle')
-local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
+local logger = reqscript('internal/df-autojournal/logger')
+local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
+local wiki_initializer = reqscript('internal/df-autojournal/initializer')
+local wiki_settings = reqscript('internal/df-autojournal/settings_gui')
+local chronicle = reqscript('internal/df-autojournal/chronicle')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
+local HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area').HyperTextArea
 
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic
@@ -30,6 +31,7 @@ WikiWindow.ATTRS {
     on_initialize=DEFAULT_NIL,
     on_page_change=DEFAULT_NIL,
     on_text_change=DEFAULT_NIL,
+    on_link_click=DEFAULT_NIL,
 }
 
 function WikiWindow:init()
@@ -122,14 +124,25 @@ function WikiWindow:init()
             interior_b=true,
         },
         -- Editor (Right)
-        widgets.TextArea{
+        HyperTextArea{
             view_id='editor',
-            frame={t=1, b=3, l=27, r=0},
-            frame_inset={l=1, r=0},
-            on_text_change=self:callback('onTextChange'),
-            on_cursor_change=self:callback('onCursorChange'),
+            frame={t=1, b=3, l=26, r=0},
+            text_pen=COLOR_LIGHTCYAN,
+            link_pen=COLOR_LIGHTBLUE,
+            link_hover_pen=COLOR_WHITE,
+            link_pages=PAGES,
+            on_link_click=function(link_data)
+                if self.on_link_click then
+                    self.on_link_click(link_data)
+                end
+            end,
+            on_text_change=function(raw, display)
+                self:onTextChange(raw, display)
+            end,
+            on_cursor_change=function(cursor, old)
+                self:onCursorChange(cursor, old)
+            end,
         },
-        widgets.HelpButton{command="gui/journal", frame={r=0,t=1}},
         -- Bottom Bar
         widgets.Panel{
             frame={l=0, r=0, b=1, h=1},
@@ -158,19 +171,24 @@ function WikiWindow:onWikiPageSubmit(idx, choice)
     end
 end
 
-function WikiWindow:onJournalTocSubmit(idx, section)
-    self.subviews.editor:setCursor(section.line_cursor)
-    self.subviews.editor:scrollToCursor(section.line_cursor)
+function WikiWindow:onLinkClick(link_data)
+    if self.on_link_click then
+        self.on_link_click(link_data)
+    end
 end
 
-function WikiWindow:onTextChange(text)
+function WikiWindow:onJournalTocSubmit(idx, section)
+    self.subviews.editor.hyper_text_area:setCursor(section.line_cursor)
+end
+
+function WikiWindow:onTextChange(raw, display)
     if self.on_text_change then
-        self.on_text_change(text)
+        self.on_text_change(display)
     end
     self:reloadJournalToc()
 end
 
-function WikiWindow:onCursorChange(cursor)
+function WikiWindow:onCursorChange(cursor, old)
     self.subviews.journal_toc_panel.text_cursor = cursor
     local section_index = self.subviews.journal_toc_panel:currentSection()
     self.subviews.journal_toc_panel:setSelectedSection(section_index)
@@ -178,14 +196,14 @@ end
 
 function WikiWindow:reloadJournalToc()
     self.subviews.journal_toc_panel:reload(
-        self.subviews.editor:getText(),
-        self.subviews.editor:getCursor() or 1
+        self.subviews.editor:getRawText(),
+        self.subviews.editor.hyper_text_area.cursor or 1
     )
 end
 
-function WikiWindow:setPageContent(text, cursor)
-    self.subviews.editor:setText(text)
-    self.subviews.editor:setCursor(cursor or 1)
+function WikiWindow:setPageContent(display_text, cursor)
+    self.subviews.editor:setDisplayText(display_text)
+    self.subviews.editor.hyper_text_area:setCursor(cursor or 1)
     self:reloadJournalToc()
 end
 
@@ -228,13 +246,13 @@ function WikiContext:get_key(page_id)
     return self.save_prefix .. 'p_' .. page_id
 end
 
-function WikiContext:save_content(page_id, text, cursor)
+function WikiContext:save_content(page_id, display_text, cursor)
     if dfhack.isWorldLoaded() then
         local key = self:get_key(page_id)
-        logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ", length: " .. #text .. ")")
+        logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ")")
         dfhack.persistent.saveSiteData(
             key,
-            {text={text}, cursor={cursor}}
+            {content=display_text, cursor={cursor}}
         )
     end
 end
@@ -249,14 +267,16 @@ function WikiContext:load_content(page_id)
             logger.log("WikiContext: Failed to load page " .. page_id .. " or no data found.")
             data = {}
         end
-        if not data.text then
-            data.text = {''}
+        if not data.content then
+            data.content = {}
+        elseif type(data.content) == 'string' then
+            data.content = {{text=data.content, pen=COLOR_LIGHTCYAN}}
         end
-        data.cursor = data.cursor or {#data.text[1] + 1}
-        logger.log("WikiContext: Loaded page " .. page_id .. " (length: " .. #data.text[1] .. ")")
+        data.cursor = data.cursor or {1}
+        logger.log("WikiContext: Loaded page " .. page_id)
         return data
     end
-    return {text={''}, cursor={1}}
+    return {content={}, cursor={1}}
 end
 
 function WikiContext:get_dynamic_pages()
@@ -298,6 +318,7 @@ function WikiScreen:init()
             on_initialize=self:callback('onInitialize'),
             on_page_change=self:callback('onPageChange'),
             on_text_change=self:callback('onTextChange'),
+            on_link_click=function(link_data) self:onPageChange(link_data) end,
         }
     }
 
@@ -362,19 +383,17 @@ end
 function WikiScreen:onPageChange(page_id, no_save)
     -- Save current page before switching
     if not no_save then
-        local text = self.subviews.wiki_window.subviews.editor:getText()
-        local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
-        self.context:save_content(self.current_page_id, utils.from_ui(text), cursor)
+        local editor = self.subviews.wiki_window.subviews.editor
+        self.context:save_content(self.current_page_id, editor.display_text, editor.hyper_text_area.cursor)
     end
 
     -- Load new page
     self.current_page_id = page_id
-    local content = self.context:load_content(page_id)
+    local data = self.context:load_content(page_id)
 
-    -- Default placeholder if page is new
-    if content.text[1] == '' then
+    -- Default placeholder if page is empty
+    if #data.content == 0 or (type(data.content[1]) == 'string' and data.content[1] == '') then
         local title = page_id:gsub("^%l", string.upper)
-        -- Try to find name in PAGES or dynamic pages
         for _, p in ipairs(PAGES) do
             if p.id == page_id then title = p.text break end
         end
@@ -383,15 +402,20 @@ function WikiScreen:onPageChange(page_id, no_save)
             if p.id == page_id then title = p.text break end
         end
 
-        content.text[1] = "# " .. title .. "\n\nWelcome to the " .. title .. " page."
+        data.content = {
+            { text = "# " .. title, pen = COLOR_YELLOW },
+            "\n\nWelcome to the ",
+            { text = title, pen = COLOR_LIGHTCYAN },
+            " page.",
+        }
     end
 
-    self.subviews.wiki_window:setPageContent(utils.to_ui(content.text[1]), content.cursor[1])
+    self.subviews.wiki_window:setPageContent(data.content, data.cursor[1] or 1)
 end
 
-function WikiScreen:onTextChange(text)
-    local cursor = self.subviews.wiki_window.subviews.editor:getCursor()
-    self.context:save_content(self.current_page_id, utils.from_ui(text), cursor)
+function WikiScreen:onTextChange(display_text)
+    local editor = self.subviews.wiki_window.subviews.editor
+    self.context:save_content(self.current_page_id, display_text, editor.hyper_text_area.cursor)
 end
 
 function WikiScreen:onDismiss()

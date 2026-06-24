@@ -1,6 +1,6 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
-local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
+local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 
 function render(unit)
     local settings = mfw_settings.get_settings().citizen
@@ -15,7 +15,9 @@ function render(unit)
     local content = "# " .. name .. "\n\n"
     content = content .. "**Profession:** " .. prof .. "\n"
     content = content .. "**Gender:** " .. sex .. "\n"
-    content = content .. "**Age:** " .. age .. "\n\n"
+    -- Don't do age, because it changes the whole time, and we don't want to update values the whole time
+    -- TODO: Maybe add a "Birth Year" field instead, which is static and doesn't change over time?
+    -- content = content .. "**Age:** " .. age .. "\n\n"
     
     content = content .. "## Personal Journal\n"
     content = content .. "*Log your thoughts here...*\n\n"

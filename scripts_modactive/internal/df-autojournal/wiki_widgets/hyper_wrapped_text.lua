@@ -14,7 +14,9 @@
 -- After :update() the public fields are:
 --   self.lines        -- array of raw line strings (same as WrappedText.lines)
 --   self.line_spans   -- array (indexed by line number) of span-fragment lists
---                        Each fragment: { text, pen, on_click }
+--                        Each fragment: { text, pen, link }
+
+local HUtils = reqscript('internal/df-autojournal/wiki_widgets/hta_utils')
 
 HyperWrappedText = defclass(HyperWrappedText)
 
@@ -26,56 +28,6 @@ HyperWrappedText.ATTRS {
 
 function HyperWrappedText:init()
     self:update(self.raw_text, self.display_text, self.wrap_width)
-end
-
--- ---------------------------------------------------------------------------
--- helpers
--- ---------------------------------------------------------------------------
-
--- Normalise a display_text entry into a canonical span table.
-local function to_span(entry)
-    if type(entry) == 'string' then
-        return { text = entry, pen = nil, on_click = nil }
-    end
-    return {
-        text     = entry.text     or '',
-        pen      = entry.pen      or nil,
-        on_click = entry.on_click or nil,
-    }
-end
-
--- Build a flat list of character-level records from display_text spans.
--- Each record: { char, pen, on_click }
--- This makes per-character reassembly during line splitting trivial.
-local function build_char_list(display_text)
-    local chars = {}
-    for _, entry in ipairs(display_text) do
-        local span = to_span(entry)
-        for i = 1, #span.text do
-            chars[#chars + 1] = {
-                char     = span.text:sub(i, i),
-                pen      = span.pen,
-                on_click = span.on_click,
-            }
-        end
-    end
-    return chars
-end
-
--- Collapse a run of adjacent chars that share the same pen/on_click into
--- a single fragment.  Returns a list of { text, pen, on_click }.
-local function collapse_chars(char_run)
-    local frags = {}
-    local cur = nil
-    for _, c in ipairs(char_run) do
-        if cur and cur.pen == c.pen and cur.on_click == c.on_click then
-            cur.text = cur.text .. c.char
-        else
-            cur = { text = c.char, pen = c.pen, on_click = c.on_click }
-            frags[#frags + 1] = cur
-        end
-    end
-    return frags
 end
 
 -- ---------------------------------------------------------------------------
@@ -96,12 +48,16 @@ function HyperWrappedText:update(raw_text, display_text, wrap_width)
             keep_original_newlines = true,
         }
     )
+    
+    -- Ensure trailing newline has a place for the cursor
+    if raw_text:sub(-1) == '\n' then
+        table.insert(self.lines, '')
+    end
 
     -- 2. Build a per-character decoration list from display_text.
-    local char_list = build_char_list(display_text)
+    local char_list = HUtils.build_char_list(display_text)
 
     -- 3. Walk lines and slice char_list into matching fragments.
-    --    We advance a global character index through char_list.
     self.line_spans = {}
     local char_idx = 1
 
@@ -113,7 +69,7 @@ function HyperWrappedText:update(raw_text, display_text, wrap_width)
                 { char = ' ', pen = nil, on_click = nil }
             char_idx = char_idx + 1
         end
-        self.line_spans[#self.line_spans + 1] = collapse_chars(line_chars)
+        self.line_spans[#self.line_spans + 1] = HUtils.collapse_chars(line_chars)
     end
 end
 
@@ -148,8 +104,8 @@ function HyperWrappedText:indexToCoords(index)
 end
 
 -- ---------------------------------------------------------------------------
--- hit-test: given (x, y) in wrapped-text coordinates, return the on_click
--- handler of the span fragment under that position, or nil.
+-- hit-test: given (x, y) in wrapped-text coordinates, return the link
+-- data of the span fragment under that position, and the start index.
 -- ---------------------------------------------------------------------------
 
 function HyperWrappedText:getClickHandlerAt(x, y)
@@ -157,11 +113,16 @@ function HyperWrappedText:getClickHandlerAt(x, y)
     local frags  = self.line_spans[norm_y]
     if not frags then return nil end
 
+    local offset = 0
+    for i = 1, norm_y - 1 do
+        offset = offset + #self.lines[i]
+    end
+
     local col = 0
     for _, frag in ipairs(frags) do
         local frag_end = col + #frag.text
         if x > col and x <= frag_end then
-            return frag.on_click
+            return frag.link, offset + col + 1
         end
         col = frag_end
     end

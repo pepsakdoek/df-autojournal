@@ -1,6 +1,6 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
-local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
+local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 
 function render()
     local settings = mfw_settings.get_settings().fort

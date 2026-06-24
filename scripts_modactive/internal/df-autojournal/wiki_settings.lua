@@ -40,7 +40,7 @@ local DEFAULT_SETTINGS = {
     }
 }
 
-local logger = reqscript('internal/DFMyFortWiki/logger')
+local logger = reqscript('internal/df-autojournal/logger')
 local json = require('json')
 
 function get_settings()

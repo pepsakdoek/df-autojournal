@@ -1,13 +1,13 @@
 --@ module = true
-local logger = reqscript('internal/DFMyFortWiki/logger')
-local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
+local logger = reqscript('internal/df-autojournal/logger')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
 
 -- Templates
-local citizen_template = reqscript('internal/DFMyFortWiki/templates/citizen')
-local artifact_template = reqscript('internal/DFMyFortWiki/templates/artifact')
-local fort_template = reqscript('internal/DFMyFortWiki/templates/fort')
-local civ_template = reqscript('internal/DFMyFortWiki/templates/civilization')
-local event_template = reqscript('internal/DFMyFortWiki/templates/event')
+local citizen_template = reqscript('internal/df-autojournal/templates/citizen')
+local artifact_template = reqscript('internal/df-autojournal/templates/artifact')
+local fort_template = reqscript('internal/df-autojournal/templates/fort')
+local civ_template = reqscript('internal/df-autojournal/templates/civilization')
+local event_template = reqscript('internal/df-autojournal/templates/event')
 
 WikiInitializer = defclass(WikiInitializer)
 

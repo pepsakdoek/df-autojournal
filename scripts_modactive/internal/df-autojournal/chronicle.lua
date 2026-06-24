@@ -1,6 +1,6 @@
 --@ module = true
-local logger = reqscript('internal/DFMyFortWiki/logger')
-local event_parser = reqscript('internal/DFMyFortWiki/event_parser')
+local logger = reqscript('internal/df-autojournal/logger')
+local event_parser = reqscript('internal/df-autojournal/event_parser')
 
 local Chronicle = {}
 local CHRONICLE_KEY = 'mfw_chronicle_state'

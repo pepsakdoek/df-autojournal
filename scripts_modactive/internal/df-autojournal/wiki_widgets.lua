@@ -4,6 +4,8 @@ local widgets = require('gui.widgets')
 local utils = require('utils')
 local textures = require('gui.textures')
 
+HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area').HyperTextArea
+
 --------------------------------------------------------------------------------
 --- ToggleLabel
 local function get_icon_pens()

@@ -1,5 +1,5 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
 
 function render(event_data)
     local title = event_data and event_data.title or "New Event"

@@ -1,10 +1,10 @@
 --@ module = true
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local wiki_widgets = reqscript('internal/DFMyFortWiki/wiki_widgets')
-local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
+local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
+local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 
-local logger = reqscript('internal/DFMyFortWiki/logger')
+local logger = reqscript('internal/df-autojournal/logger')
 
 SettingsWindow = defclass(SettingsWindow, widgets.Window)
 SettingsWindow.ATTRS {

@@ -1,7 +1,7 @@
 --@ module = true
-local utils = reqscript('internal/DFMyFortWiki/wiki_utils')
-local mfw_settings = reqscript('internal/DFMyFortWiki/wiki_settings')
-local logger = reqscript('internal/DFMyFortWiki/logger')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
+local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
+local logger = reqscript('internal/df-autojournal/logger')
 
 local function find_position_by_id(civ, position_id)
     if not civ or not civ.positions or not civ.positions.own then return nil end
