@@ -26,10 +26,11 @@ WikiWindow = defclass(WikiWindow, widgets.Window)
 WikiWindow.ATTRS {
     frame_title='My Fort Wiki',
     resizable=true,
-    resize_min={w=82, h=25},
+    resize_min={w=56, h=20},
     frame_inset={l=0,r=0,t=0,b=0},
     on_initialize=DEFAULT_NIL,
     on_page_change=DEFAULT_NIL,
+    on_page_tree_toggle=DEFAULT_NIL,
     on_text_change=DEFAULT_NIL,
     on_link_click=DEFAULT_NIL,
 }
@@ -70,7 +71,7 @@ function WikiWindow:init()
                         local data = dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
                         return data and data.val and data.val[1] == 1
                     end,
-                    on_change=function(val) 
+                    on_change=function(val)
                         logger.log("Auto-Journaling toggled: " .. tostring(val))
                         dfhack.persistent.saveSiteData('mfw_auto_journal_enabled', {val={val and 1 or 0}})
                     end,
@@ -166,7 +167,11 @@ function WikiWindow:onInitialize()
 end
 
 function WikiWindow:onWikiPageSubmit(idx, choice)
-    if self.on_page_change then
+    if choice.is_parent then
+        if self.on_page_tree_toggle then
+            self.on_page_tree_toggle(choice.id)
+        end
+    elseif self.on_page_change then
         self.on_page_change(choice.id)
     end
 end
@@ -297,6 +302,23 @@ function WikiContext:save_dynamic_pages(pages)
     end
 end
 
+function WikiContext:save_window_frame(frame)
+    if dfhack.isWorldLoaded() then
+        dfhack.persistent.saveSiteData(self.save_prefix .. 'window_frame', frame)
+    end
+end
+
+function WikiContext:load_window_frame()
+    if not dfhack.isWorldLoaded() then return nil end
+    local ok, data = pcall(function()
+        return dfhack.persistent.getSiteData(self.save_prefix .. 'window_frame') or {}
+    end)
+    if ok and data and data.w and data.h then
+        return {w=data.w, h=data.h}
+    end
+    return nil
+end
+
 WikiScreen = defclass(WikiScreen, gui.ZScreen)
 WikiScreen.ATTRS {
     focus_path='my-fort-wiki',
@@ -306,46 +328,55 @@ WikiScreen.ATTRS {
 function WikiScreen:init()
     self.context = WikiContext{}
     self.current_page_id = 'fort'
+    self.expanded = {}
 
     -- Start background chronicle if not already running
-    -- Uncomment for now, because I'm testing other things, but the chronicles is currently crashing
     -- chronicle.start_background_task(self.context)
+
+    local win_frame = self.context:load_window_frame() or {w=100, h=50}
 
     self:addviews{
         WikiWindow{
             view_id='wiki_window',
-            frame={w=100, h=50},
+            frame=win_frame,
             on_initialize=self:callback('onInitialize'),
             on_page_change=self:callback('onPageChange'),
+            on_page_tree_toggle=self:callback('onPageTreeToggle'),
             on_text_change=self:callback('onTextChange'),
             on_link_click=function(link_data) self:onPageChange(link_data) end,
         }
     }
 
     self:refreshPageList()
+    self:updateLinkPages()
     self:onPageChange(self.current_page_id, true)
 end
 
 function WikiScreen:refreshPageList()
-    local pages = {}
-    for _, p in ipairs(PAGES) do
-        table.insert(pages, p)
-    end
-    
     local dynamic = self.context:get_dynamic_pages()
-    for _, p in ipairs(dynamic) do
-        table.insert(pages, p)
-    end
-    
-    self.subviews.wiki_window.subviews.wiki_page_list:setChoices(pages)
-    
+
+    local page_tree = wiki_widgets.build_page_tree(PAGES, dynamic)
+    local flat = wiki_widgets.flatten_page_tree(page_tree, self.expanded)
+
+    local list = self.subviews.wiki_window.subviews.wiki_page_list
+    list:setChoices(flat)
+
     -- Restore selection
-    for idx, p in ipairs(pages) do
+    for idx, p in ipairs(flat) do
         if p.id == self.current_page_id then
-            self.subviews.wiki_window.subviews.wiki_page_list:setSelected(idx)
+            list:setSelected(idx)
             break
         end
     end
+end
+
+function WikiScreen:onPageTreeToggle(page_id)
+    if self.expanded[page_id] then
+        self.expanded[page_id] = nil
+    else
+        self.expanded[page_id] = true
+    end
+    self:refreshPageList()
 end
 
 function WikiScreen:onInitialize()
@@ -372,10 +403,11 @@ function WikiScreen:performInitialization()
         context = self.context,
         on_complete = function()
             self:refreshPageList()
+            self:updateLinkPages()
             self:onPageChange(self.current_page_id, true)
         end
     }
-    
+
     initializer:perform(self)
     self.initializing = false
 end
@@ -418,7 +450,22 @@ function WikiScreen:onTextChange(display_text)
     self.context:save_content(self.current_page_id, display_text, editor.hyper_text_area.cursor)
 end
 
+function WikiScreen:updateLinkPages()
+    local dynamic = self.context:get_dynamic_pages()
+    local all_pages = {}
+    for _, p in ipairs(PAGES) do table.insert(all_pages, p) end
+    for _, p in ipairs(dynamic) do table.insert(all_pages, p) end
+    self.subviews.wiki_window.subviews.editor.link_pages = all_pages
+end
+
 function WikiScreen:onDismiss()
+    local win = self.subviews.wiki_window
+    if win and win.frame_body then
+        self.context:save_window_frame({
+            w=win.frame_body.width,
+            h=win.frame_body.height
+        })
+    end
     view = nil
 end
 

@@ -229,4 +229,83 @@ function TableOfContents:reload(text, cursor)
     self.subviews.table_of_contents:setChoices(sections)
 end
 
+--------------------------------------------------------------------------------
+--- Page Tree helpers for collapsible Wiki TOC
+
+local PAGE_PARENT_RULES = {
+    {prefix='citizen:', parent='citizens'},
+    {prefix='artifact:', parent='artifacts'},
+    {prefix='event:', parent='events'},
+}
+
+function get_page_parent(page_id)
+    for _, rule in ipairs(PAGE_PARENT_RULES) do
+        if page_id:sub(1, #rule.prefix) == rule.prefix then
+            return rule.parent
+        end
+    end
+    return nil
+end
+
+function build_page_tree(static_pages, dynamic_pages)
+    local tree = {}
+    for _, p in ipairs(static_pages) do
+        local children = {}
+        local is_parent = false
+        for _, dp in ipairs(dynamic_pages) do
+            local parent = get_page_parent(dp.id)
+            if parent == p.id then
+                table.insert(children, dp)
+                is_parent = true
+            end
+        end
+        table.insert(tree, {
+            text = p.text,
+            id = p.id,
+            children = is_parent and children or nil,
+        })
+    end
+    for _, dp in ipairs(dynamic_pages) do
+        local parent = get_page_parent(dp.id)
+        if not parent or not tree_contains_id(tree, parent) then
+            table.insert(tree, {
+                text = dp.text,
+                id = dp.id,
+                children = nil,
+            })
+        end
+    end
+    return tree
+end
+
+function tree_contains_id(tree, id)
+    for _, node in ipairs(tree) do
+        if node.id == id then return true end
+    end
+    return false
+end
+
+function flatten_page_tree(tree, expanded)
+    local result = {}
+    for _, node in ipairs(tree) do
+        local has_children = node.children and #node.children > 0
+        local icon = has_children and (expanded[node.id] and '[-] ' or '[+] ') or '    '
+        table.insert(result, {
+            text = icon .. node.text,
+            id = node.id,
+            is_parent = has_children,
+        })
+        if has_children and expanded[node.id] then
+            for _, child in ipairs(node.children) do
+                table.insert(result, {
+                    text = '  ' .. child.text,
+                    id = child.id,
+                    is_parent = false,
+                })
+            end
+        end
+    end
+    return result
+end
+
 return _ENV

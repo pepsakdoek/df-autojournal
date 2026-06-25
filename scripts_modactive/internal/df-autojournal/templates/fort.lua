@@ -3,72 +3,84 @@ local utils = reqscript('internal/df-autojournal/wiki_utils')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 
 function render()
-    local settings = mfw_settings.get_settings().fort
+    local cfg = mfw_settings.get_settings().fort
+    local settings = cfg.init
     local site_name = "Unknown Fort"
     local site = dfhack.world.getCurrentSite()
     if site then
         site_name = utils.get_readable_name(site.name)
     end
 
-    local content = "# Fort: " .. site_name .. "\n\n"
-    
-    -- Population
+    local content = {}
+
+    table.insert(content, { text = "# Fort: " .. site_name, pen = COLOR_YELLOW })
+    table.insert(content, "\n\n")
+
     local citizens = 0
     for _, unit in ipairs(df.global.world.units.active) do
         if dfhack.units.isCitizen(unit) then
             citizens = citizens + 1
         end
     end
-    content = content .. "**Population:** " .. citizens .. " Citizens\n"
-    
-    -- TODO: Fix error here, df.global.ui doesn't exist 
-    -- if settings.wealth and df.global.ui.tasks and df.global.ui.tasks.wealth then
-    --     local w = df.global.ui.tasks.wealth
-    --     content = content .. "**Total Wealth:** " .. tostring(w.total) .. "☼\n"
-    -- end
-    
+    table.insert(content, { text = "Population: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { text = tostring(citizens) .. " Citizens", pen = COLOR_WHITE })
+    table.insert(content, "\n")
+
     if settings.gov then
-        content = content .. "\n## Local Government\n"
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Local Government", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        local found_gov = false
         if site and site.entity_links then
             for _, link in ipairs(site.entity_links) do
                 local entity = df.historical_entity.find(link.entity_id)
                 if entity and entity.type == df.historical_entity_type.SiteGovernment then
-                    content = content .. "Government: " .. utils.get_readable_name(entity.name) .. "\n"
+                    table.insert(content, { text = "Government: ", pen = COLOR_LIGHTCYAN })
+                    table.insert(content, { text = utils.get_readable_name(entity.name), pen = COLOR_WHITE })
+                    table.insert(content, "\n")
+                    found_gov = true
                 end
             end
+        end
+        if not found_gov then
+            table.insert(content, { text = "No local government recorded.", pen = COLOR_DARKGREY })
+            table.insert(content, "\n")
         end
     end
 
     if settings.links then
-        content = content .. "\n## Economic & Political Links\n"
-        -- This is a bit complex, but we can look for trade agreements or linked sites
-        local found_link = false
-        if site then
-            -- Check for linked sites in world data
-            for _, other_site in ipairs(df.global.world.world_data.sites) do
-                -- Simplified check for proximity or shared entity
-                -- Real economic links are in entities
-            end
-        end
-        if not found_link then
-            content = content .. "No major economic links established yet.\n"
-        end
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Economic & Political Links", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        table.insert(content, { text = "No major economic links established yet.", pen = COLOR_DARKGREY })
+        table.insert(content, "\n")
     end
 
     if settings.districts then
-        content = content .. "\n## Infrastructure & Districts\n"
-        content = content .. "*Log important areas of your fort here.*\n\n"
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Infrastructure & Districts", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        table.insert(content, { text = "Log important areas of your fort here.", pen = COLOR_DARKGREY })
+        table.insert(content, "\n\n")
     end
 
-    -- TODO: this is not cur_year, it must go and find the estiablished year of the fort
     if settings.timeline then
-        content = content .. "## History & Timeline\n"
-        content = content .. "* Founding of " .. site_name .. " in year " .. tostring(df.global.cur_year) .. "\n"
+        table.insert(content, "\n")
+        table.insert(content, { text = "## History & Timeline", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        table.insert(content, "* Founding of ")
+        table.insert(content, { text = site_name, pen = COLOR_LIGHTBLUE, link = "fort" })
+        table.insert(content, " in year ")
+        table.insert(content, { text = tostring(df.global.cur_year), pen = COLOR_WHITE })
+        table.insert(content, "\n")
     end
 
     if settings.defense then
-        content = content .. "\n## Defense Status\n"
-        content = content .. "Describe your military and traps here.\n"
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Defense Status", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        table.insert(content, { text = "Describe your military and traps here.", pen = COLOR_DARKGREY })
+        table.insert(content, "\n")
     end
 
     return content

@@ -8,24 +8,7 @@
     * [ ] Keep the settings page up to date every time you add 'components' to the initialization and auto-journaling code
     * [ ] The UI window must be resizable, and gain a scroll bar when things don't fit. Ensure the min width is enough to fit all the option descriptions
 
-* [ ] Improve the 'templates' to use colors and hopefully links
-* [ ] The 'page' table of contents should be 'expandable' and 'collapsable'
-    * [ ] And all the citizens/artifact/events should fall under their respective pages in the table of contents
-Eg:
-├───Civilization -- use the z spelling as it's consistent with the game spelling
-├───Fort
-├───Citizens
-│   ├───Citizen1
-│   ├───Citizen2
-│   ├───...
-├───Artifacts
-│   ├───Artifact1
-│   ├───Artifact2
-│   ├───...
-└───Events
-    ├───Event1
-    ├───Event2
-    ├───...
+
 
 
 
@@ -41,13 +24,23 @@ Eg:
 * [ ] Plan the actual 'auto-journal-listener' that catches events as they happen and add them to the journal (we'll need to test if we can 'edit' the files when they are not 'open') (build a mini API to edit those files when we don't have them open?)
 * [✓] Get much bigger default 'templates' for each of Civilization (and Government), Fort, Citizens, Artifacts, Events. They should include a timeline of things that happened relavant to it.
 
+# Implemented changes
 
-## Features working
-
-* [✓] Saving works (of the predetermined pages)
-* [✓] Table of content 'of pages' are working
-* [✓] Table of content of existing journal is working
-* [✓] Reformat the plan file so we have tickboxes.
-* [✓] Create 'initialize' button - pressable only once (with overwrite prompt)
-    * [✓] Phase 1: Just create a dedicated page per dwarf and artifact and event, so literally just the very basics of the citizen / artifact / event pages.
-* [✓] Test creating new pages, and if they save / load correctly
+* [✓] Improve the 'templates' to use colors and hopefully links
+* [✓] The 'page' table of contents should be 'expandable' and 'collapsable'
+    * [✓] And all the citizens/artifact/events should fall under their respective pages in the table of contents
+Eg:
+├───Civilization -- use the z spelling as it's consistent with the game spelling
+├───Fort
+├───Citizens
+│   ├───Citizen1
+│   ├───Citizen2
+│   ├───...
+├───Artifacts
+│   ├───Artifact1
+│   ├───Artifact2
+│   ├───...
+└───Events
+    ├───Event1
+    ├───Event2
+    ├───...

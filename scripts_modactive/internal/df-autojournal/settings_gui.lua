@@ -1,150 +1,219 @@
 --@ module = true
 local gui = require('gui')
 local widgets = require('gui.widgets')
-local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
+local TabBar = require('gui.widgets.tab_bar')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
+local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
 
 local logger = reqscript('internal/df-autojournal/logger')
+
+local TEMPLATE_IDS = {'civ', 'fort', 'citizen', 'artifact', 'event'}
+local TEMPLATE_LABELS = {'Civ', 'Fort', 'Citizen', 'Artifact', 'Event'}
+local LABEL_WIDTH = 20
+
+local function capitalize(str)
+    return (str:gsub("^%l", string.upper):gsub("_", " "))
+end
+
+local SETTING_DESCRIPTIONS = {
+    civ = {
+        init = {
+            leadership = "Show leadership hierarchy and government positions",
+            ethics = "Show civilization ethics and value system",
+            relations = "Show diplomatic relationships with other civilizations",
+            history = "Show major historical events of the civilization",
+            wars = "Show war and conflict records",
+        },
+        journal = {
+            diplomacy = "Auto-record diplomatic events and treaty changes",
+            wars = "Auto-record war declarations and peace treaties",
+            leadership = "Auto-record leadership changes and succession",
+        },
+    },
+    fort = {
+        init = {
+            wealth = "Show fort wealth and economic status",
+            gov = "Show local government structure and ruling entities",
+            districts = "Show infrastructure and district information",
+            defense = "Show military and defense capabilities",
+            links = "Show economic and political links to other sites",
+            timeline = "Show founding and historical timeline",
+        },
+        journal = {
+            population = "Auto-record population changes and migration waves",
+            construction = "Auto-record major construction projects",
+            defense = "Auto-record siege and military events",
+        },
+    },
+    citizen = {
+        init = {
+            values = "Show personality values and beliefs",
+            relationships = "Show family and social relationships",
+            skills = "Show notable skills and proficiencies",
+            appearance = "Show physical appearance description",
+            needs = "Show current needs and desires",
+            medical = "Show health status and injuries",
+            timeline = "Show personal timeline of events",
+        },
+        journal = {
+            pet_adopted = "Auto-record when a citizen adopts a pet",
+            died = "Auto-record citizen deaths and causes",
+            renamed = "Auto-record name changes",
+        },
+    },
+    artifact = {
+        init = {
+            description = "Show artifact visual description",
+            history = "Show artifact history and creation story",
+            creator = "Link to the artifact's creator in history",
+            location = "Show current location and holder of the artifact",
+        },
+        journal = {
+            created = "Auto-record when new artifacts are created",
+        },
+    },
+    event = {
+        init = {
+            participants = "Show key participants in the event",
+            summary = "Show a brief summary of what happened",
+            consequences = "Show aftermath and consequences",
+        },
+        journal = {
+            new_events = "Auto-record newly generated world events",
+        },
+    },
+}
+
+local function desc(tab_id, category, key)
+    local d = SETTING_DESCRIPTIONS[tab_id]
+    return d and d[category] and d[category][key] or ''
+end
+
+local function make_toggle(tab_id, category, key, initial_val, row, on_hover)
+    local display_name = capitalize(key)
+    local padding = string.rep(' ', LABEL_WIDTH - #display_name)
+    return wiki_widgets.ToggleLabel{
+        view_id='toggle_' .. tab_id .. '_' .. category .. '_' .. key,
+        frame={t=row, l=0, r=0},
+        label=padding .. display_name .. ' ',
+        initial_option=initial_val,
+        on_change=function(val)
+            local s = mfw_settings.get_settings()
+            if s[tab_id] and s[tab_id][category] then
+                s[tab_id][category][key] = val
+                mfw_settings.save_settings(s)
+            end
+        end,
+    }
+end
+
+local function create_tab_panel(tab_id)
+    local settings = mfw_settings.get_settings()
+    local t = settings[tab_id]
+    if not t then
+        return widgets.Panel{view_id='panel_' .. tab_id}
+    end
+
+    local subviews = {}
+    local row = 0
+
+    table.insert(subviews, widgets.Label{
+        frame={t=row, l=0},
+        text='Initialization',
+        text_pen=COLOR_LIGHTCYAN,
+    })
+    row = row + 1
+
+    local init_keys = {}
+    for k, _ in pairs(t.init) do table.insert(init_keys, k) end
+    table.sort(init_keys)
+    for _, key in ipairs(init_keys) do
+        table.insert(subviews, make_toggle(tab_id, 'init', key, t.init[key], row))
+        row = row + 1
+    end
+
+    row = row + 1
+
+    table.insert(subviews, widgets.Label{
+        frame={t=row, l=0},
+        text='Auto-Journaling',
+        text_pen=COLOR_LIGHTCYAN,
+    })
+    row = row + 1
+
+    local journal_keys = {}
+    for k, _ in pairs(t.journal) do table.insert(journal_keys, k) end
+    table.sort(journal_keys)
+    for _, key in ipairs(journal_keys) do
+        table.insert(subviews, make_toggle(tab_id, 'journal', key, t.journal[key], row))
+        row = row + 1
+    end
+
+    return widgets.Panel{
+        view_id='panel_' .. tab_id,
+        subviews=subviews,
+    }
+end
 
 SettingsWindow = defclass(SettingsWindow, widgets.Window)
 SettingsWindow.ATTRS {
     frame_title='Wiki Settings',
-    frame={w=60, h=40},
+    frame={w=56, h=24},
+    resizable=true,
+    resize_min={w=56, h=16},
 }
 
 function SettingsWindow:init()
-    local ok, err = xpcall(function()
-        logger.log("SettingsWindow:init started")
-        self.settings = mfw_settings.get_settings()
-        logger.log("SettingsWindow: settings loaded")
+    self.current_tab_idx = 1
+    self.current_tab_id = 'civ'
+    self.tab_panels = {}
 
-        local function create_toggle(label, template, key)
-            if not self.settings[template] then
-                logger.log_error("Settings missing template: " .. tostring(template))
-                return widgets.Label{text="Error: " .. tostring(template)}
-            end
-            
-            -- Ensure key exists, default to true if missing
-            if self.settings[template][key] == nil then
-                logger.log("Warning: Settings missing key [" .. tostring(key) .. "] in template [" .. tostring(template) .. "]")
-                self.settings[template][key] = true
-            end
+    local all_views = {
+        TabBar{
+            view_id='tab_bar',
+            labels=TEMPLATE_LABELS,
+            on_select=function(idx) self:onTabSelected(idx) end,
+            get_cur_page=function() return self.current_tab_idx end,
+            frame={t=0, l=0, r=0},
+            key=false,
+            key_back=false,
+        },
+    }
 
-            return wiki_widgets.ToggleLabel{
-                label=label .. ' ',
-                initial_option=self.settings[template][key],
-                on_change=function(val)
-                    self.settings[template][key] = val
-                    mfw_settings.save_settings(self.settings)
-                end
-            }
-        end
-
-        local function create_preset_buttons(template)
-            return widgets.Panel{
-                frame={h=1},
-                subviews={
-                    widgets.Label{frame={l=0}, text='Quick: '},
-                    widgets.Label{
-                        frame={l=7, w=3},
-                        text='All',
-                        text_pen=COLOR_LIGHTGREEN,
-                        on_click=function()
-                            mfw_settings.set_preset(self.settings, template, 'all')
-                            self:update_toggles()
-                        end
-                    },
-                    widgets.Label{
-                        frame={l=11, w=3},
-                        text='Min',
-                        text_pen=COLOR_LIGHTRED,
-                        on_click=function()
-                            mfw_settings.set_preset(self.settings, template, 'minimal')
-                            self:update_toggles()
-                        end
-                    },
-                    widgets.Label{
-                        frame={l=15, w=3},
-                        text='Rec',
-                        text_pen=COLOR_LIGHTCYAN,
-                        on_click=function()
-                            mfw_settings.set_preset(self.settings, template, 'recommended')
-                            self:update_toggles()
-                        end
-                    },
-                }
-            }
-        end
-
-        self:addviews{
-            widgets.Panel{
-                view_id='settings_panel',
-                frame={t=0, l=0, r=0, b=0},
-                subviews={
-                    -- Civilization
-                    widgets.Label{frame={t=0, l=0}, text='Civilization Template', text_pen=COLOR_LIGHTCYAN},
-                    create_preset_buttons('civ'):assign{frame={t=1, l=2}},
-                    create_toggle('Leadership', 'civ', 'leadership'):assign{frame={t=2, l=2}, view_id='civ_leadership'},
-                    create_toggle('Ethics', 'civ', 'ethics'):assign{frame={t=3, l=2}, view_id='civ_ethics'},
-                    create_toggle('Relations', 'civ', 'relations'):assign{frame={t=4, l=2}, view_id='civ_relations'},
-                    create_toggle('Wars/Peace', 'civ', 'wars'):assign{frame={t=5, l=2}, view_id='civ_wars'},
-                    create_toggle('History', 'civ', 'history'):assign{frame={t=6, l=2}, view_id='civ_history'},
-
-                    -- Fort
-                    widgets.Label{frame={t=8, l=0}, text='Fort Template', text_pen=COLOR_LIGHTCYAN},
-                    create_preset_buttons('fort'):assign{frame={t=9, l=2}},
-                    create_toggle('Wealth', 'fort', 'wealth'):assign{frame={t=10, l=2}, view_id='fort_wealth'},
-                    create_toggle('Government', 'fort', 'gov'):assign{frame={t=11, l=2}, view_id='fort_gov'},
-                    create_toggle('Links', 'fort', 'links'):assign{frame={t=12, l=2}, view_id='fort_links'},
-                    create_toggle('Timeline', 'fort', 'timeline'):assign{frame={t=13, l=2}, view_id='fort_timeline'},
-                    create_toggle('Districts', 'fort', 'districts'):assign{frame={t=14, l=2}, view_id='fort_districts'},
-                    create_toggle('Defense', 'fort', 'defense'):assign{frame={t=15, l=2}, view_id='fort_defense'},
-
-                    -- Citizen
-                    widgets.Label{frame={t=17, l=0}, text='Citizen Template', text_pen=COLOR_LIGHTCYAN},
-                    create_preset_buttons('citizen'):assign{frame={t=18, l=2}},
-                    create_toggle('Relationships', 'citizen', 'relationships'):assign{frame={t=19, l=2}, view_id='citizen_relationships'},
-                    create_toggle('Skills', 'citizen', 'skills'):assign{frame={t=20, l=2}, view_id='citizen_skills'},
-                    create_toggle('Appearance', 'citizen', 'appearance'):assign{frame={t=21, l=2}, view_id='citizen_appearance'},
-                    create_toggle('Needs', 'citizen', 'needs'):assign{frame={t=22, l=2}, view_id='citizen_needs'},
-                    create_toggle('Medical', 'citizen', 'medical'):assign{frame={t=23, l=2}, view_id='citizen_medical'},
-                    create_toggle('Timeline', 'citizen', 'timeline'):assign{frame={t=24, l=2}, view_id='citizen_timeline'},
-                    create_toggle('Values', 'citizen', 'values'):assign{frame={t=25, l=2}, view_id='citizen_values'},
-
-                    -- Artifact
-                    widgets.Label{frame={t=27, l=0}, text='Artifact Template', text_pen=COLOR_LIGHTCYAN},
-                    create_preset_buttons('artifact'):assign{frame={t=28, l=2}},
-                    create_toggle('Description', 'artifact', 'description'):assign{frame={t=29, l=2}, view_id='artifact_description'},
-                    create_toggle('History', 'artifact', 'history'):assign{frame={t=30, l=2}, view_id='artifact_history'},
-                    create_toggle('Creator Link', 'artifact', 'creator'):assign{frame={t=31, l=2}, view_id='artifact_creator'},
-                    create_toggle('Location', 'artifact', 'location'):assign{frame={t=32, l=2}, view_id='artifact_location'},
-                }
-            }
-        }
-        logger.log("SettingsWindow:init finished successfully")
-    end, function(err)
-        return debug.traceback(err)
-    end)
-    if not ok then
-        logger.log_error("SettingsWindow:init failed: " .. tostring(err))
+    for i, id in ipairs(TEMPLATE_IDS) do
+        local panel = create_tab_panel(id)
+        panel.frame = {t=3, l=0, r=0, b=2}
+        panel.visible = (i == 1)
+        table.insert(all_views, panel)
+        self.tab_panels[id] = panel
     end
+
+    table.insert(all_views, widgets.Label{
+        view_id='help_bar',
+        frame={b=0, l=0, r=0, h=1},
+        text='Select a setting above to see its description',
+        text_pen=COLOR_DARKGREY,
+    })
+
+    self:addviews(all_views)
 end
 
-function SettingsWindow:update_toggles()
-    self.settings = mfw_settings.get_settings()
-    for template, keys in pairs(self.settings) do
-        for key, val in pairs(keys) do
-            local view_id = template .. '_' .. key
-            if self.subviews[view_id] then
-                self.subviews[view_id]:setOption(val)
-            end
+function SettingsWindow:onTabSelected(idx)
+    local id = TEMPLATE_IDS[idx]
+    if id then
+        self.current_tab_idx = idx
+        self.current_tab_id = id
+        for panel_id, panel in pairs(self.tab_panels) do
+            panel.visible = (panel_id == id)
         end
+        self.subviews.help_bar:setText('Select a setting above to see its description')
     end
 end
 
 SettingsScreen = defclass(SettingsScreen, gui.ZScreen)
 SettingsScreen.ATTRS {
     focus_path='mfw-settings',
+    pass_pause=true,
 }
 
 function SettingsScreen:init()

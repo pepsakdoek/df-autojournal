@@ -3,37 +3,49 @@ local utils = reqscript('internal/df-autojournal/wiki_utils')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 
 function render(item)
-    local settings = mfw_settings.get_settings().artifact
+    local cfg = mfw_settings.get_settings().artifact
+    local settings = cfg.init
     local name = utils.sanitize(dfhack.items.getReadableDescription(item))
     local itype = item:getType()
     local type_name = tostring(df.item_type[itype]):gsub("_", " "):lower():gsub("^%l", string.upper)
-    
+
     local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
     local artifact_record = nil
     if art_ref then
         artifact_record = df.artifact_record.find(art_ref.artifact_id)
     end
 
-    local content = "# " .. name .. "\n\n"
-    content = content .. "**Type:** " .. type_name .. "\n"
-    
+    local content = {}
+
+    table.insert(content, { text = "# " .. name, pen = COLOR_YELLOW })
+    table.insert(content, "\n\n")
+
+    table.insert(content, { text = "Type: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { text = type_name, pen = COLOR_WHITE })
+    table.insert(content, "\n")
+
     if artifact_record then
-        content = content .. "**Artifact ID:** " .. tostring(artifact_record.id) .. "\n"
+        table.insert(content, { text = "Artifact ID: ", pen = COLOR_LIGHTCYAN })
+        table.insert(content, { text = tostring(artifact_record.id), pen = COLOR_WHITE })
+        table.insert(content, "\n")
     end
-    
-    -- Value
+
     local value = dfhack.items.getValue(item)
-    content = content .. "**Estimated Value:** " .. tostring(value) .. "☼\n\n"
+    table.insert(content, { text = "Estimated Value: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { text = tostring(value) .. ":registered:", pen = COLOR_LIGHTGREEN })
+    table.insert(content, "\n\n")
 
     if settings.description then
-        content = content .. "## Description\n"
+        table.insert(content, { text = "## Description", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
         local long_desc = utils.sanitize(dfhack.items.getDescription(item, 0))
-        content = content .. long_desc .. "\n\n"
+        table.insert(content, { text = long_desc, pen = COLOR_WHITE })
+        table.insert(content, "\n\n")
     end
 
     if settings.history then
-        content = content .. "## History\n"
-        -- Try to find creator
+        table.insert(content, { text = "## History", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
         local creator_link = nil
         if artifact_record and settings.creator then
             local creator_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.UNIT_CREATOR)
@@ -41,27 +53,40 @@ function render(item)
                 local unit = df.unit.find(creator_ref.unit_id)
                 if unit then
                     local unit_name = utils.sanitize(dfhack.units.getReadableName(unit))
-                    creator_link = "[" .. unit_name .. "](citizen:" .. tostring(unit.id) .. ")"
+                    creator_link = {
+                        text = unit_name,
+                        pen = COLOR_LIGHTBLUE,
+                        link = "citizen:" .. tostring(unit.id)
+                    }
                 end
             end
         end
 
+        table.insert(content, "Created by ")
         if creator_link then
-            content = content .. "Created by " .. creator_link .. ".\n"
+            table.insert(content, creator_link)
         elseif artifact_record and artifact_record.name then
-            content = content .. "Named " .. utils.get_readable_name(artifact_record.name) .. " by its creator.\n"
+            table.insert(content, { text = utils.get_readable_name(artifact_record.name), pen = COLOR_WHITE })
+            table.insert(content, " by its creator")
+        else
+            table.insert(content, { text = "Unknown", pen = COLOR_DARKGREY })
         end
+        table.insert(content, ".\n")
     end
-    
+
     if settings.location then
-        content = content .. "\n## Location & Holder\n"
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Location & Holder", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
         local pos = dfhack.items.getPosition(item)
-        if pos then
-            content = content .. "Location: (" .. pos.x .. ", " .. pos.y .. ", " .. pos.z .. ")\n"
+        if pos and type(pos) == 'table' then
+            table.insert(content, { text = "Location: ", pen = COLOR_LIGHTCYAN })
+            table.insert(content, { text = "(" .. pos.x .. ", " .. pos.y .. ", " .. pos.z .. ")", pen = COLOR_WHITE })
+            table.insert(content, "\n")
         end
     end
 
-    return content
+    return utils.sanitize_content(content)
 end
 
 return _ENV

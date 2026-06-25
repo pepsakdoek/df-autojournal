@@ -127,3 +127,47 @@ end
 function get_date_str()
     return tostring(df.global.cur_year) .. "-" .. tostring(df.global.cur_year_tick)
 end
+
+-- Sanitize content that can be either a string or a display_text array
+function sanitize_content(content)
+    if type(content) == 'string' then
+        return sanitize(content)
+    elseif type(content) == 'table' then
+        local result = {}
+        for _, span in ipairs(content) do
+            if type(span) == 'string' then
+                table.insert(result, sanitize(span))
+            elseif type(span) == 'table' and span.text then
+                table.insert(result, { text = sanitize(span.text), pen = span.pen, link = span.link })
+            end
+        end
+        return result
+    end
+    return content
+end
+
+-- Helper to create a colored span
+function colored(text, pen)
+    return { text = text, pen = pen }
+end
+
+-- Helper to create a header span
+function header(text, level)
+    local prefix = string.rep('#', level or 1)
+    return colored(prefix .. ' ' .. text, COLOR_YELLOW)
+end
+
+-- Helper to create a label span
+function label(text)
+    return colored(text, COLOR_LIGHTCYAN)
+end
+
+-- Helper to create a value span
+function value(text)
+    return colored(text, COLOR_WHITE)
+end
+
+-- Helper to create a muted/note span
+function note(text)
+    return colored(text, COLOR_DARKGREY)
+end
