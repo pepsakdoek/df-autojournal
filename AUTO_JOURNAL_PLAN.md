@@ -5,9 +5,9 @@ This document outlines the architecture and implementation strategy for the auto
 ## 1. Core Architecture: The "Chronicle" Model
 To minimize impact on game performance (FPS), we use a **Batch-Scan** approach rather than real-time event listening.
 
-*   **Mechanism:** Periodically (e.g., every 5 minutes or at seasonal transitions) scan the game's `world.history.events` list.
+*   **Mechanism:** Periodically (e.g., every 5 minutes or at seasonal transitions or even as it happens (must determine if it adds lag to the game)) scan the game's `world.history.events` list.
 *   **Tracking:** Store the `last_processed_event_id` in the site data to avoid redundant processing.
-*   **The "Processing Window":** When triggered, the mod scans from `last_processed_event_id` to the current end of the list. Heavy processing (10-20s) is preferred over constant micro-stutters.
+*   **The "Processing Window":** When triggered, the mod scans from `last_processed_event_id` to the current end of the list. Heavy processing (10-20s) is preferred over constant micro-stutters (but if it's a smooth experience maybe that is best?).
 
 ## 2. Concurrency & Pausing
 To resolve the problem of both the user and the Auto-Journal-Listener editing the same page simultaneously:
