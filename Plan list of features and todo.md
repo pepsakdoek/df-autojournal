@@ -1,28 +1,49 @@
 # DFMyFortWiki plan, and list of features implemented
 
+# Always keep doing
+
+    * Keep the settings page up to date every time you add 'components' to the initialization and auto-journaling code
+    * For every feature implemented add it to the testing (we should maybe split testing and Todo at a point)
+
+
 ## TODO Next
 
-* [ ] Settings page that has toggle labels (wiki widgets) on what information they want to be autopopulated in the initialize and auto-journaling features, at the moment the Settings page has a Civilisation area, with no visible settings at all
-    * [ ] Split the 'initializing' settings from the 'auto-journaling' settings (Common settings base implemented)
-    * [ ] Each page type should have it's own tab full of settings, split into initialization settings and autojournal settings
-    * [ ] Keep the settings page up to date every time you add 'components' to the initialization and auto-journaling code
-    * [ ] The UI window must be resizable, and gain a scroll bar when things don't fit. Ensure the min width is enough to fit all the option descriptions
+
+
+## Longer TODO list
+
+* [ ] Insert link button's UI should include search, when you have many dwarves and artifacts searching is good
+* [ ] Check if we can implement 'proper' tables inside the HyperTextArea, so we can list/sort dwarves/artifacts/events
+* [ ] Plan and implement the actual 'auto-journal-listener' that catches events as they happen and add them to the journal 
+* [ ] Plan how to do events in more detail (Basic template implemented)
+* [ ] Implement much 'deeper' initialization thinking, check can we actually find out when a dwarf arrived in dfhack etc. Generally massively improve the templates.
+* [ ] Maybe an animals and Pets page?
+* [ ] Civilization
+    * [ ] Diplomatic Relations 
+        * My test civ actually has 'contact' with 2 other 'civs' as well as my own civ. We need to discreminate between Civ (High Hammer), and 'local government' (Dented Halls) -- we do that on the fort page
+    * [ ] Ethics and Values
+        * I think dwarves all have the same sets of ethics, and not quite sure how much detail we want to dive into on the Civ page (but where else), but do not 'hardcode' it because mods might change and make goblins playable or add more races
+    * [ ] Ruling monarch? 
+    * [ ] General location on the map (not sure if we can do this, but one should be able to say most of the Civ X's population is in the North, or central, or they are all over the world)
+    * [ ] Reference the 'world name' on the civ page.
+    * [ ] Ask AI what other things one might find interesting about your own civ and we can check if we can track it
+* [ ] Fort
+    * [ ] Economic and Political Links
+        * Make it actually list it if it's available
+    * [ ] Infrastructure & Districts
+        * For sure have things like a count of bedrooms
+        * Guildhalls/Temples/Inns (list each)
+            * Agreements (outstanding maybe? and completed) 
+        * Maybe workshop list and counts
+    * [ ] List animals? - Also see the animals and pets possible page
+    * [ ] Deepest depths mined? Highest structure? Ground level?
 
 
 
 
-
-## Todo Features and Testing Required
+## Testing Required
 
 * [x] Test if an intialised wiki 'remembers' it's initialised after saving / loading - FAILED
-* [✓] Phase 2: Plan how to do events in more detail (Basic template implemented)
-    * [ ] The 'root' citizen/artifact/event pages should just list all of them and link them, and keep it updated with 
-        * [ ] I don't think the 'Journal' - Which uses a 'TextArea' ui element supports 'tables'. It would be nice to show a table and be able to filter/sort on happiness, age etc.
-        * [ ] If possible maybe we can support 'links' (clickable links to go to 'linked' pages) 
-* [✓] Autocreated content should create links (even if it's just special characters) to linkable content (dwarf 1 is dwarf 2's father).
-  The respective links (on each page) should use .md file standard for creating 'links' [text to display](linklocation/ID)
-* [ ] Plan the actual 'auto-journal-listener' that catches events as they happen and add them to the journal (we'll need to test if we can 'edit' the files when they are not 'open') (build a mini API to edit those files when we don't have them open?)
-* [✓] Get much bigger default 'templates' for each of Civilization (and Government), Fort, Citizens, Artifacts, Events. They should include a timeline of things that happened relavant to it.
 
 # Implemented changes
 
@@ -44,3 +65,15 @@ Eg:
     ├───Event1
     ├───Event2
     ├───...
+
+* [✓] Settings page that has toggle labels (wiki widgets) on what information they want to be autopopulated in the initialize and auto-journaling features, at the moment the Settings page has a Civilisation area, with no visible settings at all
+    * [✓] Split the 'initializing' settings from the 'auto-journaling' settings (Common settings base implemented)
+    * [✓] Each page type should have it's own tab full of settings, split into initialization settings and autojournal settings
+    * [✓] The UI window must be resizable, and gain a scroll bar when things don't fit. Ensure the min width is enough to fit all the option descriptions
+
+* [✓] Get much bigger default 'templates' for each of Civilization (and Government), Fort, Citizens, Artifacts, Events. They should include a timeline of things that happened relavant to it.
+
+* [✓] If possible maybe we can support 'links' (clickable links to go to 'linked' pages) 
+* [✓] Autocreated content should create links (even if it's just special characters) to linkable content (dwarf 1 is dwarf 2's father).
+
+* [✓] The 'root' citizen/artifact/event pages should just list all of them and link them, and keep it updated with 

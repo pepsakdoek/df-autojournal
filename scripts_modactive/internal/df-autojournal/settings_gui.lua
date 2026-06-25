@@ -86,16 +86,16 @@ local SETTING_DESCRIPTIONS = {
 
 local function desc(tab_id, category, key)
     local d = SETTING_DESCRIPTIONS[tab_id]
-    return d and d[category] and d[category][key] or ''
+    return d and d[category] and d[category][key] or (capitalize(key) .. ' setting')
 end
 
-local function make_toggle(tab_id, category, key, initial_val, row, on_hover)
+local function make_toggle(tab_id, category, key, initial_val, row)
     local display_name = capitalize(key)
     local padding = string.rep(' ', LABEL_WIDTH - #display_name)
     return wiki_widgets.ToggleLabel{
         view_id='toggle_' .. tab_id .. '_' .. category .. '_' .. key,
         frame={t=row, l=0, r=0},
-        label=padding .. display_name .. ' ',
+        label=display_name .. padding .. ' ',
         initial_option=initial_val,
         on_change=function(val)
             local s = mfw_settings.get_settings()
@@ -118,6 +118,7 @@ local function create_tab_panel(tab_id)
     local row = 0
 
     table.insert(subviews, widgets.Label{
+        view_id='section_init_' .. tab_id,
         frame={t=row, l=0},
         text='Initialization',
         text_pen=COLOR_LIGHTCYAN,
@@ -135,6 +136,7 @@ local function create_tab_panel(tab_id)
     row = row + 1
 
     table.insert(subviews, widgets.Label{
+        view_id='section_journal_' .. tab_id,
         frame={t=row, l=0},
         text='Auto-Journaling',
         text_pen=COLOR_LIGHTCYAN,
@@ -154,6 +156,8 @@ local function create_tab_panel(tab_id)
         subviews=subviews,
     }
 end
+
+local settings_instance = nil
 
 SettingsWindow = defclass(SettingsWindow, widgets.Window)
 SettingsWindow.ATTRS {
@@ -192,7 +196,7 @@ function SettingsWindow:init()
         view_id='help_bar',
         frame={b=0, l=0, r=0, h=1},
         text='Select a setting above to see its description',
-        text_pen=COLOR_DARKGREY,
+        text_pen=COLOR_GREY,
     })
 
     self:addviews(all_views)
@@ -210,6 +214,51 @@ function SettingsWindow:onTabSelected(idx)
     end
 end
 
+function SettingsWindow:updateHoverHelp()
+    local found = false
+    for panel_id, panel in pairs(self.tab_panels) do
+        if panel.visible then
+            for _, sv in ipairs(panel.subviews) do
+                local vid = sv.view_id
+                if vid and vid:match('^toggle_') then
+                    local mx, my = sv:getMousePos()
+                    if mx then
+                        local tab_id, category, key = vid:match('^toggle_(.+)_(.+)_(.+)$')
+                        if tab_id then
+                            self.subviews.help_bar:setText(desc(tab_id, category, key))
+                            found = true
+                        end
+                        break
+                    end
+                end
+            end
+            if found then break end
+        end
+    end
+    if not found then
+        local tab_id = self.current_tab_id
+        local any_hovered = false
+        for panel_id, panel in pairs(self.tab_panels) do
+            if panel.visible then
+                local mx, my = panel:getMousePos()
+                if mx then any_hovered = true end
+                break
+            end
+        end
+        if not any_hovered then
+            local mx, my = self:getMousePos()
+            if not mx then
+                self.subviews.help_bar:setText('Select a setting above to see its description')
+            end
+        end
+    end
+end
+
+function SettingsWindow:onRenderBody(dc)
+    SettingsWindow.super.onRenderBody(self, dc)
+    self:updateHoverHelp()
+end
+
 SettingsScreen = defclass(SettingsScreen, gui.ZScreen)
 SettingsScreen.ATTRS {
     focus_path='mfw-settings',
@@ -220,8 +269,16 @@ function SettingsScreen:init()
     self:addviews{SettingsWindow{}}
 end
 
+function SettingsScreen:onDismiss()
+    settings_instance = nil
+end
+
 function show_settings()
-    SettingsScreen{}:show()
+    if settings_instance then
+        settings_instance:raise()
+    else
+        settings_instance = SettingsScreen{}:show()
+    end
 end
 
 return _ENV
