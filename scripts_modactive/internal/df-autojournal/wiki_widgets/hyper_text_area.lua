@@ -11,6 +11,7 @@ local widgets   = require('gui.widgets')
 
 local Toolbar              = reqscript('internal/df-autojournal/wiki_widgets/toolbar').Toolbar
 local LinkModal            = reqscript('internal/df-autojournal/wiki_widgets/link_modal').LinkModal
+local TableEditorModal     = reqscript('internal/df-autojournal/wiki_widgets/table_editor_modal').TableEditorModal
 local HyperTextAreaContent = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area_content').HyperTextAreaContent
 
 -- ===========================================================================
@@ -28,7 +29,6 @@ HyperTextArea.ATTRS {
     on_text_change   = DEFAULT_NIL,
     on_cursor_change = DEFAULT_NIL,
     on_link_click    = DEFAULT_NIL,
-    link_pages       = DEFAULT_NIL,
     debug            = false,
 }
 
@@ -45,11 +45,11 @@ function HyperTextArea:init()
             self.hyper_text_area.active_pen = color
         end,
         on_link_request = function() self:openLinkModal() end,
+        on_table_request = function() self:openTableEditor() end,
     }
 
     self.hyper_text_area = HyperTextAreaContent {   
         frame           = {l=4, r=4, t=0, b=3},
-        raw_text        = self.raw_text,
         display_text    = self.display_text,
         text_pen        = self.text_pen,
         link_pen        = self.link_pen,
@@ -90,51 +90,145 @@ function HyperTextArea:init()
             "Ctrl+Shift+Up/Down: Color | Ctrl+Ins: Link | Ctrl+Z/Y: Undo/Redo\n",
             "Left-click: Cursor | ",
             {text = "Ctrl+Click: Follow Link", pen = COLOR_LIGHTCYAN},
-            " | Drag: Select"
+            " | Drag: Select | ",
+            {text = string.char(30), pen = COLOR_LIGHTCYAN},
+            ": Edit Table"
         }
     }
 
     self:addviews { self.toolbar, self.hyper_text_area, self.scrollbar, self.info_box }
 end
 
+function HyperTextArea:openTableEditor()
+    local content = self.hyper_text_area
+    local cursor = content.cursor
+    local tbls = content.table_blocks
+
+    if #tbls == 0 then
+        -- No tables exist – open modal in create mode
+        TableEditorModal{
+            table_block = nil,
+            on_submit = function(name, new_columns, new_rows, max_rows)
+                local pos = cursor
+                local id = content._next_table_id
+                content._next_table_id = content._next_table_id + 1
+                table.insert(content.table_blocks, {
+                    pos      = pos,
+                    columns  = new_columns,
+                    rows     = new_rows,
+                    sort_col = nil,
+                    sort_asc = true,
+                    max_rows = max_rows,
+                    id       = id,
+                    name     = name,
+                })
+                content:updateContent()
+            end,
+        }:show()
+        return
+    end
+
+    local nearest = nil
+    local nearest_dist = math.huge
+    for i, tb in ipairs(tbls) do
+        local dist = math.abs(tb.pos - cursor)
+        if dist < nearest_dist then
+            nearest_dist = dist
+            nearest = i
+        end
+    end
+
+    if nearest then
+        local tb = tbls[nearest]
+        TableEditorModal{
+            table_block = {
+                columns  = tb.columns,
+                rows     = tb.rows,
+                sort_col = tb.sort_col,
+                sort_asc = tb.sort_asc,
+                max_rows = tb.max_rows,
+                name     = tb.name,
+            },
+            on_submit = function(name, new_columns, new_rows, max_rows)
+                tb.columns = new_columns
+                tb.rows    = new_rows
+                tb.name    = name
+                tb.max_rows = max_rows
+                content:updateContent()
+            end,
+        }:show()
+    end
+end
+
 function HyperTextArea:openLinkModal()
     LinkModal{
-        pages = self.link_pages,
         on_submit = function(text, page)
+            local content = self.hyper_text_area
+            local insert_start = content.cursor
             for i = 1, #text do
-                table.insert(self.hyper_text_area.char_list, self.hyper_text_area.cursor, {
+                table.insert(content.char_list, content.cursor, {
                     char = text:sub(i, i),
                     pen = self.link_pen,
                     link = page
                 })
-                self.hyper_text_area.cursor = self.hyper_text_area.cursor + 1
+                content.cursor = content.cursor + 1
             end
             -- Always add a space after a link to prevent 'end of text' bugs
-            table.insert(self.hyper_text_area.char_list, self.hyper_text_area.cursor, {
+            table.insert(content.char_list, content.cursor, {
                 char = ' ',
                 pen = self.active_pen
             })
-            self.hyper_text_area.cursor = self.hyper_text_area.cursor + 1
-            self.hyper_text_area:updateContent()
+            content.cursor = content.cursor + 1
+            local chars_inserted = #text + 1
+            content:_adjust_table_positions_after_insert(insert_start, chars_inserted)
+            content:updateContent()
         end
     }:show()
 end
 
-function HyperTextArea:setContent(raw_text, display_text)
-    self.raw_text    = raw_text
+function HyperTextArea:setContent(display_text)
     self.display_text = display_text
+    self.raw_text     = ''
     self.render_start_line_y = 1
-    self.hyper_text_area:setContent(raw_text, display_text)
+    self.hyper_text_area:setContent(display_text)
+    self.raw_text = self.hyper_text_area.wrapped_text.raw_text
     if self.frame_body then self:updateLayout() end
 end
 
 function HyperTextArea:setDisplayText(display_text)
-    local t = {}
-    for _, s in ipairs(display_text) do
-        t[#t+1] = type(s) == 'string' and s or s.text
+    self:setContent(display_text)
+end
+
+-- Add a table block at the current cursor position.
+-- columns: { {header="Name", align="left", width=0, min_width=5}, ... }
+-- rows:    { { {text="Urist", link="dwarf/1"}, {text="127"} }, ... }
+-- opts:    { sort_col=nil, sort_asc=true, max_rows=nil }
+function HyperTextArea:addTable(columns, rows, opts)
+    opts = opts or {}
+    local function new_table_block()
+        return {
+            type     = 'table',
+            columns  = columns,
+            rows     = rows,
+            sort_col = opts.sort_col,
+            sort_asc = (opts.sort_asc ~= false),
+            max_rows = opts.max_rows,
+        }
     end
-    local raw_text = table.concat(t)
-    self:setContent(raw_text, display_text)
+    local content = self.hyper_text_area
+    local pos = content.cursor
+    local id = content._next_table_id
+    content._next_table_id = content._next_table_id + 1
+    table.insert(content.table_blocks, {
+        pos      = pos,
+        columns  = columns,
+        rows     = rows,
+        sort_col = opts.sort_col,
+        sort_asc = (opts.sort_asc ~= false),
+        max_rows = opts.max_rows,
+        id       = id,
+    })
+    content:updateContent()
 end
 
 function HyperTextArea:getRawText() return self.raw_text end
@@ -178,7 +272,8 @@ function HyperTextArea:updateScrollbar(target_y)
 end
 
 function HyperTextArea:renderSubviews(dc)
-    self.hyper_text_area.frame_body.y1 = self.frame_body.y1 - (self.render_start_line_y - 1)
+    -- No frame_body shift needed: onRenderBody and all coordinate
+    -- conversions already use render_start_line_y as the scroll offset.
     HyperTextArea.super.renderSubviews(self, dc)
 end
 

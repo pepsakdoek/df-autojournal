@@ -23,14 +23,15 @@ function HistoryStore:init()
     self.future = {}
 end
 
-function HistoryStore:store(entry_type, char_list, cursor)
+function HistoryStore:store(entry_type, char_list, cursor, table_blocks)
     local last_entry = self.past[#self.past]
     if not last_entry or entry_type == HISTORY_ENTRY.OTHER or
        last_entry.entry_type ~= entry_type then
         table.insert(self.past, {
-            entry_type = entry_type,
-            char_list  = copyall(char_list),
-            cursor     = cursor
+            entry_type   = entry_type,
+            char_list    = copyall(char_list),
+            cursor       = cursor,
+            table_blocks = table_blocks and copyall(table_blocks) or {},
         })
     end
     self.future = {}
@@ -39,24 +40,26 @@ function HistoryStore:store(entry_type, char_list, cursor)
     end
 end
 
-function HistoryStore:undo(curr_char_list, curr_cursor)
+function HistoryStore:undo(curr_char_list, curr_cursor, curr_table_blocks)
     if #self.past == 0 then return nil end
     local entry = table.remove(self.past, #self.past)
     table.insert(self.future, {
-        entry_type = HISTORY_ENTRY.OTHER,
-        char_list  = copyall(curr_char_list),
-        cursor     = curr_cursor
+        entry_type   = HISTORY_ENTRY.OTHER,
+        char_list    = copyall(curr_char_list),
+        cursor       = curr_cursor,
+        table_blocks = curr_table_blocks and copyall(curr_table_blocks) or {},
     })
     return entry
 end
 
-function HistoryStore:redo(curr_char_list, curr_cursor)
+function HistoryStore:redo(curr_char_list, curr_cursor, curr_table_blocks)
     if #self.future == 0 then return nil end
     local entry = table.remove(self.future, #self.future)
     table.insert(self.past, {
-        entry_type = HISTORY_ENTRY.OTHER,
-        char_list  = copyall(curr_char_list),
-        cursor     = curr_cursor
+        entry_type   = HISTORY_ENTRY.OTHER,
+        char_list    = copyall(curr_char_list),
+        cursor       = curr_cursor,
+        table_blocks = curr_table_blocks and copyall(curr_table_blocks) or {},
     })
     return entry
 end

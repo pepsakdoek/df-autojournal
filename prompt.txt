@@ -1,0 +1,9 @@
+read @opencodesummary.md for an overview of the project. 
+
+I recently changed the HyperTextView in @scripts_modactive/internal/df-autojournal/wiki_widgets to support tables inside the HyperTextView. Change the way that the Citizens, Artifact and Event pages work so that they use a table.
+
+For the citizens page, I want the Full Name (Column name should just be name, excluding nickname), Nickname, Birth Year, Happiness Level, Title or Role, Death Status
+
+For the Artifact page, Artifact name, creator, item type, value
+
+You can check the @scripts_modactive/internal/df-autojournal/wiki_widgets/README.md for an explanation of how to insert a table into the inner workings of the table.

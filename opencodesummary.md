@@ -21,14 +21,14 @@ D:\P\df-autojournal\scripts_modactive\df-autojournal.lua	Mod entry point. Requir
 
 Core Logic (internal/df-autojournal/)
 File	Purpose
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\main_gui.lua	Main UI screen. Defines WikiWindow (the main window with Wiki TOC, Journal TOC, Editor), WikiContext (persistent data storage wrapper), and WikiScreen (the full-screen ZScreen). Orchestrates the entire UI. (441 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\initializer.lua	Wiki Initializer. Scans the fortress for active units, renders templates for civ/fort/citizens, saves content via WikiContext. Defines WikiInitializer class. Currently uses citizens only (artifacts code commented out). (139 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\chronicle.lua	Auto-Journaling Chronicle. Batch-scans world.history.events, filters by site, parses events, and appends entries to the appropriate wiki pages. Runs as a background dfhack.timeout loop every 1 minute. (109 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\event_parser.lua	Event Parser. Maps DF history event types (HIST_FIGURE_NEW_PET, HIST_FIGURE_DIED, ARTIFACT_CREATED, HIST_FIGURE_RENAME) into structured entries with page_id, section, and text. Provides helper functions for unit/HF links. (85 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\logger.lua	Logger. Writes timestamped logs to wiki_debug.log in the DF root directory and prints to DFHack console. (24 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_utils.lua	Utilities. get_civ_id(), get_site_id(), translate_name(), sanitize() (CP437 to UTF-8 accent-stripping and back), get_readable_name(), get_date_str(). (129 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_settings.lua	Settings data model. Defines DEFAULT_SETTINGS (nested table per template type), loads/saves from persistent DF site data using JSON encoding, provides set_preset() for "all/minimal/recommended" presets. (105 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\settings_gui.lua	Settings UI screen. Defines SettingsWindow (a widgets.Window) and SettingsScreen (a gui.ZScreen). Creates toggle labels for every template setting (civ: 5, fort: 6, citizen: 7, artifact: 4), with quick preset buttons (All/Min/Rec). (158 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\main_gui.lua	Main UI screen. Defines WikiWindow (the main window with Wiki TOC, Journal TOC, Editor), WikiContext (persistent data storage wrapper), and WikiScreen (the full-screen ZScreen). Orchestrates the entire UI. (443 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\initializer.lua	Wiki Initializer. Scans the fortress for active units, renders templates for civ/fort/citizens/artifacts, saves content via WikiContext. Defines WikiInitializer class. Builds root Citizens and Artifacts pages with sortable table blocks. Uses safe_save() wrapper with pcall logging. (207 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\chronicle.lua	Auto-Journaling Chronicle. Batch-scans world.history.events, filters by site, parses events, and appends entries to the appropriate wiki pages. Runs as a background dfhack.timeout loop every 1 minute. (99 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\event_parser.lua	Event Parser. Maps DF history event types (HIST_FIGURE_NEW_PET, HIST_FIGURE_DIED, ARTIFACT_CREATED, HIST_FIGURE_RENAME) into structured entries with page_id, section, and text. Provides helper functions for unit/HF links. (79 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\logger.lua	Logger. Writes timestamped logs to wiki_debug.log in the DF root directory and prints to DFHack console. (21 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_utils.lua	Utilities. get_civ_id(), get_site_id(), translate_name(), sanitize() (CP437 to UTF-8 accent-stripping and back), get_readable_name(), get_date_str(), sanitize_content() (handles strings, spans, and table blocks), plus helper functions colored(), header(), label(), value(), note(). (174 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_settings.lua	Settings data model. Defines DEFAULT_SETTINGS (nested table per template type), loads/saves from persistent DF site data using JSON encoding, provides set_preset() for "all/minimal/recommended" presets. (219 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\settings_gui.lua	Settings UI screen. Defines SettingsWindow (a widgets.Window) and SettingsScreen (a gui.ZScreen). Creates toggle labels for every template setting (civ: 5, fort: 6, citizen: 7, artifact: 4), with quick preset buttons (All/Min/Rec). (255 lines)
 
 Templates (internal/df-autojournal/templates/)
 File	Purpose
@@ -41,14 +41,18 @@ D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\event.lu
 
 Widget/UI System (internal/df-autojournal/wiki_widgets/)
 File	Purpose
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets.lua	Core widget re-exports. Defines three custom widgets: ToggleLabel (toggle switch with [X] / [ ] icons), Shifter (collapse/expand arrow button for Journal TOC), TableOfContents (scannable section list with Prev/Next navigation). (232 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area.lua	HyperTextArea -- the rich-text display/editor widget. Wraps toolbar + content area + scrollbar + info box. Handles color selection (Ctrl+Shift+Up/Down), link insertion (Ctrl+Insert), clipboard, cursor movement, scroll. (208 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area_content.lua	HyperTextAreaContent -- the internal rendering/editing engine. Manages a flat char_list (character-level records with pen/link). Handles input: typing, cursor movement, selection, copy/cut/paste, undo/redo, mouse hit-testing with link click detection. (472 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_wrapped_text.lua	HyperWrappedText -- text-wrapping engine that operates on display_text/raw_text pairs. Produces lines and line_spans arrays. Provides coordsToIndex, indexToCoords, and getClickHandlerAt for hit-testing. (132 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_utils.lua	HTA Utilities: to_span(), build_char_list(), collapse_chars(), char_list_to_raw(). (75 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\history_store.lua	HistoryStore -- undo/redo manager for HyperTextArea. Stores up to 25 entries, coalesces consecutive same-type edits. (64 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\toolbar.lua	Toolbar -- vertical color picker widget (15 colors) with a link-insert button at the bottom. (75 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\link_modal.lua	LinkModal -- a modal ZScreen for inserting internal wiki links. Shows an EditField for display text and a List of destination pages. (77 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets.lua	Core widget re-exports. Defines three custom widgets: ToggleLabel (toggle switch with [X] / [ ] icons), Shifter (collapse/expand arrow button for Journal TOC), TableOfContents (scannable section list with Prev/Next navigation). Also defines page tree helpers: build_page_tree(), flatten_page_tree(), get_page_parent(), tree_contains_id() used for collapsible [+] / [-] Wiki TOC. (281 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\README.md	HyperTextArea documentation: span format, table block format, programmatic usage, table editor instructions. (163 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area.lua	HyperTextArea -- the rich-text display/editor widget. Wraps toolbar + content area + scrollbar + info box. Handles color selection (Ctrl+Shift+Up/Down), link insertion (Ctrl+Insert), clipboard, cursor movement, scroll. Also manages table blocks: setDisplayText() passes table entries through, addTable() inserts at cursor. (274 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area_content.lua	HyperTextAreaContent -- the internal rendering/editing engine. Manages a flat char_list (character-level records with pen/link). Handles input: typing, cursor movement, selection, copy/cut/paste, undo/redo, mouse hit-testing with link click detection. Extracts table blocks separately from char_list and manages their positions, supports sortable columns (click header to sort), placeholders, and scroll awareness. (635 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_wrapped_text.lua	HyperWrappedText -- text-wrapping engine that operates on display_text/raw_text pairs. Produces lines and line_spans arrays. Provides coordsToIndex, indexToCoords, and getClickHandlerAt for hit-testing. Handles table-block line tracking (is_table_line marks table rows as non-editable). (268 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_table.lua	HyperTable -- table block rendering engine. Renders multi-column tables with headers, sort indicators (^/v), row clipping, line drawing (horiz/vert rules with CP437 box-drawing chars), and cell alignment. (318 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_utils.lua	HTA Utilities: to_span(), is_table_block(), build_char_list(), collapse_chars(), char_list_to_raw(). (79 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\history_store.lua	HistoryStore -- undo/redo manager for HyperTextArea. Stores up to 25 entries, coalesces consecutive same-type edits. (60 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\toolbar.lua	Toolbar -- vertical color picker widget (15 colors) with a link-insert button at the bottom and a table-insert button (▲) above it. (72 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\link_modal.lua	LinkModal -- a modal ZScreen for inserting internal wiki links. Shows an EditField for display text and a List of destination pages. (63 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\table_editor_modal.lua	TableEditorModal -- modal for editing table blocks. Two sections: Columns (header|align|stretch format) and Data (pipe-delimited rows). Supports F2 save and Esc discard. (331 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_context.lua	HTAContext -- optional serialization context (JSON-based persistence for HyperTextArea content). (36 lines)
 
 3. SETTINGS PAGE IMPLEMENTATION
 Data Model (wiki_settings.lua)
@@ -76,10 +80,12 @@ Initialization (initializer.lua)
 2. Renders and saves Civ page (civ_template.render()) and Fort page (fort_template.render())
 3. Iterates df.global.world.units.active, filters to citizens via dfhack.units.isCitizen(unit)
 4. For each citizen, renders citizen_template.render(unit) and saves under key 'citizen:' .. unit.id
-5. Builds a root Citizens index page with * [Name](citizen:id) links
-6. Artifacts are commented out (TODO)
-7. Saves the dynamic page list and sets initialized flag
-8. Calls on_complete callback to refresh the page list
+5. Builds a root Citizens index page with a **sortable table block** (columns: Name, Birth Year, Happiness, Title/Role, Death Status) with linked names
+6. Iterates artifacts, renders artifact_template.render(item), saves under key 'artifact:' .. art_record.id
+7. Builds a root Artifacts index page with a **sortable table block** (columns: Name, Creator, Type, Value) with linked names
+8. Saves the dynamic page list and sets initialized flag
+9. Calls on_complete callback to refresh the page list
+- All save_content calls use safe_save() wrapper with pcall error capture and logging
 Auto-Journaling: Chronicle (chronicle.lua)
 - Batch-scan approach (not real-time event listening)
 - Chronicle.get_state() reads last_event_id and is_running from persistent site data
@@ -104,8 +110,8 @@ Handles 4 event types currently:
 Wiki Page TOC (Left Panel)
 - Defined in WikiWindow:init() as a widgets.List with view_id='wiki_page_list'
 - Hardcoded pages: PAGES = {{text='Civilisation', id='civ'}, {text='Fort', id='fort'}, {text='Citizens', id='citizens'}, {text='Artifacts', id='artifacts'}, {text='Events', id='events'}}
-- Dynamic pages (citizen/artifact sub-pages) are appended to this list via WikiScreen:refreshPageList() which calls self.context:get_dynamic_pages()
-- Selection triggers onWikiPageSubmit(idx, choice) which calls self.on_page_change(choice.id)
+- Dynamic pages (citizen/artifact sub-pages) are appended to this list via WikiScreen:refreshPageList() which uses build_page_tree() + flatten_page_tree() to create a collapsible tree with [+] / [-] icons
+- Selection triggers onWikiPageSubmit(idx, choice): for parent items (Citizens/Artifacts/Events), clicking the [+] / [-] icon toggles expand/collapse, clicking the text navigates to the root page. Non-parent items always navigate.
 Journal Page TOC (Middle Panel)
 - Implemented as TableOfContents widget (defined in wiki_widgets.lua)
 - TableOfContents extends widgets.Panel with an internal widgets.List (view_id='table_of_contents')
@@ -119,7 +125,6 @@ Journal Page TOC (Middle Panel)
 Layout Management
 - WikiWindow:ensurePanelsRelSize() recalculates the l (left) positions of divider and editor panels as the Wiki TOC and Journal TOC panels are shown/hidden
 - WikiWindow:preUpdateLayout() calls ensurePanelsRelSize()
-
 
 6. TEMPLATE SYSTEM
 Design: Each template type is a standalone Lua module in templates/ that exports a render() function. Templates are unaware of the event parser -- they are only used during initialization to generate the initial page content. The event parser uses a different mechanism (Chronicle.append_to_page) to append to existing pages.
@@ -155,12 +160,13 @@ Custom Widgets (in wiki_widgets.lua and wiki_widgets/)
 1. ToggleLabel -- A styled toggle button using [O] / [X] icons from DF's control panel tile sheet. Extends ToggleHotkeyLabel.
 2. Shifter -- A collapse/expand arrow used to show/hide the Journal TOC. Shows << or >> characters.
 3. TableOfContents -- A section header scanner + navigable list with Prev/Next buttons.
-4. HyperTextArea (wiki_widgets/hyper_text_area.lua) -- The main rich-text widget:
-- Contains a Toolbar (color picker + link button)
+4. Page tree helpers (build_page_tree, flatten_page_tree, etc.) -- Collapsible Wiki TOC with parent/child grouping and [+] / [-] icons.
+5. HyperTextArea (wiki_widgets/hyper_text_area.lua) -- The main rich-text widget:
+- Contains a Toolbar (color picker + link button + table insert button)
 - Contains HyperTextAreaContent (the editable text engine)
 - Contains a Scrollbar
 - Contains an InfoBox showing keyboard shortcuts
-5. HyperTextAreaContent (wiki_widgets/hyper_text_area_content.lua) -- Character-level text editor with:
+6. HyperTextAreaContent (wiki_widgets/hyper_text_area_content.lua) -- Character-level text editor with:
 - Flat char_list array of {char, pen, link} records
 - Text manipulation (insert, delete, backspace, enter)
 - Selection (mouse drag, Ctrl+A, Shift+cursor)
@@ -168,16 +174,25 @@ Custom Widgets (in wiki_widgets.lua and wiki_widgets/)
 - Undo/redo (Ctrl+Z/Y) via HistoryStore
 - Link click handling (Ctrl+click) with hover highlighting
 - Cursor navigation (arrows, home/end, Ctrl+left/right, Ctrl+home/end)
-6. HyperWrappedText (wiki_widgets/hyper_wrapped_text.lua) -- Text wrapping engine that bridges display_text (rich spans) to raw_text (plain string). Produces lines and line_spans for rendering.
-7. Toolbar (wiki_widgets/toolbar.lua) -- Vertical strip of 15 color blocks with selection indicator and a link-insert button at the bottom.
-8. LinkModal (wiki_widgets/link_modal.lua) -- Dialog for inserting [text](page) links over the text.
-9. HistoryStore (wiki_widgets/history_store.lua) -- Undo/redo stack with coalescing of same-type edits, up to 25 entries deep.
+- **Table block management**: extracts table blocks from display_text into separate table_blocks array with position tracking; handles insert/delete adjustments, sorting, placeholder lines
+7. HyperWrappedText (wiki_widgets/hyper_wrapped_text.lua) -- Text wrapping engine that bridges display_text (rich spans) to raw_text (plain string). Produces lines and line_spans for rendering. Tracks table lines (is_table_line) and manages table block line accounting.
+8. **HyperTable** (wiki_widgets/hyper_table.lua) -- Dedicated table block renderer. Handles column layout (auto-width, fixed-width, stretch), sorting (click header to sort by column), row clipping (with "and N more" overflow line), text alignment, box-drawing borders.
+9. Toolbar (wiki_widgets/toolbar.lua) -- Vertical strip of 15 color blocks with selection indicator, a link-insert button at the bottom, and a **table-insert button** (▲) above the link button.
+10. LinkModal (wiki_widgets/link_modal.lua) -- Dialog for inserting [text](page) links over the text.
+11. **TableEditorModal** (wiki_widgets/table_editor_modal.lua) -- Modal for editing table blocks. Two text areas: Columns (header|align|stretch format) and Data (pipe-delimited). F2 to save, Esc to discard.
+12. HistoryStore (wiki_widgets/history_store.lua) -- Undo/redo stack with coalescing of same-type edits, up to 25 entries deep.
+13. HTAContext (wiki_widgets/hta_context.lua) -- Optional JSON-based serialization context for HyperTextArea content persistence.
 Link System
 - Links use the format [display text](page_id) where page_id can be civ, fort, citizens, artifacts, events, or citizen:<unit_id>
 - Links are parsed at the character level in HyperTextAreaContent
 - Mouse hit-testing: HyperWrappedText:getClickHandlerAt(x, y) checks which span fragment is under the cursor and returns the link data
 - Ctrl+Click navigates to the linked page via on_link_click
-
+Table Blocks
+- Tables are a first-class type in the display_text model: { type='table', columns={...}, rows={...}, sort_col=nil, sort_asc=true, max_rows=nil }
+- Table columns support: header, align (left/right/center), width, min_width, max_width, stretch
+- Tables are extracted into a separate table_blocks array (not part of char_list) and rendered as read-only full-width blocks
+- Table header clicks trigger sorting; sort indicator shown as ^/v on the sorted column header
+- The table editor modal (▲ button in toolbar) allows editing the nearest table's columns and data
 
 8. ARCHITECTURAL SUMMARY
 User launches mod
@@ -189,21 +204,22 @@ df-autojournal.lua (entry point)
 main_gui.lua -> WikiScreen (ZScreen)
        |
        +-- WikiWindow (main UI container)
-       |     +-- Wiki Page List (left) -- hardcoded + dynamic pages
+       |     +-- Wiki Page List (left) -- collapsible tree with [+]/[-], click icon to toggle, click text to navigate
        |     +-- Shifter + Journal TOC (middle) -- collapsible section headers
-       |     +-- HyperTextArea (right) -- rich text editor
+       |     +-- HyperTextArea (right) -- rich text editor with table block support
        |     +-- Bottom bar (hotkey hints)
        |
        +-- WikiContext (persistence layer)
-       |     +-- save_content / load_content (per page)
+       |     +-- save_content / load_content (per page) with pcall error logging
        |     +-- save_dynamic_pages / get_dynamic_pages
        |     +-- Uses dfhack.persistent.saveSiteData with prefix 'mfw_'
        |
        +-- Initialization flow:
        |     WikiInitializer:perform()
-       |       -> reads civ_template, fort_template, citizen_template
-       |       -> renders and saves content for each citizen
-       |       -> saves index pages with links
+       |       -> reads civ_template, fort_template, citizen_template, artifact_template
+       |       -> renders and saves content for each citizen and artifact
+       |       -> builds root Citizens and Artifacts pages with sortable table blocks
+       |       -> saves index pages with links, using safe_save() wrapper for error capture
        |
        +-- Auto-Journaling flow (currently disabled):
              Chronicle:process_events()
@@ -220,13 +236,16 @@ main_gui.lua -> WikiScreen (ZScreen)
 Widget System:
   DFHack gui/gui.widgets (standard) + Custom widgets:
     wiki_widgets/:
-      toolbar.lua          -- color picker
-      link_modal.lua       -- link inserter
-      hyper_wrapped_text.lua -- text wrapping engine
-      hyper_text_area_content.lua -- char-level editor engine
-      hyper_text_area.lua  -- combined rich-text widget
-      hta_utils.lua        -- span/char list utilities
-      history_store.lua    -- undo/redo
+      toolbar.lua              -- color picker + table insert button
+      link_modal.lua           -- link inserter
+      hyper_wrapped_text.lua   -- text wrapping engine with table-line tracking
+      hyper_text_area_content.lua -- char-level editor with table block management
+      hyper_text_area.lua      -- combined rich-text widget
+      hyper_table.lua          -- table block rendering engine
+      table_editor_modal.lua   -- table editor modal
+      hta_utils.lua            -- span/char list utilities + table block detection
+      history_store.lua        -- undo/redo
+      hta_context.lua          -- optional JSON persistence
 
 Templates:
   templates/:

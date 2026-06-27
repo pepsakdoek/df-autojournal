@@ -128,7 +128,6 @@ function get_date_str()
     return tostring(df.global.cur_year) .. "-" .. tostring(df.global.cur_year_tick)
 end
 
--- Sanitize content that can be either a string or a display_text array
 function sanitize_content(content)
     if type(content) == 'string' then
         return sanitize(content)
@@ -137,6 +136,28 @@ function sanitize_content(content)
         for _, span in ipairs(content) do
             if type(span) == 'string' then
                 table.insert(result, sanitize(span))
+            elseif type(span) == 'table' and span.type == 'table' then
+                local tbl = {}
+                for k, v in pairs(span) do
+                    tbl[k] = v
+                end
+                if tbl.columns then
+                    for _, col in ipairs(tbl.columns) do
+                        if col.header then
+                            col.header = sanitize(col.header)
+                        end
+                    end
+                end
+                if tbl.rows then
+                    for _, row in ipairs(tbl.rows) do
+                        for _, cell in ipairs(row) do
+                            if cell.text then
+                                cell.text = sanitize(cell.text)
+                            end
+                        end
+                    end
+                end
+                table.insert(result, tbl)
             elseif type(span) == 'table' and span.text then
                 table.insert(result, { text = sanitize(span.text), pen = span.pen, link = span.link })
             end

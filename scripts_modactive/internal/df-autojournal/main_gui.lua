@@ -168,8 +168,18 @@ end
 
 function WikiWindow:onWikiPageSubmit(idx, choice)
     if choice.is_parent then
-        if self.on_page_tree_toggle then
-            self.on_page_tree_toggle(choice.id)
+        local list = self.subviews.wiki_page_list
+        if list then
+            local mx = list:getMousePos()
+            if mx and mx >= 0 and mx <= 3 then
+                if self.on_page_tree_toggle then
+                    self.on_page_tree_toggle(choice.id)
+                end
+                return
+            end
+        end
+        if self.on_page_change then
+            self.on_page_change(choice.id)
         end
     elseif self.on_page_change then
         self.on_page_change(choice.id)
@@ -255,10 +265,10 @@ function WikiContext:save_content(page_id, display_text, cursor)
     if dfhack.isWorldLoaded() then
         local key = self:get_key(page_id)
         logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ")")
-        dfhack.persistent.saveSiteData(
-            key,
-            {content=display_text, cursor={cursor}}
-        )
+        local ok, err = pcall(dfhack.persistent.saveSiteData, key, {content=display_text, cursor={cursor}})
+        if not ok then
+            logger.log_error("WikiContext: Failed to persist page " .. page_id .. ": " .. tostring(err))
+        end
     end
 end
 

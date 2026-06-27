@@ -10,6 +10,9 @@ function to_span(entry)
     if type(entry) == 'string' then
         return { text = entry, pen = nil, link = nil }
     end
+    if entry.type == 'table' then
+        return entry  -- pass through table blocks unmodified
+    end
     return {
         text = entry.text or '',
         pen  = entry.pen  or nil,
@@ -17,17 +20,25 @@ function to_span(entry)
     }
 end
 
+-- Return true if the display_text entry is a table block.
+function is_table_block(entry)
+    return type(entry) == 'table' and entry.type == 'table'
+end
+
 -- Build a flat list of character-level records from display_text spans.
+-- Table blocks are skipped (they are handled separately by the renderer).
 function build_char_list(display_text)
     local chars = {}
     for _, entry in ipairs(display_text) do
-        local span = to_span(entry)
-        for i = 1, #span.text do
-            chars[#chars + 1] = {
-                char = span.text:sub(i, i),
-                pen  = span.pen,
-                link = span.link,
-            }
+        if not is_table_block(entry) then
+            local span = to_span(entry)
+            for i = 1, #span.text do
+                chars[#chars + 1] = {
+                    char = span.text:sub(i, i),
+                    pen  = span.pen,
+                    link = span.link,
+                }
+            end
         end
     end
     return chars
