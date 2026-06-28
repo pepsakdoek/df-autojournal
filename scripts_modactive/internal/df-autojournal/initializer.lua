@@ -74,12 +74,12 @@ function WikiInitializer:perform(screen)
                 local happiness = "Unknown"
                 if unit and unit.status.current_soul and unit.status.current_soul.personality then
                     local stress = unit.status.current_soul.personality.stress
-                    if stress < -100000 then happiness = "Euphoric"
-                    elseif stress < -50000 then happiness = "Very Happy"
+                    if stress < -50000 then happiness = "Euphoric"
+                    elseif stress < -25000 then happiness = "Very Happy"
                     elseif stress < -10000 then happiness = "Happy"
                     elseif stress < 10000 then happiness = "Content"
-                    elseif stress < 50000 then happiness = "Unhappy"
-                    elseif stress < 100000 then happiness = "Very Unhappy"
+                    elseif stress < 25000 then happiness = "Unhappy"
+                    elseif stress < 50000 then happiness = "Very Unhappy"
                     else happiness = "Miserable"
                     end
                 end
@@ -93,7 +93,6 @@ function WikiInitializer:perform(screen)
                     { text = name, pen = COLOR_LIGHTBLUE, link = id },
                     { text = birth_year, pen = COLOR_WHITE },
                     { text = happiness },
-                    { text = profession },
                     { text = death_status, pen = dead and COLOR_LIGHTRED or COLOR_LIGHTGREEN },
                 })
             end
@@ -109,14 +108,12 @@ function WikiInitializer:perform(screen)
         table.insert(citizen_root, {
             type = 'table',
             columns = {
-                { header = 'Name', align = 'left', min_width = 15 },
-                { header = 'Birth Year', align = 'right', min_width = 6 },
-                { header = 'Happiness', align = 'left', min_width = 10 },
-                { header = 'Title / Role', align = 'left', min_width = 15 },
-                { header = 'Death Status', align = 'left', min_width = 8 },
+                { header = 'Name', align = 'left', min_width = 15, max_width = 50, stretch = true },
+                { header = 'Birth Year', align = 'right', min_width = 6, stretch = false },
+                { header = 'Happiness', align = 'left', min_width = 10, stretch = false },
+                { header = 'Death Status', align = 'left', min_width = 8, stretch = false },
             },
-            rows = citizen_rows,
-            max_rows = 50,
+            rows = citizen_rows
         })
         safe_save(self.context, 'citizens', utils.sanitize_content(citizen_root), 1)
 

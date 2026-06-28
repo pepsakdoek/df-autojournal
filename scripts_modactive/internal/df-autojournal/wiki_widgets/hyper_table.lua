@@ -94,12 +94,16 @@ function HyperTable:calc_column_widths(avail_width)
             local avail_for_auto = avail - fixed_total
             if avail_for_auto < 1 then avail_for_auto = 1 end
             if #auto_cols > 0 then
-                local each = math.floor(avail_for_auto / #auto_cols)
-                local remainder = avail_for_auto - each * #auto_cols
-                for idx, j in ipairs(auto_cols) do
-                    widths[j] = each + (idx <= remainder and 1 or 0)
-                    if widths[j] < self.columns[j].min_width then
-                        widths[j] = self.columns[j].min_width
+                local remaining = avail_for_auto
+                for _, j in ipairs(auto_cols) do
+                    widths[j] = self.columns[j].min_width
+                    remaining = remaining - widths[j]
+                end
+                if remaining > 0 then
+                    local each = math.floor(remaining / #auto_cols)
+                    local extra = remaining - each * #auto_cols
+                    for idx, j in ipairs(auto_cols) do
+                        widths[j] = widths[j] + each + (idx <= extra and 1 or 0)
                     end
                 end
             end
@@ -124,6 +128,10 @@ function HyperTable:calc_column_widths(avail_width)
                 local remainder = leftover - each * #stretch_cols
                 for idx, j in ipairs(stretch_cols) do
                     widths[j] = widths[j] + each + (idx <= remainder and 1 or 0)
+                    local max_w = self.columns[j].max_width
+                    if max_w and max_w > 0 and widths[j] > max_w then
+                        widths[j] = max_w
+                    end
                 end
             end
         end
