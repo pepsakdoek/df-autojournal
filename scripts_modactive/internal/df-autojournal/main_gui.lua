@@ -8,6 +8,7 @@ local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
 local wiki_initializer = reqscript('internal/df-autojournal/initializer')
 local wiki_settings = reqscript('internal/df-autojournal/settings_gui')
 local chronicle = reqscript('internal/df-autojournal/chronicle')
+local event_listener = reqscript('internal/df-autojournal/event_listener')
 local utils = reqscript('internal/df-autojournal/wiki_utils')
 local HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area').HyperTextArea
 
@@ -68,12 +69,14 @@ function WikiWindow:init()
                     label='Auto-Journaling ',
                     key='CUSTOM_ALT_A',
                     initial_option=function()
-                        local data = dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
-                        return data and data.val and data.val[1] == 1
+                        return event_listener.is_running()
                     end,
                     on_change=function(val)
-                        logger.log("Auto-Journaling toggled: " .. tostring(val))
-                        dfhack.persistent.saveSiteData('mfw_auto_journal_enabled', {val={val and 1 or 0}})
+                        if val then
+                            event_listener.start()
+                        else
+                            event_listener.stop()
+                        end
                     end,
                 },
                 widgets.HotkeyLabel{

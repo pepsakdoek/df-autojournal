@@ -1,6 +1,8 @@
 --@ module = true
 local logger = reqscript('internal/df-autojournal/logger')
 local utils = reqscript('internal/df-autojournal/wiki_utils')
+local event_parser = reqscript('internal/df-autojournal/event_parser')
+local event_listener = reqscript('internal/df-autojournal/event_listener')
 
 -- Templates
 local citizen_template = reqscript('internal/df-autojournal/templates/citizen')
@@ -206,13 +208,16 @@ function WikiInitializer:perform(screen)
         logger.log("Saving " .. #dynamic_pages .. " dynamic pages...")
         self.context:save_dynamic_pages(dynamic_pages)
 
-        -- 3. Events (Simple list for now)
+        -- 3. Events page (placeholder, will be populated by catch-up)
         local events_root = {}
         table.insert(events_root, { text = "# Events", pen = COLOR_YELLOW })
         table.insert(events_root, "\n\n")
         table.insert(events_root, { text = "Events will be listed here.", pen = COLOR_DARKGREY })
         table.insert(events_root, "\n")
         safe_save(self.context, 'events', utils.sanitize_content(events_root), 1)
+
+        -- 4. Historical catch-up: scan past events for this site
+        self:catchUpEvents(site_id)
 
         -- Set initialized flag
         dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
@@ -233,6 +238,83 @@ function WikiInitializer:perform(screen)
     end
 
     return ok
+end
+
+---------------------------------------------------------------------------
+--- Historical event catch-up: scan all past events for this site.
+--- Runs during initialization, after citizen/artifact pages are built.
+--- Batches in chunks of 500 with progress logging, persists a marker
+--- so subsequent inits only catch up from where we left off.
+---------------------------------------------------------------------------
+
+function WikiInitializer:catchUpEvents(site_id)
+    local events = df.global.world.history.events
+    if not events or #events == 0 then
+        logger.log("Catch-up: no history events to scan.")
+        return
+    end
+
+    local current_max = df.global.world.history.event_id
+    local catchup_key = self.context.save_prefix .. 'catchup_last_id'
+
+    -- Read last caught-up event ID
+    local last_done = 0
+    local ok_load, data = pcall(function()
+        return dfhack.persistent.getSiteData(catchup_key)
+    end)
+    if ok_load and data and data.val then
+        last_done = data.val
+    end
+
+    if last_done >= current_max then
+        logger.log("Catch-up: already up to date (last=" .. last_done .. ", max=" .. current_max .. ")")
+        return
+    end
+
+    logger.log("Catch-up: scanning events " .. last_done .. " to " .. current_max)
+
+    local batch_size = 500
+    local total_scanned = 0
+    local total_matched = 0
+    local max_index = #events - 1
+
+    for i = 0, max_index do
+        local ev = events[i]
+        if not ev then goto continue end
+
+        local ev_id = ev.id
+        if ev_id < last_done then goto continue end
+        if ev_id >= current_max then break end
+
+        total_scanned = total_scanned + 1
+
+        -- Filter by site
+        local ev_site = -1
+        pcall(function()
+            if ev.getSite then ev_site = ev:getSite() end
+        end)
+
+        if ev_site == site_id then
+            local parsed = event_parser.parse(ev)
+            if parsed and parsed.page_id then
+                local entry_text = "* " .. parsed.text .. "\n"
+                event_listener.append_to_page(parsed.page_id, parsed.section, entry_text)
+                total_matched = total_matched + 1
+            end
+        end
+
+        -- Save progress every batch
+        if total_scanned % batch_size == 0 then
+            pcall(dfhack.persistent.saveSiteData, catchup_key, {val=ev_id})
+            logger.log("Catch-up: scanned " .. total_scanned .. ", matched " .. total_matched)
+        end
+
+        ::continue::
+    end
+
+    -- Save final marker
+    pcall(dfhack.persistent.saveSiteData, catchup_key, {val=current_max})
+    logger.log("Catch-up complete: scanned " .. total_scanned .. " events, matched " .. total_matched)
 end
 
 return _ENV
