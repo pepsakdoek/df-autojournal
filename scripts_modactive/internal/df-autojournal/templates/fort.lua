@@ -83,6 +83,12 @@ function render()
         table.insert(content, "\n")
     end
 
+    -- Fort Timeline — populated by event listener / catch-up
+    table.insert(content, "\n")
+    table.insert(content, { text = "## Fort Timeline", pen = COLOR_YELLOW })
+    table.insert(content, "\n")
+    table.insert(content, "* " .. site_name .. " founded.\n")
+
     return content
 end
 

@@ -10,6 +10,8 @@ local artifact_template = reqscript('internal/df-autojournal/templates/artifact'
 local fort_template = reqscript('internal/df-autojournal/templates/fort')
 local civ_template = reqscript('internal/df-autojournal/templates/civilization')
 local event_template = reqscript('internal/df-autojournal/templates/event')
+local timeline_template = reqscript('internal/df-autojournal/templates/timeline')
+local enemies_template = reqscript('internal/df-autojournal/templates/enemies')
 
 local function safe_save(context, page_id, content, cursor)
     local ok, err = pcall(context.save_content, context, page_id, content, cursor)
@@ -208,16 +210,22 @@ function WikiInitializer:perform(screen)
         logger.log("Saving " .. #dynamic_pages .. " dynamic pages...")
         self.context:save_dynamic_pages(dynamic_pages)
 
-        -- 3. Events page (placeholder, will be populated by catch-up)
+        -- 3. Events page (placeholder, will be populated by catch-up + timeline)
         local events_root = {}
         table.insert(events_root, { text = "# Events", pen = COLOR_YELLOW })
         table.insert(events_root, "\n\n")
-        table.insert(events_root, { text = "Events will be listed here.", pen = COLOR_DARKGREY })
+        table.insert(events_root, { text = "Loading events...", pen = COLOR_DARKGREY })
         table.insert(events_root, "\n")
         safe_save(self.context, 'events', utils.sanitize_content(events_root), 1)
 
         -- 4. Historical catch-up: scan past events for this site
         self:catchUpEvents(site_id)
+
+        -- 5. Render timeline table + counts on Events page
+        self:renderEventsTimeline()
+
+        -- 6. Render Enemies page with registry
+        self:renderEnemiesPage()
 
         -- Set initialized flag
         dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
@@ -254,7 +262,7 @@ function WikiInitializer:catchUpEvents(site_id)
         return
     end
 
-    local current_max = df.global.world.history.event_id
+    local current_max = #events
     local catchup_key = self.context.save_prefix .. 'catchup_last_id'
 
     -- Read last caught-up event ID
@@ -300,6 +308,39 @@ function WikiInitializer:catchUpEvents(site_id)
                 local entry_text = "* " .. parsed.text .. "\n"
                 event_listener.append_to_page(parsed.page_id, parsed.section, entry_text)
                 total_matched = total_matched + 1
+
+                -- Register in timeline registry
+                local pseudo = {
+                    year = ev.year or df.global.cur_year,
+                    season = "",
+                    category = "general",
+                    event_type = tostring(ev:getType()),
+                    summary = parsed.text,
+                    targets = {},
+                }
+                event_listener.register_timeline_entry(pseudo)
+
+                -- Register threat events in enemy registry
+                local etype = ev:getType()
+                if etype == df.history_event_type.HIST_FIGURE_ATTACK
+                    or etype == df.history_event_type.HIST_FIGURE_SITE_CONFLICT
+                    or etype == df.history_event_type.HIST_FIGURE_ABDUCTED
+                    or etype == df.history_event_type.CREATURE_DEVOURED then
+                    local enemy_name = "Unknown Threat"
+                    pcall(function()
+                        local type_str = tostring(etype):gsub("HIST_FIGURE_", ""):gsub("_", " "):lower()
+                        enemy_name = parsed.text:match("attacked (.+) in year")
+                            or parsed.text:match("Abducted (.+) in year")
+                            or parsed.text:match("Devoured (.+) in year")
+                            or "Historical " .. type_str
+                    end)
+                    event_listener.register_enemy_encounter(
+                        enemy_name,
+                        "Historical Threat",
+                        ev.year or df.global.cur_year,
+                        false
+                    )
+                end
             end
         end
 
@@ -315,6 +356,95 @@ function WikiInitializer:catchUpEvents(site_id)
     -- Save final marker
     pcall(dfhack.persistent.saveSiteData, catchup_key, {val=current_max})
     logger.log("Catch-up complete: scanned " .. total_scanned .. " events, matched " .. total_matched)
+end
+
+---------------------------------------------------------------------------
+--- Render timeline table + category counts on the Events page.
+--- Called after catch-up completes so the registry has entries.
+---------------------------------------------------------------------------
+
+function WikiInitializer:renderEventsTimeline()
+    -- Load timeline registry
+    local entries = {}
+    local ok_load = pcall(function()
+        local data = dfhack.persistent.getSiteData('mfw_event_timeline')
+        if data and data.entries then
+            entries = data.entries
+        end
+    end)
+    if not ok_load then
+        logger.log("renderTimeline: no timeline data found")
+        return
+    end
+
+    -- Build category counts
+    local categories = {}
+    local cat_count = 0
+    for _, e in ipairs(entries) do
+        local cat = e.category or "general"
+        if not categories[cat] then
+            categories[cat] = 0
+            cat_count = cat_count + 1
+        end
+        categories[cat] = categories[cat] + 1
+    end
+
+    -- Render timeline content
+    local timeline_content = {}
+    for _, item in ipairs(timeline_template.render_counts(categories)) do
+        table.insert(timeline_content, item)
+    end
+    for _, item in ipairs(timeline_template.render_timeline(entries)) do
+        table.insert(timeline_content, item)
+    end
+
+    -- Load existing Events page content
+    local page_data = self.context:load_content('events')
+    local existing = page_data.content or {}
+    if type(existing) == 'string' then
+        existing = {{text=existing, pen=COLOR_LIGHTCYAN}}
+    end
+
+    -- Merge: keep existing content (category sections from catch-up),
+    -- but insert timeline content after the # Events header
+    local merged = {}
+    local header_done = false
+    for _, item in ipairs(existing) do
+        table.insert(merged, item)
+        if not header_done then
+            local text = type(item) == 'table' and item.text or tostring(item)
+            if text and text:match("^# Events") then
+                -- Insert timeline section after the header
+                table.insert(merged, "\n")
+                for _, t_item in ipairs(timeline_content) do
+                    table.insert(merged, t_item)
+                end
+                table.insert(merged, "\n")
+                table.insert(merged, { text = "## Event Log", pen = COLOR_YELLOW })
+                table.insert(merged, "\n")
+                header_done = true
+            end
+        end
+    end
+
+    safe_save(self.context, 'events', utils.sanitize_content(merged), 1)
+    logger.log("Events timeline rendered with " .. #entries .. " entries across " .. cat_count .. " categories")
+end
+
+---------------------------------------------------------------------------
+--- Render the Enemies page from the enemy registry.
+--- Called after catch-up completes so the registry has entries.
+---------------------------------------------------------------------------
+
+function WikiInitializer:renderEnemiesPage()
+    if not event_listener.load_enemies then
+        logger.log_error("event_listener.load_enemies not available, skipping enemies page")
+        return
+    end
+    local enemies = event_listener.load_enemies()
+    local content = enemies_template.render(enemies)
+    safe_save(self.context, 'enemies', utils.sanitize_content(content), 1)
+    logger.log("Enemies page rendered with " .. #enemies .. " entries")
 end
 
 return _ENV

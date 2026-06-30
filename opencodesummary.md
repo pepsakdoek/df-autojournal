@@ -1,7 +1,7 @@
 Here is the complete analysis of the codebase.
 
 1. PROJECT OVERVIEW
-What it is: A DFHack Lua mod for Dwarf Fortress (v50+ Steam) called "DF Autojournal" (ID: df_autojournal). It provides a wiki-like auto-journaling system inside Dwarf Fortress -- similar to the vanilla Journal but with multi-page support, auto-generated citizen/artifact/event pages, a table of contents, templates, settings, and a rich-text editor with clickable links.
+What it is: A DFHack Lua mod for Dwarf Fortress (v50+ Steam) called "DF Autojournal" (ID: df_autojournal). Provides a wiki-like auto-journaling system inside Dwarf Fortress -- multi-page citizen/artifact/event/enemies wiki, real-time event capture via DFHack eventful hooks, historical event catch-up on initialization, family relationship tracking, overlay status icons, sortable timeline, category-filterable settings, and a rich-text editor with clickable links and table blocks.
 Author: pepsakdoek  
 Version: 0.1.0  
 Stack: Dwarf Fortress Steam v50.xx + DFHack (Lua API)
@@ -15,239 +15,231 @@ D:\P\df-autojournal\AUTO_JOURNAL_PLAN.md	Detailed plan for the batch-scan auto-j
 D:\P\df-autojournal\template_ideas.md	Ideas for future template enhancements (world position, temperature, birth year vs. age)
 D:\P\df-autojournal\Plan list of features and todo.md	Feature checklist, TODO items, working features
 
-Entry Point
+Entry Point & Overlay
 File	Purpose
-D:\P\df-autojournal\scripts_modactive\df-autojournal.lua	Mod entry point. Requires main_gui and calls main_gui.main() when run directly (not as a module). 8 lines.
+D:\P\df-autojournal\scripts_modactive\df-autojournal.lua	Mod entry point. Requires main_gui + event_listener, calls main_gui.main() when run directly. (9 lines)
+D:\P\df-autojournal\scripts_modactive\df-autojournal-status.lua	Overlay script (--@ overlay df-autojournal-status). Shows top-right status icons (ON/OFF) for the event listener. Registers onStateChange handler to auto-start listener on map load and stop on world unload. Checks persisted state directly without depending on listener module being fully loaded. (67 lines)
 
 Core Logic (internal/df-autojournal/)
 File	Purpose
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\main_gui.lua	Main UI screen. Defines WikiWindow (the main window with Wiki TOC, Journal TOC, Editor), WikiContext (persistent data storage wrapper), and WikiScreen (the full-screen ZScreen). Orchestrates the entire UI. (443 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\initializer.lua	Wiki Initializer. Scans the fortress for active units, renders templates for civ/fort/citizens/artifacts, saves content via WikiContext. Defines WikiInitializer class. Builds root Citizens and Artifacts pages with sortable table blocks. Uses safe_save() wrapper with pcall logging. (207 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\chronicle.lua	Auto-Journaling Chronicle. Batch-scans world.history.events, filters by site, parses events, and appends entries to the appropriate wiki pages. Runs as a background dfhack.timeout loop every 1 minute. (99 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\event_parser.lua	Event Parser. Maps DF history event types (HIST_FIGURE_NEW_PET, HIST_FIGURE_DIED, ARTIFACT_CREATED, HIST_FIGURE_RENAME) into structured entries with page_id, section, and text. Provides helper functions for unit/HF links. (79 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\logger.lua	Logger. Writes timestamped logs to wiki_debug.log in the DF root directory and prints to DFHack console. (21 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_utils.lua	Utilities. get_civ_id(), get_site_id(), translate_name(), sanitize() (CP437 to UTF-8 accent-stripping and back), get_readable_name(), get_date_str(), sanitize_content() (handles strings, spans, and table blocks), plus helper functions colored(), header(), label(), value(), note(). (174 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_settings.lua	Settings data model. Defines DEFAULT_SETTINGS (nested table per template type), loads/saves from persistent DF site data using JSON encoding, provides set_preset() for "all/minimal/recommended" presets. (219 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\settings_gui.lua	Settings UI screen. Defines SettingsWindow (a widgets.Window) and SettingsScreen (a gui.ZScreen). Creates toggle labels for every template setting (civ: 5, fort: 6, citizen: 7, artifact: 4), with quick preset buttons (All/Min/Rec). (255 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\main_gui.lua	Main UI screen. Defines WikiWindow (Wiki TOC, Journal TOC, Editor), WikiContext (persistence layer), WikiScreen (ZScreen). PAGES table includes Civilisation, Fort, Citizens, Artifacts, Events, Enemies. Auto-Journaling toggle wired to event_listener.start()/stop(). (502 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\initializer.lua	Wiki Initializer. Scans fortress for active units, renders civ/fort/citizen/artifact templates. Added: historical event catch-up (catchUpEvents, scans history events forward in batches of 500), timeline rendering on Events page (renderEventsTimeline), enemies page from registry (renderEnemiesPage), timeline registry registration for threat events, enemy registry registration for threat-type history events. (420 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\event_listener.lua	Real-time event listener (NEW in Phase 1, expanded Phase 2). Wraps require('plugins.eventful') with 6 hooks: onReport, onUnitDeath, onItemCreated, onUnitNewActive, onInvasion, onSyndrome. Hooks are registered once per Lua session. Routes parsed events to wiki pages via direct dfhack.persistent access (no WikiContext dependency). Features: append_to_page (span-array format), timeline registry (mfw_event_timeline, 1000 entry cap), enemy registry (mfw_enemies with dedup by normalized name), seen-unit dedup set, category-level settings filtering (12 event toggles). Exports: append_to_page, register_timeline_entry, register_enemy_encounter, load_enemies. (464 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\chronicle.lua	Legacy batch-scan Chronicle. Disabled in favor of real-time event_listener. Remains for backward compatibility. (109 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\event_parser.lua	Comprehensive event parser. Two subsystems:
+- Real-time: parse_report() classifies 55+ DFHack report type IDs into 9 categories (threat, achievement, social, trade, crisis, military, environment, world, combat). Each category has a dedicated format function with date stamping, speaker extraction, and wiki link generation. Plus parse_death(), parse_item_created(), parse_new_unit(), parse_invasion(), parse_syndrome() for eventful hooks. Extracts enemy_name from threat report text via heuristic parser.
+- Historical: parse() handles 15+ df.history_event_type values (HIST_FIGURE_DIED, ATTACK, ABDUCTED, BECAME_VAMPIRE, BECAME_WEREBEAST, GAINS_SYNDROME, ENTITY_MIGRANT, MASTERPIECE_*, CREATURE_DEVOURED, ADD_HF_HF_LINK, CREATED_STRUCTURE, and the original 4 types). Uses is_our_hf() helper that checks entity links to our civ (works even for dead/unloaded units). (1144 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\logger.lua	Logger. Writes to wiki_debug.log in DF root + DFHack console. (24 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_utils.lua	Utilities. get_civ_id(), get_site_id(), translate_name(), sanitize(), get_readable_name(), get_date_str(), sanitize_content() (handles strings, spans, table blocks), plus helper functions colored(), header(), label(), value(), note(). (194 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_settings.lua	Settings data model. DEFAULT_SETTINGS: civ (5 init), fort (6 init), citizen (7 init + 3 journal), artifact (4 init + 1 journal), event (3 init + 12 journal toggles added in Phase 6 update: threat_events, achievement_events, social_events, trade_events, crisis_events, military_events, environment_events, world_events, death_events, birth_migrant_events, syndrome_events, siege_events). Loads/saves from dfhack.persistent via JSON. Provides set_preset(). Auto-migration from old flat format. (254 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\settings_gui.lua	Settings UI screen. TabBar with 5 tabs (Civ, Fort, Citizen, Artifact, Event). Dynamic toggle generation from settings model. Help bar shows descriptions on hover. (295 lines)
 
 Templates (internal/df-autojournal/templates/)
 File	Purpose
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\fort.lua	Fort template renderer. Reads mfw_settings.get_settings().fort, generates markdown with sections: Population, Government, Links, Districts, Timeline, Defense. (77 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\civilization.lua	Civilization template renderer. Reads mfw_settings.get_settings().civ, generates markdown with sections: Type, Diplomatic Relations, Ethics, Major History. Leadership code is commented out. (101 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\citizen.lua	Citizen template renderer. Reads mfw_settings.get_settings().citizen, generates markdown: Profession, Gender, Personal Journal, Values (active), Appearance/Needs/Relationships/Skills (commented out), Timeline. (123 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\artifact.lua	Artifact template renderer. Reads mfw_settings.get_settings().artifact, generates: Type, Value, Description, History (with creator link), Location. (67 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\event.lua	Event template renderer. Static template with sections: Summary, Key Participants, Detailed Account, Consequences. (27 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\fort.lua	Fort template. Adds Fort Timeline section at end for auto-appended event entries. (94 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\civilization.lua	Civilization template. Sections: Type, Diplomatic Relations, Ethics, Major History. (103 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\citizen.lua	Citizen template. Family & Relationships section added: queries unit.hist_figure_id -> histfig_links, renders Spouse(s), Parents, Children with clickable wiki links for citizen relatives (COLOR_LIGHTBLUE) and plain text for non-citizen. (100 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\artifact.lua	Artifact template. Sections: Type, Value, Description, History (creator link), Location. (92 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\event.lua	Event detail page template. Rewritten to accept structured event_data: title, year, season, category, participants[] (with name+link), description, consequences, links[]. Renders: header, metadata, Summary, Key Participants (clickable), Related links, Detailed Account (editable), Consequences. (90 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\timeline.lua	Timeline rendering (NEW in Phase 4). Two functions: render_timeline(entries) generates a sortable table (Year, Season, Category with color, Summary with wiki-markup stripped, Link column), sorted newest-first with 200-row cap; render_counts(categories) generates category breakdown by count. (179 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\templates\enemies.lua	Enemies page (NEW in Phase 6). Renders a sortable table (Name, Type with colored badges, First Year, Defeated Y/N with color, Encounters, Notes) sorted by first-year, plus an Encounter Log section header for appended entries. (93 lines)
 
 
 Widget/UI System (internal/df-autojournal/wiki_widgets/)
 File	Purpose
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets.lua	Core widget re-exports. Defines three custom widgets: ToggleLabel (toggle switch with [X] / [ ] icons), Shifter (collapse/expand arrow button for Journal TOC), TableOfContents (scannable section list with Prev/Next navigation). Also defines page tree helpers: build_page_tree(), flatten_page_tree(), get_page_parent(), tree_contains_id() used for collapsible [+] / [-] Wiki TOC. (281 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\README.md	HyperTextArea documentation: span format, table block format, programmatic usage, table editor instructions. (163 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area.lua	HyperTextArea -- the rich-text display/editor widget. Wraps toolbar + content area + scrollbar + info box. Handles color selection (Ctrl+Shift+Up/Down), link insertion (Ctrl+Insert), clipboard, cursor movement, scroll. Also manages table blocks: setDisplayText() passes table entries through, addTable() inserts at cursor. (274 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area_content.lua	HyperTextAreaContent -- the internal rendering/editing engine. Manages a flat char_list (character-level records with pen/link). Handles input: typing, cursor movement, selection, copy/cut/paste, undo/redo, mouse hit-testing with link click detection. Extracts table blocks separately from char_list and manages their positions, supports sortable columns (click header to sort), placeholders, and scroll awareness. (635 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_wrapped_text.lua	HyperWrappedText -- text-wrapping engine that operates on display_text/raw_text pairs. Produces lines and line_spans arrays. Provides coordsToIndex, indexToCoords, and getClickHandlerAt for hit-testing. Handles table-block line tracking (is_table_line marks table rows as non-editable). (268 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_table.lua	HyperTable -- table block rendering engine. Renders multi-column tables with headers, sort indicators (^/v), row clipping, line drawing (horiz/vert rules with CP437 box-drawing chars), and cell alignment. (318 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_utils.lua	HTA Utilities: to_span(), is_table_block(), build_char_list(), collapse_chars(), char_list_to_raw(). (79 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\history_store.lua	HistoryStore -- undo/redo manager for HyperTextArea. Stores up to 25 entries, coalesces consecutive same-type edits. (60 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\toolbar.lua	Toolbar -- vertical color picker widget (15 colors) with a link-insert button at the bottom and a table-insert button (▲) above it. (72 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\link_modal.lua	LinkModal -- a modal ZScreen for inserting internal wiki links. Shows an EditField for display text and a List of destination pages. (63 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\table_editor_modal.lua	TableEditorModal -- modal for editing table blocks. Two sections: Columns (header|align|stretch format) and Data (pipe-delimited rows). Supports F2 save and Esc discard. (331 lines)
-D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_context.lua	HTAContext -- optional serialization context (JSON-based persistence for HyperTextArea content). (36 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets.lua	Core widget re-exports. ToggleLabel, Shifter, TableOfContents, page tree helpers. (311 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\README.md	HyperTextArea documentation. (213 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area.lua	HyperTextArea rich-text widget. (303 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_text_area_content.lua	Char-level editing engine. (698 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_wrapped_text.lua	Text wrapping engine. (307 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hyper_table.lua	Table block rendering engine. (362 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_utils.lua	Span/char-list utilities. (86 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\history_store.lua	Undo/redo manager. (67 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\toolbar.lua	Color picker + table/link buttons. (81 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\link_modal.lua	Link insertion dialog. (69 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\table_editor_modal.lua	Table editor modal. (365 lines)
+D:\P\df-autojournal\scripts_modactive\internal\df-autojournal\wiki_widgets\hta_context.lua	Optional JSON persistence. (42 lines)
 
 3. SETTINGS PAGE IMPLEMENTATION
 Data Model (wiki_settings.lua)
 - Storage key: 'mfw_settings' in dfhack.persistent.getSiteData/saveSiteData
-- Default settings are a nested table keyed by template type (civ, fort, citizen, artifact, event), each containing boolean toggles:
-- civ: leadership, ethics, relations, wars, history
-- fort: wealth, gov, districts, defense, links, timeline
-- citizen: values, relationships, skills, appearance, needs, medical, timeline
-- artifact: description, history, creator, location
-- event: participants, summary, consequences
-- Settings are JSON-encoded for storage with legacy table support
+- Default settings keyed by template type, each with init + journal booleans:
+- civ: init(leadership, ethics, relations, wars, history) journal(diplomacy, wars, leadership)
+- fort: init(wealth, gov, districts, defense, links, timeline) journal(population, construction, defense)
+- citizen: init(values, relationships, skills, appearance, needs, medical, timeline) journal(pet_adopted, died, renamed)
+- artifact: init(description, history, creator, location) journal(created)
+- event: init(participants, summary, consequences) journal(threat_events, achievement_events, social_events, trade_events, crisis_events, military_events, environment_events, world_events, death_events, birth_migrant_events, syndrome_events, siege_events)
+- 12 granular event journal toggles replaced the original blanket new_events toggle
+- Settings are JSON-encoded with auto-migration from old flat format
 - Presets: set_preset(settings, template, 'all'|'minimal'|'recommended')
 Settings GUI (settings_gui.lua)
-- SettingsWindow extends widgets.Window with frame={w=60, h=40}
-- SettingsScreen extends gui.ZScreen with focus_path='mfw-settings'
-- Uses a local create_toggle(label, template, key) closure that returns a ToggleLabel bound to the specific setting, with auto-save on change
-- Uses a local create_preset_buttons(template) closure that creates "All", "Min", "Rec" quick preset labels
-- To update toggles after a preset change: SettingsWindow:update_toggles() re-reads settings and sets each toggle
-- Limitation: The settings panel is currently a flat list -- no tabs for "initialization" vs "auto-journaling" yet, and no scrollbar (it can overflow the window)
+- SettingsWindow extends widgets.Window with 5-tab TabBar
+- Each tab reads the settings model and creates ToggleLabels dynamically
+- Help bar shows per-setting description on mouse hover
+- event tab's journal section shows all 12 category toggles with descriptive help text
 
 4. INITIALIZATION AND AUTO-JOURNALING CODE
 Initialization (initializer.lua)
-- WikiInitializer:perform(screen) does a full scan:
+- WikiInitializer:perform(screen) full scan order:
 1. Gets site ID, aborts if invalid
-2. Renders and saves Civ page (civ_template.render()) and Fort page (fort_template.render())
-3. Iterates df.global.world.units.active, filters to citizens via dfhack.units.isCitizen(unit)
-4. For each citizen, renders citizen_template.render(unit) and saves under key 'citizen:' .. unit.id
-5. Builds a root Citizens index page with a **sortable table block** (columns: Name, Birth Year, Happiness, Title/Role, Death Status) with linked names
-6. Iterates artifacts, renders artifact_template.render(item), saves under key 'artifact:' .. art_record.id
-7. Builds a root Artifacts index page with a **sortable table block** (columns: Name, Creator, Type, Value) with linked names
-8. Saves the dynamic page list and sets initialized flag
-9. Calls on_complete callback to refresh the page list
-- All save_content calls use safe_save() wrapper with pcall error capture and logging
-Auto-Journaling: Chronicle (chronicle.lua)
-- Batch-scan approach (not real-time event listening)
-- Chronicle.get_state() reads last_event_id and is_running from persistent site data
-- Chronicle.process_events(context) is the core:
-1. Reads current max event ID from df.global.world.history.event_id
-2. Scans backwards from event_id - 1 down to last_event_id (max 500 events per cycle)
-3. Filters by site (if the event has a getSite() method)
-4. Parses each event via event_parser.parse(event), which returns {page_id, section, text} or nil
-5. Appends parsed entries to the appropriate page via Chronicle.append_to_page()
-- Chronicle.append_to_page(context, page_id, section_title, text) finds the ## Section header in the page content and inserts the new text after it (or creates the section if missing)
-- Background loop: Chronicle.start_background_task(context) runs every 1 minute via dfhack.timeout(1, 'min', tick). Checks if mfw_auto_journal_enabled is true and fortress mode is active.
-- Currently commented out in WikiScreen:init(): -- chronicle.start_background_task(self.context) -- because it was crashing during testing.
-Event Parser (event_parser.lua)
-Handles 4 event types currently:
-- HIST_FIGURE_NEW_PET -> citizen page, "History & Timeline" section (adopted pet/child)
-- HIST_FIGURE_DIED -> citizen page, "History & Timeline" section (death with cause)
-- ARTIFACT_CREATED -> artifacts root page, "Recent Events" section
-- HIST_FIGURE_RENAME -> citizen page, "History & Timeline" section (new name)
+2. Renders Civ page + Fort page (fort template now includes Fort Timeline section)
+3. Iterates active units, renders citizen pages (now with Family & Relationships section)
+4. Builds Citizens index page with sortable table block
+5. Iterates artifacts, renders artifact pages
+6. Builds Artifacts index page with sortable table block
+7. Creates Events page placeholder
+8. **catchUpEvents(site_id)**: Scans df.global.world.history.events forward from event 0 to current max, filters by getSite() == site_id, calls event_parser.parse(ev) for each match, appends entries via event_listener.append_to_page(). Batches of 500 with progress logging. Saves mfw_catchup_last_id marker for resumability. Registers matched events in timeline registry + enemy registry for threat types.
+9. **renderEventsTimeline()**: Loads mfw_event_timeline registry, builds category counts, renders via timeline_template.render_counts() + render_timeline(), merges into Events page after # Events header.
+10. **renderEnemiesPage()**: Loads mfw_enemies registry via event_listener.load_enemies(), renders via enemies_template.render(), saves as enemies page.
+11. Saves dynamic page list, sets initialized flag, calls on_complete.
 
+Real-Time Event Listener (event_listener.lua) — replaces the old batch-scan Chronicle
+- Requires plugins.eventful, registers 6 hooks once per Lua session
+- Event flow: eventful hook -> EventListener._on_*() -> event_parser.parse_*() -> route_parsed() -> append_to_page() + register_timeline_entry() + register_enemy_encounter()
+- append_to_page() works with span-array content format, finds/creates ## Section headers
+- is_category_enabled() checks mfw_settings per-category toggles before routing
+- route_parsed() respects settings, logs all routed events
+- Timeline registry (mfw_event_timeline): stores {year, season, category, event_type, summary} capped at 1000 entries
+- Enemy registry (mfw_enemies): stores {name, enemy_type, first_year, encounters, defeated, last_year} deduplicated by normalized name key
+- Seen unit IDs persisted to avoid duplicate migrant/birth events
+
+Chronicle (chronicle.lua) — legacy batch-scan, currently disabled in favor of real-time listener
+
+Historical Event Parser (event_parser.lua)
+Two parsing subsystems:
+- Real-time (parse_report, parse_death, parse_item_created, parse_new_unit, parse_invasion, parse_syndrome):
+  - Classifies 55+ DF report type IDs into 9 categories
+  - Returns structured {targets, year, season, category, event_type, is_major, importance, summary, enemy_name?}
+  - Each category has a dedicated format function with date stamp, speaker/participant extraction, wiki link generation
+  - extract_enemy_name() heuristic: parses "A THING, Name, has come" / "Name has come" / "The Goblins" patterns
+  - parse_death() routes citizen deaths to citizen History & Timeline + events Deaths; enemy deaths to enemies Kill List
+  - parse_invasion() counts invaders, identifies race/civ, routes to events + fort + enemies
+  - parse_syndrome() filters mundane syndromes (alcohol, etc.), routes notable syndromes to citizen + events
+- Historical (parse):
+  - Handles 15+ df.history_event_type values (original 4 + new: ATTACK, SITE_CONFLICT, ABDUCTED, BECAME_VAMPIRE, BECAME_WEREBEAST, GAINS_SYNDROME, ENTITY_MIGRANT, MASTERPIECE_*, CREATURE_DEVOURED, ADD_HF_HF_LINK, CREATED_STRUCTURE)
+  - Uses is_our_hf() that checks entity links to our civ (works for dead/unloaded units)
+  - Returns {page_id, section, text, importance} format for backward compatibility with Chronicle
+
+Overlay Script (df-autojournal-status.lua)
+- --@ overlay marker for DFHack overlay system auto-discovery
+- Checks persisted state directly via dfhack.persistent.getSiteData (no module dependency for state check)
+- Registers onStateChange handler: on SC_MAP_LOADED reads mfw_auto_journal_enabled and starts listener; on SC_WORLD_UNLOADED stops listener
+- OVERLAY_VIEWS defines a top-right Panel showing ON/OFF labels with color: ON green when active, OFF red when disabled, both dim otherwise
+- All event_listener calls guarded with nil checks for graceful degradation
 
 5. TABLE OF CONTENTS IMPLEMENTATION
 Wiki Page TOC (Left Panel)
-- Defined in WikiWindow:init() as a widgets.List with view_id='wiki_page_list'
-- Hardcoded pages: PAGES = {{text='Civilisation', id='civ'}, {text='Fort', id='fort'}, {text='Citizens', id='citizens'}, {text='Artifacts', id='artifacts'}, {text='Events', id='events'}}
-- Dynamic pages (citizen/artifact sub-pages) are appended to this list via WikiScreen:refreshPageList() which uses build_page_tree() + flatten_page_tree() to create a collapsible tree with [+] / [-] icons
-- Selection triggers onWikiPageSubmit(idx, choice): for parent items (Citizens/Artifacts/Events), clicking the [+] / [-] icon toggles expand/collapse, clicking the text navigates to the root page. Non-parent items always navigate.
+- widgets.List with view_id='wiki_page_list'
+- PAGES = {Civilisation, Fort, Citizens, Artifacts, Events, Enemies} — Enemies added in Phase 6
+- Dynamic pages (citizen/artifact/enemy sub-pages) appended via refreshPageList() with collapsible [+] / [-] tree
 Journal Page TOC (Middle Panel)
-- Implemented as TableOfContents widget (defined in wiki_widgets.lua)
-- TableOfContents extends widgets.Panel with an internal widgets.List (view_id='table_of_contents')
-- TableOfContents:reload(text, cursor) scans the raw text for markdown headers (^#+ .+), builds a list of sections with line_cursor positions
-- Navigation: Prev Section (A_MOVE_N_DOWN) and Next Section (A_MOVE_S_DOWN) buttons
-- currentSection() finds the section closest to the current cursor position
-- setSelectedSection(section_index) highlights the current section in the list
-- The Journal TOC is collapsible via the Shifter widget (an arrow button with <</>> characters)
-- Visibility is toggled via the "Toggle page TOC" hotkey (CUSTOM_CTRL_O)
-- When visible, the editor area shifts right to make room
+- TableOfContents widget scans raw text for ## headers with line_cursor navigation
+- Collapsible via Shifter widget (<< / >>) and CUSTOM_CTRL_O hotkey
 Layout Management
-- WikiWindow:ensurePanelsRelSize() recalculates the l (left) positions of divider and editor panels as the Wiki TOC and Journal TOC panels are shown/hidden
-- WikiWindow:preUpdateLayout() calls ensurePanelsRelSize()
+- ensurePanelsRelSize() recalculates panel positions on open/close
 
 6. TEMPLATE SYSTEM
-Design: Each template type is a standalone Lua module in templates/ that exports a render() function. Templates are unaware of the event parser -- they are only used during initialization to generate the initial page content. The event parser uses a different mechanism (Chronicle.append_to_page) to append to existing pages.
-How templates use settings: All active templates (fort.lua, civilization.lua, citizen.lua, artifact.lua) call mfw_settings.get_settings().<template_type> and conditionally render sections based on boolean toggles.
-Template details:
-Template	Arguments	Settings sections (active)
-fort.lua	(none)	Population, Government, Links, Districts, Timeline, Defense
-civilization.lua	(none)	Type, Diplomatic Relations, Ethics, Major History
-citizen.lua	unit	Profession, Gender, Personal Journal, Values, Timeline
-artifact.lua	item	Type, Value, Description, History (creator link), Location
-event.lua	event_data	Summary, Key Participants, Detailed Account, Consequences (all static)
-Limitations noted in code/comments:
-- Many template sections are commented out due to DF API errors or nil-value crashes
-- Templates use utils.sanitize() for output sanitization
-- Age is intentionally omitted from citizen template (would need constant updates)
-- Event template is fully static (no dynamic data from settings or game state)
+Design: Each template exports render(). Initialization uses templates for initial page generation. Event listener appends entries to existing pages via append_to_page().
 
+Template	Arguments	Sections (active)
+fort.lua	(none)	Population, Government, Links, Districts, Timeline, Defense, **Fort Timeline** (event entries appended)
+civilization.lua	(none)	Type, Diplomatic Relations, Ethics, Major History
+citizen.lua	unit	Profession, Gender, **Family & Relationships** (spouse/parent/child from histfig_links, clickable for citizens), Personal Journal, Values, Timeline
+artifact.lua	item	Type, Value, Description, History (creator link), Location
+event.lua	event_data	Metadata (year/season/category), Summary, **Key Participants** (clickable links), **Related links**, Detailed Account, Consequences
+timeline.lua	entries[]	**Sortable timeline table** (Year, Season, Category with color, Summary, Link) + **Category counts** breakdown. Used by Events page.
+enemies.lua	enemies[]	**Sortable enemy registry table** (Name, Type with color badge, First Year, Defeated, Encounters, Notes) + Encounter Log section. Used by Enemies page.
 
 7. WIDGET/UI SYSTEM
-The project uses DFHack's standard GUI framework (gui, gui.widgets) plus a custom rich-text widget system:
-Standard DFHack Widgets Used
-- widgets.Window -- base for WikiWindow, SettingsWindow
-- widgets.Panel -- container panels (Wiki TOC, settings panel)
-- widgets.Label -- text labels (section headers, key hints)
-- widgets.List -- scrollable lists (page list, section TOC)
-- widgets.HotkeyLabel -- action buttons with keybindings (Initialize, Settings, Export, Toggle TOC)
-- widgets.ToggleHotkeyLabel -- base for the custom ToggleLabel
-- widgets.Divider -- vertical separators between panels
-- widgets.EditField -- text input in link modal
-- gui.ZScreen -- base for WikiScreen and SettingsScreen
-- gui.widgets.scrollbar -- scrollbar in HyperTextArea
-Custom Widgets (in wiki_widgets.lua and wiki_widgets/)
-1. ToggleLabel -- A styled toggle button using [O] / [X] icons from DF's control panel tile sheet. Extends ToggleHotkeyLabel.
-2. Shifter -- A collapse/expand arrow used to show/hide the Journal TOC. Shows << or >> characters.
-3. TableOfContents -- A section header scanner + navigable list with Prev/Next buttons.
-4. Page tree helpers (build_page_tree, flatten_page_tree, etc.) -- Collapsible Wiki TOC with parent/child grouping and [+] / [-] icons.
-5. HyperTextArea (wiki_widgets/hyper_text_area.lua) -- The main rich-text widget:
-- Contains a Toolbar (color picker + link button + table insert button)
-- Contains HyperTextAreaContent (the editable text engine)
-- Contains a Scrollbar
-- Contains an InfoBox showing keyboard shortcuts
-6. HyperTextAreaContent (wiki_widgets/hyper_text_area_content.lua) -- Character-level text editor with:
-- Flat char_list array of {char, pen, link} records
-- Text manipulation (insert, delete, backspace, enter)
-- Selection (mouse drag, Ctrl+A, Shift+cursor)
-- Clipboard (Ctrl+C/X/V)
-- Undo/redo (Ctrl+Z/Y) via HistoryStore
-- Link click handling (Ctrl+click) with hover highlighting
-- Cursor navigation (arrows, home/end, Ctrl+left/right, Ctrl+home/end)
-- **Table block management**: extracts table blocks from display_text into separate table_blocks array with position tracking; handles insert/delete adjustments, sorting, placeholder lines
-7. HyperWrappedText (wiki_widgets/hyper_wrapped_text.lua) -- Text wrapping engine that bridges display_text (rich spans) to raw_text (plain string). Produces lines and line_spans for rendering. Tracks table lines (is_table_line) and manages table block line accounting.
-8. **HyperTable** (wiki_widgets/hyper_table.lua) -- Dedicated table block renderer. Handles column layout (auto-width, fixed-width, stretch), sorting (click header to sort by column), row clipping (with "and N more" overflow line), text alignment, box-drawing borders.
-9. Toolbar (wiki_widgets/toolbar.lua) -- Vertical strip of 15 color blocks with selection indicator, a link-insert button at the bottom, and a **table-insert button** (▲) above the link button.
-10. LinkModal (wiki_widgets/link_modal.lua) -- Dialog for inserting [text](page) links over the text.
-11. **TableEditorModal** (wiki_widgets/table_editor_modal.lua) -- Modal for editing table blocks. Two text areas: Columns (header|align|stretch format) and Data (pipe-delimited). F2 to save, Esc to discard.
-12. HistoryStore (wiki_widgets/history_store.lua) -- Undo/redo stack with coalescing of same-type edits, up to 25 entries deep.
-13. HTAContext (wiki_widgets/hta_context.lua) -- Optional JSON-based serialization context for HyperTextArea content persistence.
-Link System
-- Links use the format [display text](page_id) where page_id can be civ, fort, citizens, artifacts, events, or citizen:<unit_id>
-- Links are parsed at the character level in HyperTextAreaContent
-- Mouse hit-testing: HyperWrappedText:getClickHandlerAt(x, y) checks which span fragment is under the cursor and returns the link data
-- Ctrl+Click navigates to the linked page via on_link_click
-Table Blocks
-- Tables are a first-class type in the display_text model: { type='table', columns={...}, rows={...}, sort_col=nil, sort_asc=true, max_rows=nil }
-- Table columns support: header, align (left/right/center), width, min_width, max_width, stretch
-- Tables are extracted into a separate table_blocks array (not part of char_list) and rendered as read-only full-width blocks
-- Table header clicks trigger sorting; sort indicator shown as ^/v on the sorted column header
-- The table editor modal (▲ button in toolbar) allows editing the nearest table's columns and data
+(same as previously documented — unchanged by Phases 1-6)
 
 8. ARCHITECTURAL SUMMARY
-User launches mod
-       |
-       v
+Game starts
+   |
+   v
+DFHack overlay system loads df-autojournal-status.lua (--@ overlay)
+   |-- Registers onStateChange handler (auto-start listener on map load)
+   |-- Shows ON/OFF status icons top-right
+   |-- If fortress already loaded, checks persisted state and starts listener
+   |
+User runs "df-autojournal"
+   |
+   v
 df-autojournal.lua (entry point)
-       |
-       v
-main_gui.lua -> WikiScreen (ZScreen)
-       |
-       +-- WikiWindow (main UI container)
-       |     +-- Wiki Page List (left) -- collapsible tree with [+]/[-], click icon to toggle, click text to navigate
-       |     +-- Shifter + Journal TOC (middle) -- collapsible section headers
-       |     +-- HyperTextArea (right) -- rich text editor with table block support
-       |     +-- Bottom bar (hotkey hints)
-       |
-       +-- WikiContext (persistence layer)
-       |     +-- save_content / load_content (per page) with pcall error logging
-       |     +-- save_dynamic_pages / get_dynamic_pages
-       |     +-- Uses dfhack.persistent.saveSiteData with prefix 'mfw_'
-       |
-       +-- Initialization flow:
-       |     WikiInitializer:perform()
-       |       -> reads civ_template, fort_template, citizen_template, artifact_template
-       |       -> renders and saves content for each citizen and artifact
-       |       -> builds root Citizens and Artifacts pages with sortable table blocks
-       |       -> saves index pages with links, using safe_save() wrapper for error capture
-       |
-       +-- Auto-Journaling flow (currently disabled):
-             Chronicle:process_events()
-               -> event_parser:parse() for each new history event
-               -> Chronicle:append_to_page() to insert into correct section
-               -> runs every 1 minute via dfhack.timeout
-       |
-       +-- Settings flow:
-             SettingsScreen -> SettingsWindow
-               -> reads mfw_settings.get_settings()
-               -> creates ToggleLabels for each template option
-               -> save_settings() via JSON-encoded persistent storage
+   |-- Requires event_listener (modules loaded, hooks not yet registered)
+   |-- Requires main_gui
+   |-- Calls main_gui.main() -> WikiScreen:show()
+   |
+   v
+WikiScreen (ZScreen)
+   |-- WikiWindow (main UI container)
+   |     |-- Wiki Page List (left) — 6 root pages + dynamic sub-pages
+   |     |-- Journal TOC (middle) — section headers
+   |     |-- HyperTextArea (right) — rich text editor
+   |
+   |-- WikiContext (persistence, prefix 'mfw_p_')
+   |
+   |-- [Initialize Wiki] button:
+   |     WikiInitializer:perform()
+   |       -> civ + fort + citizens + artifacts rendered
+   |       -> catchUpEvents(site_id): scans world.history.events forward
+   |       -> renderEventsTimeline(): timeline table + counts on Events page
+   |       -> renderEnemiesPage(): enemy registry table on Enemies page
+   |
+   |-- [Auto-Journaling] toggle:
+   |     event_listener.start() / stop()
+   |       -> eventful hooks (onReport, onUnitDeath, etc.) registered once
+   |       -> on each hook: parser -> route_parsed -> append_to_page + timeline + enemy registry
+   |       -> checks per-category settings before routing
+   |
+   |-- [Settings] button:
+   |     TabBar (Civ/Fort/Citizen/Artifact/Event)
+   |       -> 12 event-category journal toggles for granular control
 
-Widget System:
-  DFHack gui/gui.widgets (standard) + Custom widgets:
-    wiki_widgets/:
-      toolbar.lua              -- color picker + table insert button
-      link_modal.lua           -- link inserter
-      hyper_wrapped_text.lua   -- text wrapping engine with table-line tracking
-      hyper_text_area_content.lua -- char-level editor with table block management
-      hyper_text_area.lua      -- combined rich-text widget
-      hyper_table.lua          -- table block rendering engine
-      table_editor_modal.lua   -- table editor modal
-      hta_utils.lua            -- span/char list utilities + table block detection
-      history_store.lua        -- undo/redo
-      hta_context.lua          -- optional JSON persistence
+Persistence:
+   dfhack.persistent keys:
+     mfw_p_<page_id>      — wiki page content (span arrays)
+     mfw_auto_journal_enabled — listener on/off
+     mfw_seen_units       — dedup set for unit arrival events
+     mfw_event_timeline   — event timeline registry (1000 entries)
+     mfw_enemies          — enemy registry (dedup by name)
+     mfw_catchup_last_id  — historical catch-up progress marker
+     mfw_settings         — JSON-encoded settings
+     mfw_dynamic_pages    — citizen/artifact sub-page list
+     mfw_initialized      — init completion flag
+     mfw_window_frame     — window size/position
+
+Data flow for event capture:
+   DF game event occurs
+     -> eventful plugin fires callback (e.g. onReport)
+     -> EventListener._on_report(report_id)
+     -> Finds report object, extracts type + text
+     -> event_parser.parse_report(type, text, report)
+         -> classifies by report type (REPORT_MAP / combat ranges / ambush ranges)
+         -> formats entry with date, links, sanitized text
+         -> returns {targets[], year, season, category, event_type, is_major, importance, summary}
+     -> route_parsed(parsed)
+         1. is_category_enabled(parsed.category) — skips if disabled in settings
+         2. append_to_page() for each target (page_id + section)
+         3. register_timeline_entry() -> mfw_event_timeline
+         4. if parsed.enemy_name: register_enemy_encounter() -> mfw_enemies
+
+Flow for historical catch-up (during initialization):
+   df.global.world.history.events[0..N]
+     -> filtered by ev:getSite() == site_id
+     -> event_parser.parse(ev) for 15+ history event types
+     -> event_listener.append_to_page() + register_timeline_entry() + register_enemy_encounter()
+     -> progress saved every 500 events
+
+Widget dependencies:
+   DFHack gui/gui.widgets (standard) + Custom widgets:
+     wiki_widgets/:
+       toolbar.lua, link_modal.lua, hyper_wrapped_text.lua,
+       hyper_text_area_content.lua, hyper_text_area.lua,
+       hyper_table.lua, table_editor_modal.lua, hta_utils.lua,
+       history_store.lua, hta_context.lua
 
 Templates:
-  templates/:
-    fort.lua, civilization.lua, citizen.lua, artifact.lua, event.lua
-    Each reads mfw_settings and conditionally renders sections
+   templates/:
+     fort.lua, civilization.lua, citizen.lua, artifact.lua,
+     event.lua, timeline.lua, enemies.lua

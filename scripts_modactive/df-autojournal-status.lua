@@ -6,22 +6,41 @@
 local widgets = require('gui.widgets')
 local event_listener = reqscript('internal/df-autojournal/event_listener')
 
+local function ensure_state()
+    if not dfhack.mfw_state then dfhack.mfw_state = {} end
+end
+
+local function check_persisted()
+    local ok, data = pcall(function()
+        return dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
+    end)
+    return ok and data and data.val and data.val[1] == 1
+end
+
 -- Auto-start listener on map load if it was enabled
 dfhack.onStateChange.auto_journal_listener = function(code)
     if code == SC_MAP_LOADED then
         if dfhack.isWorldLoaded() and dfhack.world.isFortressMode() then
-            if event_listener.load_state() then
+            ensure_state()
+            dfhack.mfw_state.listener_enabled = check_persisted()
+            if dfhack.mfw_state.listener_enabled and event_listener.start then
                 event_listener.start()
             end
         end
     elseif code == SC_WORLD_UNLOADED then
-        event_listener.stop()
+        ensure_state()
+        dfhack.mfw_state.listener_enabled = false
+        if event_listener.stop then
+            event_listener.stop()
+        end
     end
 end
 
 -- If world already loaded at script init, apply persisted state
 if dfhack.isWorldLoaded() and dfhack.world.isFortressMode() then
-    if event_listener.load_state() then
+    ensure_state()
+    dfhack.mfw_state.listener_enabled = check_persisted()
+    if dfhack.mfw_state.listener_enabled and event_listener.start then
         event_listener.start()
     end
 end

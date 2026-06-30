@@ -66,7 +66,18 @@ local DEFAULT_SETTINGS = {
             consequences = true,
         },
         journal = {
-            new_events = true,
+            threat_events = true,
+            achievement_events = true,
+            social_events = true,
+            trade_events = true,
+            crisis_events = true,
+            military_events = true,
+            environment_events = true,
+            world_events = true,
+            death_events = true,
+            birth_migrant_events = true,
+            syndrome_events = true,
+            siege_events = true,
         }
     }
 }
@@ -76,7 +87,20 @@ local DEFAULT_JOURNAL = {
     fort = { population = true, construction = true, defense = true },
     citizen = { pet_adopted = true, died = true, renamed = true },
     artifact = { created = true },
-    event = { new_events = true },
+    event = {
+        threat_events = true,
+        achievement_events = true,
+        social_events = true,
+        trade_events = true,
+        crisis_events = true,
+        military_events = true,
+        environment_events = true,
+        world_events = true,
+        death_events = true,
+        birth_migrant_events = true,
+        syndrome_events = true,
+        siege_events = true,
+    },
 }
 
 local logger = reqscript('internal/df-autojournal/logger')

@@ -21,6 +21,7 @@ local PAGES = {
     {text='Citizens', id='citizens'},
     {text='Artifacts', id='artifacts'},
     {text='Events', id='events'},
+    {text='Enemies', id='enemies'},
 }
 
 WikiWindow = defclass(WikiWindow, widgets.Window)
@@ -73,9 +74,9 @@ function WikiWindow:init()
                     end,
                     on_change=function(val)
                         if val then
-                            event_listener.start()
+                            if event_listener.start then event_listener.start() end
                         else
-                            event_listener.stop()
+                            if event_listener.stop then event_listener.stop() end
                         end
                     end,
                 },

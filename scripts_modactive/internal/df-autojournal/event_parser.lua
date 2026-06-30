@@ -275,6 +275,27 @@ local function sanitize_report_text(text)
     return safe
 end
 
+--- Extract a potential enemy name from report text.
+--- Uses simple heuristics to find the key name in threat reports.
+local function extract_enemy_name(text, event_type)
+    if not text or text == "" then return nil end
+    local safe = sanitize_report_text(text)
+    -- Try common DF threat report patterns
+    -- "A Forgotten Beast, Some Name, has come!"
+    local name = safe:match("A .-, ([^,]+), has come")
+    if name then return name:gsub("^%s*(.-)%s*$", "%1") end
+    -- "Some Name has come!"
+    name = safe:match("^([^%s]+ [^%s]+) has come")
+    if name then return name end
+    -- "The goblins are attacking!" → use "Goblins" as enemy name
+    name = safe:match("^The ([^%s]+)")
+    if name then return name end
+    -- Fallback: use the first segment before ! or .
+    name = safe:match("^(.-)[%.:!]")
+    if name then return name end
+    return safe:sub(1, 40)
+end
+
 ---------------------------------------------------------------------------
 --- Formatting helpers per category
 ---------------------------------------------------------------------------
@@ -286,7 +307,9 @@ end
 function EventParser._format_threat_entry(report_text, report_obj, event_type)
     local date = formatted_date(df.global.cur_year, df.global.cur_year_tick)
     local text = sanitize_report_text(report_text) or event_type
-    return entry_line(date .. ": " .. text)
+    local enemy_name = extract_enemy_name(report_text, event_type)
+    local enemy_type = event_type or "Threat"
+    return entry_line(date .. ": " .. text), enemy_name, enemy_type
 end
 
 function EventParser._format_achievement_entry(report_text, report_obj, event_type)
@@ -350,7 +373,7 @@ end
 --- Build a parsed result structure from category info + entry text
 ---------------------------------------------------------------------------
 
-local function make_result(info, entry, extra_targets)
+local function make_result(info, entry, extra_targets, enemy_name, enemy_type, enemy_defeated)
     local year = df.global.cur_year
     local tick = df.global.cur_year_tick
     local season = get_season(tick)
@@ -390,7 +413,7 @@ local function make_result(info, entry, extra_targets)
         end
     end
 
-    return {
+    local result = {
         targets = targets,
         year = year,
         season = season,
@@ -400,6 +423,15 @@ local function make_result(info, entry, extra_targets)
         importance = info.importance or 1,
         summary = sanitize_report_text(entry),
     }
+
+    -- Pass through enemy tracking info if provided
+    if enemy_name then
+        result.enemy_name = enemy_name
+        result.enemy_type = enemy_type or "Unknown"
+        result.enemy_defeated = enemy_defeated or false
+    end
+
+    return result
 end
 
 ---------------------------------------------------------------------------
@@ -435,8 +467,10 @@ function EventParser.parse_report(report_type, report_text, report_obj)
 
     -- Build the entry text
     local entry = nil
+    local enemy_name = nil
+    local enemy_type = nil
     if info.category == "threat" then
-        entry = EventParser._format_threat_entry(report_text, report_obj, info.type)
+        entry, enemy_name, enemy_type = EventParser._format_threat_entry(report_text, report_obj, info.type)
     elseif info.category == "achievement" then
         entry = EventParser._format_achievement_entry(report_text, report_obj, info.type)
     elseif info.category == "social" then
@@ -457,7 +491,7 @@ function EventParser.parse_report(report_type, report_text, report_obj)
 
     if not entry then return nil end
 
-    return make_result(info, entry)
+    return make_result(info, entry, nil, enemy_name, enemy_type)
 end
 
 ---------------------------------------------------------------------------
@@ -707,7 +741,9 @@ function EventParser.parse_invasion(invasion_id)
         },
         year = year,
         season = get_season(tick),
-        category = "threat",
+        category = "siege",
+        enemy_name = invader_civ .. " (" .. invader_race .. ")",
+        enemy_type = "Invasion",
         event_type = "siege",
         is_major = true,
         importance = 4,
@@ -760,7 +796,7 @@ function EventParser.parse_syndrome(unit, syndrome_id)
         },
         year = year,
         season = get_season(tick),
-        category = "crisis",
+        category = "syndrome",
         event_type = "syndrome",
         is_major = syndrome_class:match("were") and true or false,
         importance = syndrome_class:match("were") and 3 or 2,
