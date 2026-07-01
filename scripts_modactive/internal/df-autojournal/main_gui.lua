@@ -70,10 +70,10 @@ function WikiWindow:init()
                     label='Auto-Journaling ',
                     key='CUSTOM_ALT_A',
                     initial_option=function()
-                        return event_listener.is_running()
+                        return event_listener.is_running and event_listener.is_running() or false
                     end,
                     on_change=function(val)
-                        if val then
+                        if val == 'On' or val == true then
                             if event_listener.start then event_listener.start() end
                         else
                             if event_listener.stop then event_listener.stop() end
@@ -336,7 +336,8 @@ end
 WikiScreen = defclass(WikiScreen, gui.ZScreen)
 WikiScreen.ATTRS {
     focus_path='my-fort-wiki',
-    pass_pause=false,
+    force_pause=true,
+    pass_pause=true,
 }
 
 function WikiScreen:init()
@@ -474,11 +475,17 @@ end
 
 function WikiScreen:onDismiss()
     local win = self.subviews.wiki_window
-    if win and win.frame_body then
-        self.context:save_window_frame({
-            w=win.frame_body.width,
-            h=win.frame_body.height
-        })
+    if win then
+        local editor = win.subviews.editor
+        if editor then
+            self.context:save_content(self.current_page_id, editor.display_text, editor.hyper_text_area.cursor)
+        end
+        if win.frame_body then
+            self.context:save_window_frame({
+                w=win.frame_body.width,
+                h=win.frame_body.height
+            })
+        end
     end
     view = nil
 end

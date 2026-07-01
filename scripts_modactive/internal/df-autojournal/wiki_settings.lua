@@ -137,10 +137,19 @@ local function migrate_from_old(old)
     end
     for template, def in pairs(DEFAULT_SETTINGS) do
         if not new[template] then
-            new[template] = def
+            new[template] = deep_copy(def)
         end
     end
     return new
+end
+
+local function deep_copy(t)
+    if type(t) ~= 'table' then return t end
+    local copy = {}
+    for k, v in pairs(t) do
+        copy[k] = deep_copy(v)
+    end
+    return copy
 end
 
 local function merge_with_defaults(settings)
@@ -154,7 +163,12 @@ local function merge_with_defaults(settings)
                 local cat_current = current[category]
                 if cat_current then
                     for key, val in pairs(cat_def) do
-                        merged[template][category][key] = (cat_current[key] ~= nil) and cat_current[key] or val
+                        local raw = cat_current[key]
+                        if raw ~= nil then
+                            merged[template][category][key] = raw
+                        else
+                            merged[template][category][key] = val
+                        end
                     end
                 else
                     for key, val in pairs(cat_def) do
@@ -163,7 +177,7 @@ local function merge_with_defaults(settings)
                 end
             end
         else
-            merged[template] = def
+            merged[template] = deep_copy(def)
         end
     end
     return merged
@@ -173,35 +187,76 @@ function get_settings()
     local ok, data = pcall(function()
         return dfhack.persistent.getSiteData(SETTINGS_KEY)
     end)
-    if ok and data and data.val then
-        if type(data.val) == "string" and data.val ~= "" then
-            local ok_json, decoded = pcall(json.decode, data.val)
-            if ok_json and type(decoded) == "table" then
+    if not ok then
+        logger.log_error("LOAD: getSiteData threw error")
+        return deep_copy(DEFAULT_SETTINGS)
+    end
+    if not data then
+        logger.log("LOAD: getSiteData returned nil")
+        return deep_copy(DEFAULT_SETTINGS)
+    end
+
+    logger.log("LOAD: data type=" .. type(data))
+    if data then
+        local keys = ""
+        for k, _ in pairs(data) do keys = keys .. tostring(k) .. "," end
+        logger.log("LOAD: data keys={" .. keys .. "}")
+    end
+
+    if data.val then
+        logger.log("LOAD: data.val type=" .. type(data.val) ..
+                   (type(data.val) == "string" and " length=" .. #data.val or ""))
+
+        if type(data.val) == "string" then
+            local ok2, decoded = pcall(json.decode, data.val)
+            logger.log("LOAD: json.decode ok=" .. tostring(ok2) .. " decoded type=" .. type(decoded))
+            if ok2 and type(decoded) == "table" then
+                logger.log("LOAD: decoded.civ.init.leadership=" .. tostring(decoded.civ.init.leadership) ..
+                           " ethics=" .. tostring(decoded.civ.init.ethics))
                 if not has_init_structure(decoded) then
+                    logger.log("LOAD: migrating old-format JSON")
                     decoded = migrate_from_old(decoded)
                     save_settings(decoded)
                 end
-                return merge_with_defaults(decoded)
+                local merged = merge_with_defaults(decoded)
+                logger.log("LOAD: merged.civ.init.leadership=" .. tostring(merged.civ.init.leadership) ..
+                           " ethics=" .. tostring(merged.civ.init.ethics))
+                return merged
             end
         elseif type(data.val) == "table" then
+            logger.log("LOAD: legacy table format, has_init=" .. tostring(has_init_structure(data.val)))
             local tbl = data.val
             if not has_init_structure(tbl) then
+                logger.log("LOAD: migrating old-format table")
                 tbl = migrate_from_old(tbl)
             end
             save_settings(tbl)
             return merge_with_defaults(tbl)
         end
-        logger.log("get_settings: failed to decode settings or invalid type, returning default")
+    else
+        logger.log("LOAD: data.val is nil")
     end
-    return DEFAULT_SETTINGS
+    logger.log("LOAD: falling through to defaults")
+    return deep_copy(DEFAULT_SETTINGS)
 end
 
 function save_settings(settings)
+    logger.log("SAVE: civ.init.leadership=" .. tostring(settings.civ.init.leadership) ..
+               " civ.init.ethics=" .. tostring(settings.civ.init.ethics))
+
     local ok, encoded = pcall(json.encode, settings)
-    if ok then
-        dfhack.persistent.saveSiteData(SETTINGS_KEY, {val=encoded})
+    if not ok then
+        logger.log_error("SAVE: json.encode failed: " .. tostring(encoded))
+        return
+    end
+    logger.log("SAVE: json OK length=" .. #encoded .. " preview=" .. encoded:sub(1, 250))
+
+    local ok2, result = pcall(dfhack.persistent.saveSiteData, SETTINGS_KEY, {val=encoded})
+    logger.log("SAVE: saveSiteData ok=" .. tostring(ok2) .. " result=" .. tostring(result))
+    if ok2 and result ~= false then
+        logger.log("SAVE: success")
     else
-        logger.log_error("save_settings: failed to encode settings")
+        logger.log_error("SAVE: failed (" .. tostring(ok2) .. ", " .. tostring(result) .. ")")
     end
 end
 

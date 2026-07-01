@@ -108,13 +108,13 @@ local function make_toggle(tab_id, category, key, initial_val, row)
         frame={t=row, l=0, r=0},
         label=display_name .. padding .. ' ',
         initial_option=initial_val,
-        on_change=function(val)
-            local s = mfw_settings.get_settings()
-            if s[tab_id] and s[tab_id][category] then
-                s[tab_id][category][key] = val
-                mfw_settings.save_settings(s)
-            end
-        end,
+                    on_change=function(val)
+                        local s = mfw_settings.get_settings()
+                        if s[tab_id] and s[tab_id][category] then
+                            s[tab_id][category][key] = (val == 'On' or val == true)
+                            mfw_settings.save_settings(s)
+                        end
+                    end,
     }
 end
 

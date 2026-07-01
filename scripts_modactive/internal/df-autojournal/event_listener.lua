@@ -278,13 +278,27 @@ end
 ---------------------------------------------------------------------------
 
 function EventListener.start()
-    if EventListener.is_running() then
+    if dfhack.mfw_state.hooks_registered and EventListener.is_running() then
         return
     end
 
-    local ok, err = pcall(function()
-        -- Register eventful hooks only once per Lua session
-        if not dfhack.mfw_state.hooks_registered then
+    -- Set state and persist immediately so the overlay/toggle always reflect
+    -- the correct status, even if hook registration fails.
+    dfhack.mfw_state.listener_enabled = true
+    dfhack.persistent.saveSiteData(LISTENER_KEY, {val={1}})
+    logger.log("Event listener started")
+
+    -- Init seen units from persistent storage
+    if not dfhack.mfw_state.seen_units then
+        dfhack.mfw_state.seen_units = load_seen_units()
+    end
+
+    -- Load user settings for category filtering
+    dfhack.mfw_state.settings = mfw_settings.get_settings()
+
+    -- Register eventful hooks (may fail if plugin not loaded)
+    if not dfhack.mfw_state.hooks_registered then
+        local ok, err = pcall(function()
             local eventful = require('plugins.eventful')
 
             eventful.onReport(EventListener._on_report)
@@ -296,23 +310,11 @@ function EventListener.start()
 
             dfhack.mfw_state.hooks_registered = true
             logger.log("Eventful hooks registered")
+        end)
+
+        if not ok then
+            logger.log_error("Failed to register eventful hooks: " .. tostring(err))
         end
-
-        -- Init seen units from persistent storage
-        if not dfhack.mfw_state.seen_units then
-            dfhack.mfw_state.seen_units = load_seen_units()
-        end
-
-        -- Load user settings for category filtering
-        dfhack.mfw_state.settings = mfw_settings.get_settings()
-
-        dfhack.mfw_state.listener_enabled = true
-        dfhack.persistent.saveSiteData(LISTENER_KEY, {val={1}})
-        logger.log("Event listener started")
-    end)
-
-    if not ok then
-        logger.log_error("Failed to start event listener: " .. tostring(err))
     end
 end
 

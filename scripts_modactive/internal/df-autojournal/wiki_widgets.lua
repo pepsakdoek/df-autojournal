@@ -30,6 +30,11 @@ local ENABLED_PEN_LEFT, ENABLED_PEN_CENTER, ENABLED_PEN_RIGHT,
 ToggleLabel = defclass(ToggleLabel, widgets.ToggleHotkeyLabel)
 
 function ToggleLabel:init()
+    -- Evaluate initial_option function before super.init (CycleHotkeyLabel:init
+    -- calls setOption directly without resolving functions)
+    if type(self.initial_option) == 'function' then
+        self.initial_option = self.initial_option()
+    end
     ToggleLabel.super.init(self)
     
     -- Ensure self.text is a table of tokens
@@ -44,16 +49,21 @@ function ToggleLabel:init()
     -- We want to replace it with our custom icons.
     -- If there's only one token (the label), we append our icons.
     local idx = #text
+    local function opt_is_on()
+        local opt = self:getOptionValue()
+        return opt == 'On' or opt == true
+    end
+
     if idx > 1 then
         -- Assume the last token is the "On/Off" text from ToggleHotkeyLabel
-        text[idx] =     { tile = function() return self:getOptionValue() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end }
-        text[idx + 1] = { tile = function() return self:getOptionValue() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end }
-        text[idx + 2] = { tile = function() return self:getOptionValue() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end }
+        text[idx] =     { tile = function() return opt_is_on() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end }
+        text[idx + 1] = { tile = function() return opt_is_on() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end }
+        text[idx + 2] = { tile = function() return opt_is_on() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end }
     else
         -- Just append if it's just the label or empty
-        table.insert(text, { tile = function() return self:getOptionValue() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end })
-        table.insert(text, { tile = function() return self:getOptionValue() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end })
-        table.insert(text, { tile = function() return self:getOptionValue() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end })
+        table.insert(text, { tile = function() return opt_is_on() and ENABLED_PEN_LEFT or DISABLED_PEN_LEFT end })
+        table.insert(text, { tile = function() return opt_is_on() and ENABLED_PEN_CENTER or DISABLED_PEN_CENTER end })
+        table.insert(text, { tile = function() return opt_is_on() and ENABLED_PEN_RIGHT or DISABLED_PEN_RIGHT end })
     end
     self:setText(text)
 end
