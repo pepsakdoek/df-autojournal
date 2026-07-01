@@ -65,7 +65,7 @@ AutoJournalButton.ATTRS{
     default_pos     = {x=-3, y=-4},
     default_enabled = true,
     viewscreens     = {'dwarfmode', 'dwarfmode/'},
-    frame           = {w=LOGO_COLS * 2, h=LOGO_ROWS},
+    frame           = {w=LOGO_COLS, h=LOGO_ROWS},
     overlay_onupdate_max_freq_seconds = 0,
 }
 
@@ -98,10 +98,11 @@ function AutoJournalButton:init()
         local ok, data = pcall(function()
             return dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
         end)
-        dfhack.mfw_state.listener_enabled = ok and data and data.val and data.val[1] == 1
+        dfhack.mfw_state.listener_enabled = ok and data and data.val and data.val[1] == 1 or false
     end
 
     local has_png = on_normal and on_hover and off_normal and off_hover
+
     if has_png then
         self._btn_on = LogoButton{
             frame       = {l=0, t=0, w=LOGO_COLS, h=LOGO_ROWS},
@@ -110,7 +111,7 @@ function AutoJournalButton:init()
             on_click    = function() dfhack.run_command('df-autojournal') end,
         }
         self._btn_off = LogoButton{
-            frame       = {l=LOGO_COLS, t=0, w=LOGO_COLS, h=LOGO_ROWS},
+            frame       = {l=0, t=0, w=LOGO_COLS, h=LOGO_ROWS},
             normal_pens = off_normal,
             hover_pens  = off_hover,
             on_click    = function() dfhack.run_command('df-autojournal') end,
@@ -141,7 +142,7 @@ local function check_persisted()
     local ok, data = pcall(function()
         return dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
     end)
-    return ok and data and data.val and data.val[1] == 1
+    return ok and data and data.val and data.val[1] == 1 or false
 end
 
 dfhack.onStateChange.auto_journal_listener = function(code)

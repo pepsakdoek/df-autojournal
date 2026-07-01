@@ -74,9 +74,13 @@ function WikiWindow:init()
                     end,
                     on_change=function(val)
                         if val == 'On' or val == true then
-                            if event_listener.start then event_listener.start() end
+                            if event_listener.start then
+                                pcall(event_listener.start)
+                            end
                         else
-                            if event_listener.stop then event_listener.stop() end
+                            if event_listener.stop then
+                                pcall(event_listener.stop)
+                            end
                         end
                     end,
                 },

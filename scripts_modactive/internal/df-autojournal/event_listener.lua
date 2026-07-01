@@ -285,8 +285,7 @@ function EventListener.start()
     -- Set state and persist immediately so the overlay/toggle always reflect
     -- the correct status, even if hook registration fails.
     dfhack.mfw_state.listener_enabled = true
-    dfhack.persistent.saveSiteData(LISTENER_KEY, {val={1}})
-    logger.log("Event listener started")
+    pcall(dfhack.persistent.saveSiteData, LISTENER_KEY, {val={1}})
 
     -- Init seen units from persistent storage
     if not dfhack.mfw_state.seen_units then
@@ -309,7 +308,6 @@ function EventListener.start()
             eventful.onSyndrome(EventListener._on_syndrome)
 
             dfhack.mfw_state.hooks_registered = true
-            logger.log("Eventful hooks registered")
         end)
 
         if not ok then
@@ -325,8 +323,7 @@ function EventListener.stop()
     end
 
     dfhack.mfw_state.listener_enabled = false
-    dfhack.persistent.saveSiteData(LISTENER_KEY, {val={0}})
-    logger.log("Event listener stopped")
+    pcall(dfhack.persistent.saveSiteData, LISTENER_KEY, {val={0}})
 end
 
 function EventListener.is_running()
@@ -463,4 +460,9 @@ EventListener.register_timeline_entry = register_timeline_entry
 EventListener.register_enemy_encounter = register_enemy_encounter
 EventListener.load_enemies = load_enemies
 
-return EventListener
+-- Export EventListener functions to the module environment so reqscript callers
+-- find them.  DFHack returns _ENV for --@ module = true scripts.
+for k, v in pairs(EventListener) do
+    _ENV[k] = v
+end
+return _ENV
