@@ -22,11 +22,13 @@ end
 
 -- Return true if the display_text entry is a table block.
 function is_table_block(entry)
+    -- type(entry) == 'table' is it a LUA table and is it our HTA type 'table'
     return type(entry) == 'table' and entry.type == 'table'
 end
 
 -- Return true if the display_text entry is a function block.
 function is_function_block(entry)
+    -- type(entry) == 'table' is it a LUA table and is it our HTA type 'function'
     return type(entry) == 'table' and entry.type == 'function'
 end
 

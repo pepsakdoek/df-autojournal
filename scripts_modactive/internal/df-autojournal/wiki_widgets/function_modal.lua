@@ -11,6 +11,7 @@ local widgets = require('gui.widgets')
 FunctionModal = defclass(FunctionModal, gui.ZScreen)
 FunctionModal.ATTRS {
     functions     = {},
+    context       = {},  -- pre-filled arg values like { unit_id=123 }
     on_submit     = DEFAULT_NIL,
 }
 
@@ -84,6 +85,11 @@ function FunctionModal:onFunctionSelected(idx)
     local subviews = {}
     for i, arg in ipairs(schema) do
         local label = arg.label or arg.key
+        -- Pre-fill from context if a matching key exists
+        local default_val = ''
+        if self.context and self.context[arg.key] ~= nil then
+            default_val = tostring(self.context[arg.key])
+        end
         table.insert(subviews, widgets.Label{
             frame = {t=i-1, l=0},
             text = label .. ': ',
@@ -92,7 +98,7 @@ function FunctionModal:onFunctionSelected(idx)
         local field = widgets.EditField{
             view_id = 'arg_' .. arg.key,
             frame = {t=i-1, l=#label + 3, r=0},
-            text = '',
+            text = default_val,
         }
         table.insert(subviews, field)
         self.arg_fields[arg.key] = field

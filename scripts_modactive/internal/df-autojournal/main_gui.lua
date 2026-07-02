@@ -447,6 +447,19 @@ function WikiScreen:onPageChange(page_id, no_save)
     self.current_page_id = page_id
     local data = self.context:load_content(page_id)
 
+    -- Set editor context based on page type (for function arg pre-fill)
+    local editor = self.subviews.wiki_window.subviews.editor
+    local ctx = {}
+    local prefix, id = page_id:match("^(%a+):(%d+)$")
+    if prefix and id then
+        if prefix == 'citizen' then
+            ctx.unit_id = tonumber(id)
+        elseif prefix == 'artifact' then
+            ctx.item_id = tonumber(id)
+        end
+    end
+    editor.fn_context = ctx
+
     -- Default placeholder if page is empty
     if #data.content == 0 or (type(data.content[1]) == 'string' and data.content[1] == '') then
         local title = page_id:gsub("^%l", string.upper)

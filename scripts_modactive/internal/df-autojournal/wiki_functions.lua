@@ -60,7 +60,7 @@ register_function('dwarf_age', {
     },
     handler = function(args)
         local birth_year = tonumber(args.birth_year)
-        if not birth_year then return '?' end
+        if not birth_year then return '[needs birth_year]' end
         local age = df.global.cur_year - birth_year
         return tostring(age) .. ' years'
     end,
@@ -74,7 +74,7 @@ register_function('current_profession', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
         return dfhack.units.getProfessionName(unit) or 'Unknown'
@@ -89,7 +89,7 @@ register_function('current_skills', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
         local soul = unit.status.current_soul
@@ -121,7 +121,7 @@ register_function('current_needs', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
         local soul = unit.status.current_soul
@@ -148,7 +148,7 @@ register_function('current_health', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
 
@@ -184,7 +184,7 @@ register_function('current_mood', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
 
@@ -202,7 +202,7 @@ register_function('current_location', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
 
@@ -229,7 +229,7 @@ register_function('current_job', {
     },
     handler = function(args)
         local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '?' end
+        if not unit_id then return '[needs unit]' end
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
 
@@ -259,11 +259,11 @@ register_function('fort_wealth', {
     args_schema = {},
     handler = function()
         if not dfhack.world.isFortressMode() then return 'N/A' end
-        local wealth = 0
-        if df.global.plotinfo then
-            wealth = df.global.plotinfo.wealth or 0
-        end
-        return tostring(wealth) .. ' dorf bucks'
+        local plotinfo = df.global.plotinfo
+        if not plotinfo or not plotinfo.tasks then return 'Unknown' end
+        local wealth = plotinfo.tasks.wealth
+        if not wealth then return 'Unknown' end
+        return tostring(wealth.total or 0) .. ' dorf bucks'
     end,
 })
 

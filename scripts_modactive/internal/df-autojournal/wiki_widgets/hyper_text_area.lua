@@ -32,6 +32,7 @@ HyperTextArea.ATTRS {
     on_link_click    = DEFAULT_NIL,
     fn_functions     = {},  -- list from wiki_functions.list_functions()
     fn_evaluator     = DEFAULT_NIL,  -- function(fn_block) -> string
+    fn_context       = {},  -- { unit_id=123, ... } pre-filled args for the modal
     debug            = false,
 }
 
@@ -197,6 +198,7 @@ function HyperTextArea:openFunctionModal()
     if not self.fn_evaluator or #self.fn_functions == 0 then return end
     FunctionModal{
         functions = self.fn_functions,
+        context   = self.fn_context or {},
         on_submit = function(fn_key, args)
             self.hyper_text_area:insertFunctionBlock(fn_key, args)
         end,

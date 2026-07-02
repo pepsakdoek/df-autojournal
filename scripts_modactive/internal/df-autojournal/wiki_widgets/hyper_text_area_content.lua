@@ -141,6 +141,9 @@ end
 
 -- Rebuild display_text from char_list + table_blocks + fn_blocks.
 function HyperTextAreaContent:rebuild_display_text()
+    -- Sync fn_block lengths before rebuild so skip counts are current
+    self:_sync_fn_block_lengths()
+
     local display = {}
     local char_idx = 1
 
@@ -417,7 +420,11 @@ function HyperTextAreaContent:insertFunctionBlock(fn_key, args)
         self.cursor = self.cursor + 1
     end
 
-    -- Add fn_block tracking
+    -- Adjust positions of existing blocks after the insertion point
+    self:_adjust_table_positions_after_insert(pos, #result)
+    self:_adjust_fn_positions_after_insert(pos, #result)
+
+    -- Add fn_block tracking (pos is before the adjustment so it stays at the right spot)
     table.insert(self.fn_blocks, {
         pos    = pos,
         fn_key = fn_key,
@@ -426,7 +433,6 @@ function HyperTextAreaContent:insertFunctionBlock(fn_key, args)
     })
     table.sort(self.fn_blocks, function(a, b) return a.pos < b.pos end)
 
-    self:_adjust_table_positions_after_insert(pos, #result)
     self:updateContent()
 end
 
