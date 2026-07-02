@@ -36,7 +36,7 @@ end
 -- main update
 -- ---------------------------------------------------------------------------
 
-function HyperWrappedText:update(display_text, wrap_width)
+function HyperWrappedText:update(display_text, wrap_width, fn_evaluator)
     self.display_text = display_text
     self.wrap_width   = wrap_width
 
@@ -113,6 +113,15 @@ function HyperWrappedText:update(display_text, wrap_width)
                 end_line   = end_line,
                 entry      = entry,
             })
+        elseif HUtils.is_function_block(entry) then
+            -- Evaluate the function block and insert its output as text
+            local result = ''
+            if fn_evaluator then
+                result = fn_evaluator(entry) or ''
+            else
+                result = '[' .. (entry.fn_key or '?') .. ']'
+            end
+            table.insert(text_entries, { text = result, pen = COLOR_GREEN })
         else
             table.insert(text_entries, entry)
         end

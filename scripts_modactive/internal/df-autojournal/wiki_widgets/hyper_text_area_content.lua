@@ -30,6 +30,7 @@ HyperTextAreaContent.ATTRS {
     active_pen        = DEFAULT_NIL,
     active_link       = DEFAULT_NIL,
     history_size      = 25,
+    fn_evaluator      = DEFAULT_NIL,
 }
 
 function HyperTextAreaContent:init()
@@ -42,9 +43,10 @@ function HyperTextAreaContent:init()
     self.sel_pen  = dfhack.pen.parse(self.main_pen, nil, self.pen_selection)
 
     self.table_blocks = {}
-    self:_extract_table_blocks()
+    self.fn_blocks    = {}
+    self:_extract_special_blocks()
 
-    self.char_list = HUtils.build_char_list(self.display_text)
+    self.char_list = self:_build_char_list_with_fns(self.display_text)
     self.cursor    = math.max(1, #self.char_list + 1)
 
     self.wrapped_text = HyperWrappedText {
@@ -67,11 +69,45 @@ function HyperTextAreaContent:setRenderStartLineY(y)
     self.render_start_line_y = y
 end
 
--- Extract table blocks from display_text and store them with position tracking.
--- Each entry: { pos = char_index, columns, rows, sort_col, sort_asc, max_rows }
-function HyperTextAreaContent:_extract_table_blocks()
+--- Build char_list from display_text, evaluating function blocks inline.
+function HyperTextAreaContent:_build_char_list_with_fns(display_text)
+    local chars = {}
+    for _, entry in ipairs(display_text) do
+        if HUtils.is_table_block(entry) then
+            -- skip
+        elseif HUtils.is_function_block(entry) then
+            local result = self:_evaluate_fn_block(entry) or ''
+            local pen = COLOR_GREEN
+            for i = 1, #result do
+                chars[#chars + 1] = { char = result:sub(i, i), pen = pen }
+            end
+        else
+            local span = HUtils.to_span(entry)
+            for i = 1, #span.text do
+                chars[#chars + 1] = {
+                    char = span.text:sub(i, i),
+                    pen  = span.pen,
+                    link = span.link,
+                }
+            end
+        end
+    end
+    return chars
+end
+
+--- Evaluate a function block, returning the display string.
+function HyperTextAreaContent:_evaluate_fn_block(fn_block)
+    if self.fn_evaluator then
+        return self.fn_evaluator(fn_block)
+    end
+    return '[' .. (fn_block.fn_key or '?') .. ']'
+end
+
+-- Extract table blocks and function blocks from display_text with position tracking.
+function HyperTextAreaContent:_extract_special_blocks()
     self.table_blocks = {}
-    local text_pos = 1  -- current position in char_list
+    self.fn_blocks    = {}
+    local text_pos = 1
     for _, entry in ipairs(self.display_text) do
         if HUtils.is_table_block(entry) then
             local id = entry.id
@@ -83,12 +119,18 @@ function HyperTextAreaContent:_extract_table_blocks()
             end
             table.insert(self.table_blocks, {
                 pos      = text_pos,
-                columns  = entry.columns,
+                columns  = copyall(entry.columns),
                 rows     = copyall(entry.rows),
                 sort_col = entry.sort_col,
                 sort_asc = entry.sort_asc,
                 max_rows = entry.max_rows,
                 id       = id,
+            })
+        elseif HUtils.is_function_block(entry) then
+            table.insert(self.fn_blocks, {
+                pos    = text_pos,
+                fn_key = entry.fn_key,
+                args   = copyall(entry.args or {}),
             })
         else
             local span = HUtils.to_span(entry)
@@ -97,38 +139,80 @@ function HyperTextAreaContent:_extract_table_blocks()
     end
 end
 
--- Rebuild display_text from char_list + table_blocks.
--- Table blocks are inserted at their tracked positions in the character stream.
+-- Rebuild display_text from char_list + table_blocks + fn_blocks.
 function HyperTextAreaContent:rebuild_display_text()
     local display = {}
     local char_idx = 1
 
     table.sort(self.table_blocks, function(a, b) return a.pos < b.pos end)
+    table.sort(self.fn_blocks, function(a, b) return a.pos < b.pos end)
 
-    for _, tb in ipairs(self.table_blocks) do
-        if tb.pos > char_idx then
-            local seg_chars = {}
-            for i = char_idx, math.min(tb.pos - 1, #self.char_list) do
-                table.insert(seg_chars, self.char_list[i])
-            end
-            if #seg_chars > 0 then
-                local spans = HUtils.collapse_chars(seg_chars)
-                for _, span in ipairs(spans) do
-                    table.insert(display, span)
+    local tbi = 1
+    local fbi = 1
+
+    while char_idx <= #self.char_list or tbi <= #self.table_blocks or fbi <= #self.fn_blocks do
+        local next_tb_pos = tbi <= #self.table_blocks and self.table_blocks[tbi].pos or math.huge
+        local next_fb_pos = fbi <= #self.fn_blocks and self.fn_blocks[fbi].pos or math.huge
+
+        if next_tb_pos <= next_fb_pos and next_tb_pos <= #self.char_list + 1 then
+            -- Insert chars before this table block
+            if next_tb_pos > char_idx then
+                local seg_chars = {}
+                for i = char_idx, math.min(next_tb_pos - 1, #self.char_list) do
+                    table.insert(seg_chars, self.char_list[i])
                 end
+                if #seg_chars > 0 then
+                    local spans = HUtils.collapse_chars(seg_chars)
+                    for _, span in ipairs(spans) do
+                        table.insert(display, span)
+                    end
+                end
+                char_idx = next_tb_pos
             end
-            char_idx = tb.pos
+            -- Insert table block entry
+            local tb = self.table_blocks[tbi]
+            table.insert(display, {
+                type     = 'table',
+                columns  = tb.columns,
+                rows     = tb.rows,
+                sort_col = tb.sort_col,
+                sort_asc = tb.sort_asc,
+                max_rows = tb.max_rows,
+                id       = tb.id,
+                name     = tb.name,
+            })
+            tbi = tbi + 1
+            -- char_idx stays at table position
+        elseif next_fb_pos <= #self.char_list + 1 then
+            -- Insert chars before this function block
+            if next_fb_pos > char_idx then
+                local seg_chars = {}
+                for i = char_idx, math.min(next_fb_pos - 1, #self.char_list) do
+                    table.insert(seg_chars, self.char_list[i])
+                end
+                if #seg_chars > 0 then
+                    local spans = HUtils.collapse_chars(seg_chars)
+                    for _, span in ipairs(spans) do
+                        table.insert(display, span)
+                    end
+                end
+                char_idx = next_fb_pos
+            end
+            -- Insert function block entry
+            local fb = self.fn_blocks[fbi]
+            table.insert(display, {
+                type   = 'function',
+                fn_key = fb.fn_key,
+                args   = copyall(fb.args or {}),
+            })
+            -- Skip function output chars in char_list
+            local skip_count = fb.len or 0
+            char_idx = char_idx + skip_count
+            fbi = fbi + 1
+        else
+            -- Remaining chars are regular text
+            break
         end
-        table.insert(display, {
-            type     = 'table',
-            columns  = tb.columns,
-            rows     = tb.rows,
-            sort_col = tb.sort_col,
-            sort_asc = tb.sort_asc,
-            max_rows = tb.max_rows,
-            id       = tb.id,
-            name     = tb.name,
-        })
     end
 
     if char_idx <= #self.char_list then
@@ -147,6 +231,7 @@ function HyperTextAreaContent:rebuild_display_text()
     self.display_text = display
 end
 
+--- Determine if cursor is at a table boundary.
 function HyperTextAreaContent:cursor_at_table(cursor)
     local c = cursor or self.cursor
     for _, tb in ipairs(self.table_blocks) do
@@ -155,6 +240,7 @@ function HyperTextAreaContent:cursor_at_table(cursor)
     return false
 end
 
+--- Find a table block position by its id.
 function HyperTextAreaContent:_find_table_pos(entry_id)
     for _, tb in ipairs(self.table_blocks) do
         if tb.id == entry_id then
@@ -164,6 +250,7 @@ function HyperTextAreaContent:_find_table_pos(entry_id)
     return nil
 end
 
+--- Adjust table block positions after a character insert.
 function HyperTextAreaContent:_adjust_table_positions_after_insert(at_pos, count)
     for _, tb in ipairs(self.table_blocks) do
         if tb.pos >= at_pos then
@@ -172,6 +259,7 @@ function HyperTextAreaContent:_adjust_table_positions_after_insert(at_pos, count
     end
 end
 
+--- Adjust table block positions after a character delete.
 function HyperTextAreaContent:_adjust_table_positions_after_delete(from_pos, to_pos)
     local range_len = to_pos - from_pos + 1
     for _, tb in ipairs(self.table_blocks) do
@@ -183,22 +271,76 @@ function HyperTextAreaContent:_adjust_table_positions_after_delete(from_pos, to_
     end
 end
 
+--- Adjust fn block positions after a character insert.
+function HyperTextAreaContent:_adjust_fn_positions_after_insert(at_pos, count)
+    for _, fb in ipairs(self.fn_blocks) do
+        if fb.pos >= at_pos then
+            fb.pos = fb.pos + count
+        end
+    end
+end
+
+--- Adjust fn block positions after a character delete.
+function HyperTextAreaContent:_adjust_fn_positions_after_delete(from_pos, to_pos)
+    local range_len = to_pos - from_pos + 1
+    for _, fb in ipairs(self.fn_blocks) do
+        if fb.pos > to_pos then
+            fb.pos = fb.pos - range_len
+        elseif fb.pos > from_pos and fb.pos <= to_pos then
+            fb.pos = from_pos
+        end
+    end
+end
+
+--- Destroy any fn_block whose range overlaps with the given position range.
+-- Returns true if any fn_block was destroyed.
+function HyperTextAreaContent:_destroy_fn_blocks_overlapping(from_pos, to_pos)
+    local destroyed = false
+    local surviving = {}
+    for _, fb in ipairs(self.fn_blocks) do
+        local fb_end = fb.pos + (fb.len or 0) - 1
+        -- Check overlap: fb.pos..fb_end overlaps with from_pos..to_pos
+        if fb.pos > to_pos or fb_end < from_pos then
+            table.insert(surviving, fb)
+        else
+            destroyed = true
+        end
+    end
+    self.fn_blocks = surviving
+    return destroyed
+end
+
 function HyperTextAreaContent:postComputeFrame()
     self:recomputeLines()
 end
 
 function HyperTextAreaContent:recomputeLines()
     if not self.frame_body then
-        self.char_list = HUtils.build_char_list(self.display_text)
+        self.char_list = self:_build_char_list_with_fns(self.display_text)
         self.raw_text = HUtils.char_list_to_raw(self.char_list)
         return
     end
     self.wrapped_text:update(
         self.display_text,
-        self.frame_body.width - 1
+        self.frame_body.width - 1,
+        self.fn_evaluator
     )
     self.raw_text = self.wrapped_text.raw_text
     self.char_list = self.wrapped_text.char_list
+
+    -- Update fn_block lengths from current char_list state
+    self:_sync_fn_block_lengths()
+end
+
+--- Update fn_block lengths to match the number of chars their output
+-- occupies in char_list at their tracked positions.
+function HyperTextAreaContent:_sync_fn_block_lengths()
+    table.sort(self.fn_blocks, function(a, b) return a.pos < b.pos end)
+    for _, fb in ipairs(self.fn_blocks) do
+        -- Evaluate to get current output length
+        local result = self:_evaluate_fn_block({fn_key=fb.fn_key, args=fb.args}) or ''
+        fb.len = #result
+    end
 end
 
 function HyperTextAreaContent:updateContent()
@@ -235,10 +377,12 @@ function HyperTextAreaContent:eraseSelection()
     if self:hasSelection() then
         local from, to = self.cursor, self.sel_end
         if from > to then from, to = to, from end
+        self:_destroy_fn_blocks_overlapping(from, to - 1)
         for i = to, from, -1 do
             table.remove(self.char_list, i)
         end
         self:_adjust_table_positions_after_delete(from, to)
+        self:_adjust_fn_positions_after_delete(from, to)
         self:setCursor(from)
         self:updateContent()
     end
@@ -246,9 +390,43 @@ end
 
 function HyperTextAreaContent:insert(char_obj)
     self:eraseSelection()
+    self:_destroy_fn_blocks_overlapping(self.cursor, self.cursor)
     table.insert(self.char_list, self.cursor, char_obj)
     self:_adjust_table_positions_after_insert(self.cursor, 1)
+    self:_adjust_fn_positions_after_insert(self.cursor, 1)
     self:setCursor(self.cursor + 1)
+    self:updateContent()
+end
+
+--- Insert a function block at the current cursor position.
+-- Destroys any existing fn_block that overlaps the insertion point.
+-- @param fn_key  string  registered function key
+-- @param args    table   arguments for the function
+function HyperTextAreaContent:insertFunctionBlock(fn_key, args)
+    local fn_block = { fn_key = fn_key, args = args or {} }
+    local result = self:_evaluate_fn_block(fn_block) or ''
+    local pen = COLOR_GREEN
+
+    -- Destroy any fn_block at the insertion point
+    self:_destroy_fn_blocks_overlapping(self.cursor, self.cursor)
+
+    -- Insert evaluated chars into char_list
+    local pos = self.cursor
+    for i = 1, #result do
+        table.insert(self.char_list, self.cursor, { char = result:sub(i, i), pen = pen })
+        self.cursor = self.cursor + 1
+    end
+
+    -- Add fn_block tracking
+    table.insert(self.fn_blocks, {
+        pos    = pos,
+        fn_key = fn_key,
+        args   = copyall(args or {}),
+        len    = #result,
+    })
+    table.sort(self.fn_blocks, function(a, b) return a.pos < b.pos end)
+
+    self:_adjust_table_positions_after_insert(pos, #result)
     self:updateContent()
 end
 
@@ -258,7 +436,7 @@ function HyperTextAreaContent:setContent(display_text)
     self.sel_end      = nil
     self.render_start_line_y = 1
     self.nav_time     = 0
-    self:_extract_table_blocks()
+    self:_extract_special_blocks()
     self:recomputeLines()
 end
 
@@ -303,6 +481,8 @@ function HyperTextAreaContent:paste()
     
     self:eraseSelection()
     local insert_pos = self.cursor
+    self:_destroy_fn_blocks_overlapping(insert_pos, insert_pos + #clipboard - 1)
+
     for i = 1, #clipboard do
         local c = clipboard:sub(i, i)
         table.insert(self.char_list, self.cursor, {
@@ -313,6 +493,7 @@ function HyperTextAreaContent:paste()
         self.cursor = self.cursor + 1
     end
     self:_adjust_table_positions_after_insert(insert_pos, #clipboard)
+    self:_adjust_fn_positions_after_insert(insert_pos, #clipboard)
     self:updateContent()
 end
 
@@ -436,12 +617,12 @@ function HyperTextAreaContent:onInput(keys)
             return true
         elseif keys.CUSTOM_CTRL_X then
             if self:cursor_at_table() then return true end
-            self.history:store(HISTORY_ENTRY.OTHER, self.char_list, self.cursor, self.table_blocks)
+            self.history:store(HISTORY_ENTRY.OTHER, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
             self:cut()
             return true
         elseif keys.CUSTOM_CTRL_V then
             if self:cursor_at_table() then return true end
-            self.history:store(HISTORY_ENTRY.OTHER, self.char_list, self.cursor, self.table_blocks)
+            self.history:store(HISTORY_ENTRY.OTHER, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
             self:paste()
             return true
         elseif keys.CUSTOM_CTRL_A then
@@ -556,20 +737,22 @@ end
 
 function HyperTextAreaContent:onHistoryInput(keys)
     if keys.CUSTOM_CTRL_Z then
-        local entry = self.history:undo(self.char_list, self.cursor, self.table_blocks)
+        local entry = self.history:undo(self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
         if entry then
             self.char_list    = copyall(entry.char_list)
             self.cursor       = entry.cursor
             self.table_blocks = copyall(entry.table_blocks or {})
+            self.fn_blocks    = copyall(entry.fn_blocks or {})
             self:updateContent()
         end
         return true
     elseif keys.CUSTOM_CTRL_Y then
-        local entry = self.history:redo(self.char_list, self.cursor, self.table_blocks)
+        local entry = self.history:redo(self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
         if entry then
             self.char_list    = copyall(entry.char_list)
             self.cursor       = entry.cursor
             self.table_blocks = copyall(entry.table_blocks or {})
+            self.fn_blocks    = copyall(entry.fn_blocks or {})
             self:updateContent()
         end
         return true
@@ -650,38 +833,45 @@ function HyperTextAreaContent:onTextManipulationInput(keys)
     end
 
     if keys.SELECT or keys.KEY_ENTER or keys._STRING == 13 or keys._STRING == 10 then
-        self.history:store(HISTORY_ENTRY.WHITESPACE_BLOCK, self.char_list, self.cursor, self.table_blocks)
+        self.history:store(HISTORY_ENTRY.WHITESPACE_BLOCK, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
+        self:_destroy_fn_blocks_overlapping(self.cursor, self.cursor)
         self:insert({char = '\n', pen = self.active_pen, link = self.active_link})
         return true
     elseif keys.KEY_BACKSPACE then
-        self.history:store(HISTORY_ENTRY.BACKSPACE, self.char_list, self.cursor, self.table_blocks)
+        self.history:store(HISTORY_ENTRY.BACKSPACE, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
         if self:hasSelection() then
             self:eraseSelection()
         elseif self.cursor > 1 then
+            self:_destroy_fn_blocks_overlapping(self.cursor - 1, self.cursor - 1)
             table.remove(self.char_list, self.cursor - 1)
             self:_adjust_table_positions_after_delete(self.cursor - 1, self.cursor - 1)
+            self:_adjust_fn_positions_after_delete(self.cursor - 1, self.cursor - 1)
             self:setCursor(self.cursor - 1)
             self:updateContent()
         end
         return true
     elseif keys.KEY_DELETE or keys.KEYBOARD_CURSOR_DELETE or keys.CUSTOM_DELETE then
-        self.history:store(HISTORY_ENTRY.DELETE, self.char_list, self.cursor, self.table_blocks)
+        self.history:store(HISTORY_ENTRY.DELETE, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
         if self:hasSelection() then
             self:eraseSelection()
         elseif self.cursor <= #self.char_list then
+            self:_destroy_fn_blocks_overlapping(self.cursor, self.cursor)
             table.remove(self.char_list, self.cursor)
             self:_adjust_table_positions_after_delete(self.cursor, self.cursor)
+            self:_adjust_fn_positions_after_delete(self.cursor, self.cursor)
             self:updateContent()
         end
         return true
     elseif keys._STRING then
         if keys._STRING == 0 then -- Handle backspace via _STRING fallback
-            self.history:store(HISTORY_ENTRY.BACKSPACE, self.char_list, self.cursor, self.table_blocks)
+            self.history:store(HISTORY_ENTRY.BACKSPACE, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
             if self:hasSelection() then
                 self:eraseSelection()
             elseif self.cursor > 1 then
+                self:_destroy_fn_blocks_overlapping(self.cursor - 1, self.cursor - 1)
                 table.remove(self.char_list, self.cursor - 1)
                 self:_adjust_table_positions_after_delete(self.cursor - 1, self.cursor - 1)
+                self:_adjust_fn_positions_after_delete(self.cursor - 1, self.cursor - 1)
                 self:setCursor(self.cursor - 1)
                 self:updateContent()
             end
@@ -689,7 +879,8 @@ function HyperTextAreaContent:onTextManipulationInput(keys)
         end
         local char = string.char(keys._STRING)
         local entry_type = char == ' ' and HISTORY_ENTRY.WHITESPACE_BLOCK or HISTORY_ENTRY.TEXT_BLOCK
-        self.history:store(entry_type, self.char_list, self.cursor, self.table_blocks)
+        self.history:store(entry_type, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
+        self:_destroy_fn_blocks_overlapping(self.cursor, self.cursor)
         self:insert({char = char, pen = self.active_pen, link = self.active_link})
         return true
     end

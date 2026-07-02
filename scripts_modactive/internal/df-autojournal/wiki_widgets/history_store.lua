@@ -23,7 +23,7 @@ function HistoryStore:init()
     self.future = {}
 end
 
-function HistoryStore:store(entry_type, char_list, cursor, table_blocks)
+function HistoryStore:store(entry_type, char_list, cursor, table_blocks, fn_blocks)
     local last_entry = self.past[#self.past]
     if not last_entry or entry_type == HISTORY_ENTRY.OTHER or
        last_entry.entry_type ~= entry_type then
@@ -32,6 +32,7 @@ function HistoryStore:store(entry_type, char_list, cursor, table_blocks)
             char_list    = copyall(char_list),
             cursor       = cursor,
             table_blocks = table_blocks and copyall(table_blocks) or {},
+            fn_blocks    = fn_blocks and copyall(fn_blocks) or {},
         })
     end
     self.future = {}
@@ -40,7 +41,7 @@ function HistoryStore:store(entry_type, char_list, cursor, table_blocks)
     end
 end
 
-function HistoryStore:undo(curr_char_list, curr_cursor, curr_table_blocks)
+function HistoryStore:undo(curr_char_list, curr_cursor, curr_table_blocks, curr_fn_blocks)
     if #self.past == 0 then return nil end
     local entry = table.remove(self.past, #self.past)
     table.insert(self.future, {
@@ -48,11 +49,12 @@ function HistoryStore:undo(curr_char_list, curr_cursor, curr_table_blocks)
         char_list    = copyall(curr_char_list),
         cursor       = curr_cursor,
         table_blocks = curr_table_blocks and copyall(curr_table_blocks) or {},
+        fn_blocks    = curr_fn_blocks and copyall(curr_fn_blocks) or {},
     })
     return entry
 end
 
-function HistoryStore:redo(curr_char_list, curr_cursor, curr_table_blocks)
+function HistoryStore:redo(curr_char_list, curr_cursor, curr_table_blocks, curr_fn_blocks)
     if #self.future == 0 then return nil end
     local entry = table.remove(self.future, #self.future)
     table.insert(self.past, {
@@ -60,6 +62,7 @@ function HistoryStore:redo(curr_char_list, curr_cursor, curr_table_blocks)
         char_list    = copyall(curr_char_list),
         cursor       = curr_cursor,
         table_blocks = curr_table_blocks and copyall(curr_table_blocks) or {},
+        fn_blocks    = curr_fn_blocks and copyall(curr_fn_blocks) or {},
     })
     return entry
 end

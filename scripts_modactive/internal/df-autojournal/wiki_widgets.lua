@@ -5,6 +5,7 @@ local utils = require('utils')
 local textures = require('gui.textures')
 
 HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area').HyperTextArea
+FunctionModal = reqscript('internal/df-autojournal/wiki_widgets/function_modal').FunctionModal
 
 --------------------------------------------------------------------------------
 --- ToggleLabel

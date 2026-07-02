@@ -10,6 +10,7 @@ local wiki_settings = reqscript('internal/df-autojournal/settings_gui')
 local chronicle = reqscript('internal/df-autojournal/chronicle')
 local event_listener = reqscript('internal/df-autojournal/event_listener')
 local utils = reqscript('internal/df-autojournal/wiki_utils')
+local wiki_functions = reqscript('internal/df-autojournal/wiki_functions')
 local HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area').HyperTextArea
 
 --------------------------------------------------------------------------------
@@ -28,7 +29,7 @@ WikiWindow = defclass(WikiWindow, widgets.Window)
 WikiWindow.ATTRS {
     frame_title='My Fort Wiki',
     resizable=true,
-    resize_min={w=56, h=20},
+    resize_min={w=56, h=26},
     frame_inset={l=0,r=0,t=0,b=0},
     on_initialize=DEFAULT_NIL,
     on_page_change=DEFAULT_NIL,
@@ -140,6 +141,10 @@ function WikiWindow:init()
             link_pen=COLOR_LIGHTBLUE,
             link_hover_pen=COLOR_WHITE,
             link_pages=PAGES,
+            fn_evaluator=function(fn_block)
+                return wiki_functions.evaluate(fn_block)
+            end,
+            fn_functions=wiki_functions.list_functions(),
             on_link_click=function(link_data)
                 if self.on_link_click then
                     self.on_link_click(link_data)

@@ -158,6 +158,9 @@ function sanitize_content(content)
                     end
                 end
                 table.insert(result, tbl)
+            elseif type(span) == 'table' and span.type == 'function' then
+                -- Pass through function blocks unchanged
+                table.insert(result, span)
             elseif type(span) == 'table' and span.text then
                 table.insert(result, { text = sanitize(span.text), pen = span.pen, link = span.link })
             end

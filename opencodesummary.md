@@ -233,7 +233,7 @@ Flow for historical catch-up (during initialization):
 
 9. DFHACK WIDGET & MODULE INSIGHTS (from source investigation)
 
-   ToggleHotkeyLabel (D:\p\dfhack\dfhack\library\lua\gui\widgets\labels\toggle_hotkey_label.lua):
+   ToggleHotkeyLabel (You cibrary\lua\gui\widgets\labels\toggle_hotkey_label.lua):
      - Options are {label='On', value=true, pen=COLOR_GREEN} / {label='Off', value=false}
      - getOptionValue() returns the `value` field (boolean true/false)
      - on_change receives (new_value, old_value) — both booleans

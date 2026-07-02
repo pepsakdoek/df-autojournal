@@ -13,6 +13,7 @@ local Toolbar              = reqscript('internal/df-autojournal/wiki_widgets/too
 local LinkModal            = reqscript('internal/df-autojournal/wiki_widgets/link_modal').LinkModal
 local TableEditorModal     = reqscript('internal/df-autojournal/wiki_widgets/table_editor_modal').TableEditorModal
 local HyperTextAreaContent = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area_content').HyperTextAreaContent
+local FunctionModal        = reqscript('internal/df-autojournal/wiki_widgets/function_modal').FunctionModal
 
 -- ===========================================================================
 -- HyperTextArea  (public widget)
@@ -29,6 +30,8 @@ HyperTextArea.ATTRS {
     on_text_change   = DEFAULT_NIL,
     on_cursor_change = DEFAULT_NIL,
     on_link_click    = DEFAULT_NIL,
+    fn_functions     = {},  -- list from wiki_functions.list_functions()
+    fn_evaluator     = DEFAULT_NIL,  -- function(fn_block) -> string
     debug            = false,
 }
 
@@ -46,6 +49,7 @@ function HyperTextArea:init()
         end,
         on_link_request = function() self:openLinkModal() end,
         on_table_request = function() self:openTableEditor() end,
+        on_function_request = function() self:openFunctionModal() end,
     }
 
     self.hyper_text_area = HyperTextAreaContent {   
@@ -76,6 +80,7 @@ function HyperTextArea:init()
         debug           = self.debug,
         active_pen      = self.active_pen,
         active_link     = self.active_link,
+        fn_evaluator    = self.fn_evaluator,
     }
 
     self.scrollbar = Scrollbar {
@@ -92,7 +97,9 @@ function HyperTextArea:init()
             {text = "Ctrl+Click: Follow Link", pen = COLOR_LIGHTCYAN},
             " | Drag: Select | ",
             {text = string.char(30), pen = COLOR_LIGHTCYAN},
-            ": Edit Table"
+            ": Edit Table | ",
+            {text = string.char(228), pen = COLOR_GREEN},
+            ": Insert Function",
         }
     }
 
@@ -183,6 +190,16 @@ function HyperTextArea:openLinkModal()
             content:_adjust_table_positions_after_insert(insert_start, chars_inserted)
             content:updateContent()
         end
+    }:show()
+end
+
+function HyperTextArea:openFunctionModal()
+    if not self.fn_evaluator or #self.fn_functions == 0 then return end
+    FunctionModal{
+        functions = self.fn_functions,
+        on_submit = function(fn_key, args)
+            self.hyper_text_area:insertFunctionBlock(fn_key, args)
+        end,
     }:show()
 end
 

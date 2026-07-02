@@ -25,6 +25,11 @@ function is_table_block(entry)
     return type(entry) == 'table' and entry.type == 'table'
 end
 
+-- Return true if the display_text entry is a function block.
+function is_function_block(entry)
+    return type(entry) == 'table' and entry.type == 'function'
+end
+
 -- Build a flat list of character-level records from display_text spans.
 -- Table blocks are skipped (they are handled separately by the renderer).
 function build_char_list(display_text)

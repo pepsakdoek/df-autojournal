@@ -6,16 +6,18 @@
 
 local Widget = require('gui.widgets.widget')
 
-local COLOR_BLOCK = string.char(219) -- █
-local LINK_ICON   = string.char(21)  -- §
-local TABLE_ICON  = string.char(30)  -- ▲
+local COLOR_BLOCK   = string.char(219) -- █
+local LINK_ICON     = string.char(21)  -- §
+local TABLE_ICON    = string.char(30)  -- ▲
+local FUNCTION_ICON = string.char(228) -- Σ
 
 Toolbar = defclass(Toolbar, Widget)
 Toolbar.ATTRS {
-    on_color_change = DEFAULT_NIL,
-    on_link_request = DEFAULT_NIL,
-    on_table_request = DEFAULT_NIL,
-    selected_color  = 15,
+    on_color_change    = DEFAULT_NIL,
+    on_link_request    = DEFAULT_NIL,
+    on_table_request   = DEFAULT_NIL,
+    on_function_request = DEFAULT_NIL,
+    selected_color     = 15,
 }
 
 function Toolbar:onRenderBody(dc)
@@ -35,7 +37,8 @@ function Toolbar:onRenderBody(dc)
         end
     end
 
-    -- Table edit and insert link at the bottom
+    -- Function, Table, and Link buttons at the bottom
+    dc:pen(COLOR_WHITE):seek(1, dc.height - 3):string(FUNCTION_ICON)
     dc:pen(COLOR_WHITE):seek(1, dc.height - 2):string(TABLE_ICON)
     dc:pen(COLOR_WHITE):seek(1, dc.height - 1):string(LINK_ICON)
 end
@@ -66,6 +69,9 @@ function Toolbar:onInput(keys)
                 local color_idx = y + 1
                 self.selected_color = color_idx
                 if self.on_color_change then self.on_color_change(color_idx) end
+                return true
+            elseif y == self.frame_body.height - 3 then
+                if self.on_function_request then self.on_function_request() end
                 return true
             elseif y == self.frame_body.height - 2 then
                 if self.on_table_request then self.on_table_request() end
