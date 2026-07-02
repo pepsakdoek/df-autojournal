@@ -231,6 +231,88 @@ Flow for historical catch-up (during initialization):
      -> event_listener.append_to_page() + register_timeline_entry() + register_enemy_encounter()
      -> progress saved every 500 events
 
+9. DFHACK WIDGET & MODULE INSIGHTS (from source investigation)
+
+   ToggleHotkeyLabel (D:\p\dfhack\dfhack\library\lua\gui\widgets\labels\toggle_hotkey_label.lua):
+     - Options are {label='On', value=true, pen=COLOR_GREEN} / {label='Off', value=false}
+     - getOptionValue() returns the `value` field (boolean true/false)
+     - on_change receives (new_value, old_value) — both booleans
+     - initial_option can be a boolean; setOption() compares with == against each option's value field
+     - initial_option falls back to index 1 if no match
+
+   CycleHotkeyLabel (D:\p\dfhack\dfhack\library\lua\gui\widgets\labels\cycle_hotkey_label.lua):
+     - init() calls self:setOption(self.initial_option) — must NOT be a function here
+     - setOption(value_or_index): tries value match -> index match -> defaults to option 1
+     - cycle(backwards): updates option_idx, then calls on_change(new_value, old_value)
+     - getOptionValue(option_idx) returns options[option_idx].value (or the raw option if flat array)
+     - Text is constructed in init() with {key, label, {gap=..., text=getOptionLabel, pen=getOptionPen}}
+      - Always clickable (shouldHover returns true)
+
+   Custom ToggleLabel (wiki_widgets.lua:30-69):
+     - Extends DFHack's ToggleHotkeyLabel: options are {value=true, label='On'} / {value=false, label='Off'}
+     - Custom icon rendering: replaces the default "On"/"Off" text with bracket icons:
+       [√] (green, enabled) / [x] (red, disabled) using DFHack's tp_control_panel tilesheet
+     - `initial_option`: supports both a raw boolean and a function that returns boolean.
+       The function is resolved BEFORE calling super.init() because CycleHotkeyLabel:init()
+       calls setOption(initial_option) directly and can't handle function values.
+     - `on_change(val)` receives boolean true/false (the option's `value` field)
+     - `getOptionValue()` returns boolean true/false
+     - opt_is_on() helper handles both string and boolean: `return opt == 'On' or opt == true`
+       (defensive — ToggleHotkeyLabel uses booleans but the comment in init mentions "On"/"Off" text tokens)
+
+   How to use ToggleLabel:
+     - Import: `local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')`
+     - Create: `wiki_widgets.ToggleLabel{ view_id='...', label='My Setting ', key='CUSTOM_ALT_X',
+         initial_option=function() return my_current_state() end,
+         on_change=function(val) save_my_state(val) end, }`
+     - `initial_option` can be a function (evaluated once at creation) or a direct boolean
+     - `on_change` receives boolean: `true` = enabled, `false` = disabled
+
+   How to save/restore ToggleLabel state:
+     - The ToggleLabel itself does NOT persist its state — it only displays and calls on_change.
+     - To persist: in on_change, write to dfhack.persistent or your own in-memory state.
+     - To restore: in initial_option, read from your persistent/store and return a boolean.
+     - on_change receives the NEW value after the user clicks (NOT the old value).
+     - Example (persist to dfhack.persistent):
+         initial_option=function()
+           local data = dfhack.persistent.getSiteData('my_key')
+           return data and data.val and data.val[1] == 1 or false
+         end,
+         on_change=function(val)
+           dfhack.persistent.saveSiteData('my_key', {val=val and {1} or {0}})
+         end
+     - IMPORTANT: Compare val explicitly rather than truthy-checking, since
+       non-empty strings are truthy in Lua but ToggleHotkeyLabel uses booleans:
+         if val == 'On' or val == true then  -- correct
+         if val then                         -- broken (string 'Off' is truthy)
+     - For settings tables saved as JSON, normalize on save: `s[key] = (val == 'On' or val == true)`
+
+   --@ module = true behavior (reqscript returns _ENV, not the return value):
+     - When a script has `--@ module = true`, DFHack's reqscript returns the module environment
+       (_ENV), NOT the script's explicit `return` value.
+     - All functions/variables that callers need must be assigned to _ENV (the module table).
+     - `return EventListener` is ignored — the module table (_ENV) is what callers receive.
+     - Other project modules correctly use `return _ENV` at the end.
+     - Fix: iterate the local table and copy its entries to _ENV before returning:
+         for k, v in pairs(MyTable) do _ENV[k] = v end
+         return _ENV
+     - Module environment _ENV always has keys: moduleMode, dfhack_flags
+
+   overlay_onupdate_max_freq_seconds (plugins/lua/overlay.lua):
+     - Default: 5 seconds (throttles how often overlay_onupdate is called)
+     - Set to 0 for every-frame updates (no throttle)
+     - Overlay widgets only get update ticks when their registered viewscreens are active;
+       ZScreens on top may block dwarfmode overlay updates until dismissed.
+     - Hotspot widgets (hotspot=true) get update ticks on ALL viewscreens.
+
+   reqscript module caching:
+     - reqscript caches by module name string across all callers
+     - Cache persists for the Lua session (restart DF to clear)
+     - Edits to module files are NOT picked up until restart (no hot-reload)
+     - `devel/scan-scripts` may reload overlay scripts but does NOT clear reqscript cache
+     - Files in `internal/` directories are SKIPPED by foreach_module_script() (line 18 of
+       script-manager.lua: `f.path:startswith('internal/')`)
+
 Widget dependencies:
    DFHack gui/gui.widgets (standard) + Custom widgets:
      wiki_widgets/:
