@@ -528,9 +528,12 @@ function EventParser.parse_death(unit)
     local events_entry = nil
     local is_fort_dwarf = is_our_unit(unit)
 
+    local enemy_name_from_killer = nil
     if is_fort_dwarf then
         if killer_name then
             citizen_entry = entry_line(date_str .. ": Died, cause: " .. cause .. ", slain by " .. killer_name)
+            -- Extract raw enemy name from the wiki link format "[Name](citizen:id)"
+            enemy_name_from_killer = killer_name:match("%[([^%]]+)%]") or killer_name
         else
             citizen_entry = entry_line(date_str .. ": Died, cause: " .. cause)
         end
@@ -566,7 +569,7 @@ function EventParser.parse_death(unit)
         entry = events_entry or citizen_entry,
     })
 
-    return {
+    local result = {
         targets = targets,
         year = year,
         season = get_season(tick),
@@ -576,6 +579,18 @@ function EventParser.parse_death(unit)
         importance = is_fort_dwarf and 2 or 1,
         summary = unit_name .. " died (" .. cause .. ")",
     }
+    if is_fort_dwarf and enemy_name_from_killer and unit.death_info and unit.death_info.killer and unit.death_info.killer ~= -1 then
+        result.enemy_name = enemy_name_from_killer
+        result.enemy_type = "Unknown"
+        local enemy_unit = df.unit.find(unit.death_info.killer)
+        if enemy_unit then
+            local race_name = df.creature_raw.find(enemy_unit.race)
+            if race_name then
+                result.enemy_type = utils.sanitize(race_name.name[0] or "Unknown")
+            end
+        end
+    end
+    return result
 end
 
 ---------------------------------------------------------------------------

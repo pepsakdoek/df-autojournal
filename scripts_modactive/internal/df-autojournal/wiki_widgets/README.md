@@ -180,6 +180,123 @@ Bob|45|Farmer
 
 ---
 
+## Function Blocks
+
+In addition to plain strings, span tables, and table blocks, `display_text` supports
+**function blocks** — dynamic, evaluated snippets that are re-computed each time the
+editor renders:
+
+```lua
+-- Function block (evaluated at render time)
+{
+    type   = 'function',
+    fn_key = 'dwarf_age',
+    args   = { birth_year = 250, unit_id = 42 },
+}
+```
+
+| Field    | Required | Description |
+|----------|----------|-------------|
+| `type`   | yes      | Must be `'function'` |
+| `fn_key` | yes      | Registered function key (see registry below) |
+| `args`   | yes      | Table of arguments matching the function's `args_schema` |
+
+### Toolbar Button
+
+Click the **Σ** (Sigma) button at the bottom of the left toolbar (3rd from bottom,
+above the ▲ table button) to open the **Insert Function** modal.
+
+### HTA Attributes
+
+To wire up functions, set these attributes on your `HyperTextArea`:
+
+| Attribute       | Type     | Description |
+|-----------------|----------|-------------|
+| `fn_functions`  | `table`  | List from `wiki_functions.list_functions()` — drives the modal's function list |
+| `fn_evaluator`  | `function(fn_block) → string` | Called at render time to compute the function's output |
+| `fn_context`    | `table`  | Pre-filled argument values passed to the function modal (e.g. `{ unit_id = 123 }`) |
+
+```lua
+local wiki_functions = reqscript('internal/df-autojournal/wiki_functions')
+
+-- In your HyperTextArea definition:
+HyperTextArea {
+    fn_functions = wiki_functions.list_functions(),
+    fn_evaluator = function(fn_block)
+        return wiki_functions.evaluate(fn_block)
+    end,
+    fn_context = { unit_id = 123, birth_year = 250 },
+}
+```
+
+### The Function Modal
+
+Pressing **Σ** or calling `editor:openFunctionModal()` opens a `ZScreen` modal with:
+
+- **Function list** — scrollable choices of all registered functions
+- **Description label** — shows the selected function's description
+- **Argument fields** — dynamic `EditField` widgets generated from the function's
+  `args_schema`, pre-filled from `fn_context` where matching keys exist
+- **Submit** — `Enter` collects args and calls `on_submit(fn_key, args)`
+- **Cancel** — `Esc` dismisses
+
+On submit, the widget calls `hyper_text_area:insertFunctionBlock(fn_key, args)`,
+which evaluates the function, inserts the result as `COLOR_GREEN` text at the
+cursor, and tracks the block in `fn_blocks` for future re-evaluation.
+
+### Evaluation & Rendering
+
+Function blocks are evaluated at two points:
+
+1. **Content insertion** — `insertFunctionBlock()` evaluates immediately to insert
+   the correct number of characters into the `char_list`.
+2. **Render / rebuild** — both `HyperWrappedText:update()` and
+   `rebuild_display_text()` re-evaluate each function block via `fn_evaluator`,
+   updating the output whenever the widget re-renders.
+
+Function output is always displayed in **`COLOR_GREEN`**.
+
+The widget maintains a `fn_blocks` array tracking `{ pos, fn_key, args, len }`
+for each function block. Positions are adjusted on insert/delete, and overlapping
+blocks are destroyed when text is edited over them (the function block is lost
+when its output range is modified — re-insert it if needed).
+
+### Built-in Functions
+
+| fn_key | Label | Args | Description |
+|--------|-------|------|-------------|
+| `dwarf_age` | Dwarf Age | `birth_year` (num, req), `unit_id` (num) | Current age in years (or months for children) |
+| `current_profession` | Current Profession | `unit_id` (num, req) | Profession/nickname of the dwarf |
+| `current_skills` | Current Skills | `unit_id` (num, req) | All skills with rating and title |
+| `current_needs` | Current Needs | `unit_id` (num, req) | Unmet needs and desires |
+| `current_health` | Current Health | `unit_id` (num, req) | Health status and injury count |
+| `current_mood` | Current Mood | `unit_id` (num, req) | Current mood/emotional state |
+| `population_count` | Fort Population | *(none)* | Number of citizen units |
+| `fort_wealth` | Fort Wealth | *(none)* | Total fortress wealth in ☼ |
+
+### fn_context Pre-fill
+
+The `fn_context` attribute is updated per-page by the parent screen. Built-in pre-fills:
+
+| Page Type | Context Keys |
+|-----------|-------------|
+| `citizen:<id>` | `unit_id` (the unit's ID), `birth_year` (from `unit.birth_year`) |
+| `artifact:<id>` | `item_id` (the item's ID) |
+
+This means when a user opens a citizen's page and clicks **Σ**, the Dwarf Age
+function's `birth_year` and `unit_id` fields are already filled in automatically.
+
+### Checking for Function Blocks in Code
+
+```lua
+local HUtils = reqscript('internal/df-autojournal/wiki_widgets/hta_utils')
+if HUtils.is_function_block(entry) then
+    -- entry is { type='function', fn_key=..., args=... }
+end
+```
+
+---
+
 ## Implementing Navigation & Persistence
 
 To support multiple pages and ensure changes are saved when clicking links, you should use a "Context" pattern outside the widget.

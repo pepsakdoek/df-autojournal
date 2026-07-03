@@ -153,11 +153,12 @@ local function register_timeline_entry(parsed)
 end
 
 --- Register an enemy encounter in the enemies registry.
---- Creates or updates an enemy record with name, type, year, and defeat status.
+--- Creates or updates an enemy record with name, type, year, defeat status, and kill count.
 local ENEMIES_KEY = 'mfw_enemies'
 
-local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeated)
+local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeated, kill_count_inc)
     if not enemy_name or enemy_name == "" then return end
+    kill_count_inc = kill_count_inc or 0
 
     local data = {}
     local ok_load = pcall(function()
@@ -180,6 +181,9 @@ local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeat
         if was_defeated then
             record.defeated = true
         end
+        if kill_count_inc > 0 then
+            record.citizens_killed = (record.citizens_killed or 0) + kill_count_inc
+        end
     else
         record = {
             name = enemy_name,
@@ -190,11 +194,32 @@ local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeat
             defeated = was_defeated or false,
             last_year = year,
             notes = "",
+            citizens_killed = kill_count_inc > 0 and kill_count_inc or 0,
         }
         data.enemies[key] = record
     end
 
     pcall(dfhack.persistent.saveSiteData, ENEMIES_KEY, {enemies=data.enemies})
+end
+
+--- Load enemy kill data aggregated from the registry.
+--- Returns a table keyed by normalized enemy name: { count, victims[] }
+local function load_enemy_kills()
+    local data = {}
+    local ok = pcall(function()
+        local raw = dfhack.persistent.getSiteData(ENEMIES_KEY)
+        if raw and raw.enemies then
+            for nkey, rec in pairs(raw.enemies) do
+                if rec.citizens_killed and rec.citizens_killed > 0 then
+                    data[nkey] = {
+                        count = rec.citizens_killed,
+                        victims = {},
+                    }
+                end
+            end
+        end
+    end)
+    return data
 end
 
 --- Load the enemies registry (array of records sorted by first_year).
@@ -225,6 +250,19 @@ local function is_category_enabled(category)
     return s and s[setting_key] ~= false
 end
 
+--- Check if a section on the enemies page is enabled in enemies journal settings.
+local function is_enemies_section_enabled(section_title)
+    local settings = mfw_settings.get_settings()
+    local ej = settings.enemies and settings.enemies.journal
+    if not ej then return true end
+    if section_title == "Notable Encounters" then
+        return ej.encounter_log ~= false
+    elseif section_title == "Kill List" then
+        return ej.kill_list ~= false
+    end
+    return true
+end
+
 --- Route a parsed event result to all its target pages
 local function route_parsed(parsed)
     if not parsed or not parsed.targets then return end
@@ -234,18 +272,25 @@ local function route_parsed(parsed)
 
     for _, target in ipairs(parsed.targets) do
         if target.page_id and target.section and target.entry then
-            append_to_page(target.page_id, target.section, target.entry)
+            -- Check enemies page section-level settings
+            if target.page_id == "enemies" and not is_enemies_section_enabled(target.section) then
+                -- Skip this target if the section is disabled in enemies settings
+            else
+                append_to_page(target.page_id, target.section, target.entry)
+            end
         end
     end
     -- Register in the global timeline
     register_timeline_entry(parsed)
-    -- Register enemy encounter if this is a threat event
+    -- Register enemy encounter if this event has an enemy name
     if parsed.enemy_name then
+        local kill_inc = (parsed.category == "death" and parsed.enemy_defeated == nil) and 1 or 0
         register_enemy_encounter(
             parsed.enemy_name,
             parsed.enemy_type,
             parsed.year or df.global.cur_year,
-            parsed.enemy_defeated or false
+            parsed.enemy_defeated or false,
+            kill_inc
         )
     end
 end
@@ -459,6 +504,7 @@ EventListener.append_to_page = append_to_page
 EventListener.register_timeline_entry = register_timeline_entry
 EventListener.register_enemy_encounter = register_enemy_encounter
 EventListener.load_enemies = load_enemies
+EventListener.load_enemy_kills = load_enemy_kills
 
 -- Export EventListener functions to the module environment so reqscript callers
 -- find them.  DFHack returns _ENV for --@ module = true scripts.

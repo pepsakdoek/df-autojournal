@@ -3,6 +3,7 @@ local logger = reqscript('internal/df-autojournal/logger')
 local utils = reqscript('internal/df-autojournal/wiki_utils')
 local event_parser = reqscript('internal/df-autojournal/event_parser')
 local event_listener = reqscript('internal/df-autojournal/event_listener')
+local wiki_settings = reqscript('internal/df-autojournal/wiki_settings')
 
 -- Templates
 local citizen_template = reqscript('internal/df-autojournal/templates/citizen')
@@ -442,7 +443,9 @@ function WikiInitializer:renderEnemiesPage()
         return
     end
     local enemies = event_listener.load_enemies()
-    local content = enemies_template.render(enemies)
+    local settings = wiki_settings.get_settings().enemies or { init={registry=true, stats=true}, journal={encounter_log=true, kill_list=true, notable_victories=true} }
+    local kills = event_listener.load_enemy_kills and event_listener.load_enemy_kills() or {}
+    local content = enemies_template.render(enemies, settings, kills)
     safe_save(self.context, 'enemies', utils.sanitize_content(content), 1)
     logger.log("Enemies page rendered with " .. #enemies .. " entries")
 end

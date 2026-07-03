@@ -79,6 +79,17 @@ local DEFAULT_SETTINGS = {
             syndrome_events = true,
             siege_events = true,
         }
+    },
+    enemies = {
+        init = {
+            registry = true,
+            stats = true,
+        },
+        journal = {
+            encounter_log = true,
+            kill_list = true,
+            notable_victories = true,
+        }
     }
 }
 
@@ -101,6 +112,7 @@ local DEFAULT_JOURNAL = {
         syndrome_events = true,
         siege_events = true,
     },
+    enemies = { encounter_log = true, kill_list = true, notable_victories = true },
 }
 
 local logger = reqscript('internal/df-autojournal/logger')
@@ -108,7 +120,7 @@ local json = require('json')
 
 local function has_init_structure(settings)
     if type(settings) ~= 'table' then return false end
-    for _, t in ipairs{'civ', 'fort', 'citizen', 'artifact', 'event'} do
+    for _, t in ipairs{'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies'} do
         if type(settings[t]) == 'table' then
             if settings[t].init ~= nil then
                 return true

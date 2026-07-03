@@ -330,5 +330,6 @@ Templates:
 # Agent instructions
 
 * Settings and features should always be synced. 
+* Settings descriptions in settings_gui should be elaborate enough to undestand what it does
 * If on windows, use the sync_mod.bat file after changes so the user can test.
 * Significant Changes (not bugfixes, but features) to the HyperTextArea should also be noted in the relevant README.md file 

@@ -7,8 +7,8 @@ local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
 
 local logger = reqscript('internal/df-autojournal/logger')
 
-local TEMPLATE_IDS = {'civ', 'fort', 'citizen', 'artifact', 'event'}
-local TEMPLATE_LABELS = {'Civ', 'Fort', 'Citizen', 'Artifact', 'Event'}
+local TEMPLATE_IDS = {'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies'}
+local TEMPLATE_LABELS = {'Civ', 'Fort', 'Citizen', 'Artifact', 'Event', 'Enemies'}
 local LABEL_WIDTH = 20
 
 local function capitalize(str)
@@ -93,6 +93,17 @@ local SETTING_DESCRIPTIONS = {
             siege_events = "Record invasion attacks and siege details",
         },
     },
+    enemies = {
+        init = {
+            registry = "Show the enemy registry table with names, types and first appearance",
+            stats = "Show summary counts of total, defeated, and active enemies",
+        },
+        journal = {
+            encounter_log = "Auto-record threat encounters and invasions on the enemies page",
+            kill_list = "Auto-record enemies and animals killed by the fort",
+            notable_victories = "Auto-record when named enemies are defeated",
+        },
+    },
 }
 
 local function desc(tab_id, category, key)
@@ -173,9 +184,9 @@ local settings_instance = nil
 SettingsWindow = defclass(SettingsWindow, widgets.Window)
 SettingsWindow.ATTRS {
     frame_title='Wiki Settings',
-    frame={w=56, h=24},
+    frame={w=76, h=26},
     resizable=true,
-    resize_min={w=56, h=16},
+    resize_min={w=76, h=18},
 }
 
 function SettingsWindow:init()
@@ -234,7 +245,7 @@ function SettingsWindow:updateHoverHelp()
                 if vid and vid:match('^toggle_') then
                     local mx, my = sv:getMousePos()
                     if mx then
-                        local tab_id, category, key = vid:match('^toggle_(.+)_(.+)_(.+)$')
+                        local tab_id, category, key = vid:match('^toggle_(%w+)_(%w+)_(.+)$')
                         if tab_id then
                             self.subviews.help_bar:setText(desc(tab_id, category, key))
                             found = true
