@@ -60,7 +60,7 @@ This is just a list of ideas of things that might be of interest to users, and m
     * Don't link it to a hotkey, it must be dependent on where the cursor is. (in the table or 'outside it') 
 * The function Modal popup has a weird behaviour (sometimes) when you select a function with the mouse where the 'statusbar' (bottom of the UI 'Enter: Insert | Escape : Cancel') gets hidden
 * Create the actual HTML export
-
+* We probably want a progressbar for the initialization process
 
 
     

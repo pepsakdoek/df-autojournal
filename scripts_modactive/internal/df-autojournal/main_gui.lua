@@ -175,8 +175,11 @@ function WikiWindow:init()
 end
 
 function WikiWindow:onInitialize()
+    logger.log("WikiWindow:onInitialize called")
     if self.on_initialize then
         self.on_initialize()
+    else
+        logger.log("WikiWindow:onInitialize - on_initialize is nil!")
     end
 end
 
@@ -406,19 +409,29 @@ end
 
 function WikiScreen:onInitialize()
     local initialized = dfhack.persistent.getSiteData(self.context.save_prefix .. 'initialized')
+    logger.log("onInitialize: initialized=" .. tostring(initialized))
     if initialized then
+        self._reinit_stage = 1
+        logger.log("onInitialize: showing first reinit dialog")
         gui.showYesNoPrompt('Re-initialize Wiki?',
-            'You already have a wiki. Re-initializing will OVERWRITE ALL existing pages and settings. This cannot be undone. Continue?',
+            'You already have a wiki. Re-initializing will OVERWRITE ALL existing pages. This cannot be undone. Continue?',
             COLOR_LIGHTRED,
             function()
+                logger.log("onReinitConfirmed: stage 1 confirmed")
+                self._reinit_stage = 2
                 gui.showYesNoPrompt('REALLY Re-initialize?',
-                    'This is your final warning. ALL current wiki pages will be replaced with fresh templates. Your manual edits, notes, and custom entries will be LOST. Proceed?',
+                    'FINAL WARNING: All wiki pages will be replaced with fresh templates. Manual edits, notes, and custom entries will be LOST. Proceed?',
                     COLOR_LIGHTRED,
-                    function() self:performInitialization() end
+                    function()
+                        logger.log("onReinitConfirmed: stage 2 confirmed, running init")
+                        self._reinit_stage = nil
+                        self:performInitialization()
+                    end
                 )
             end
         )
     else
+        logger.log("onInitialize: no flag set, calling performInitialization directly")
         self:performInitialization()
     end
 end

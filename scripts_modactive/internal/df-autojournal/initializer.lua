@@ -77,8 +77,10 @@ function WikiInitializer:perform(screen)
         local settings = wiki_settings.get_settings()
         local tracking_mode = settings.civ and settings.civ.init and settings.civ.init.tracking or 'diplomatic'
 
+        logger.log("=== Initialization step 0: tracking civs (tracking_mode=" .. tostring(tracking_mode) .. ") ===")
         -- 0. Track known civilizations
         local known_civs = load_known_civs()
+        logger.log("Loaded " .. #known_civs .. " known civs from storage")
         local known_map = {}
         for _, c in ipairs(known_civs) do
             known_map[c.civ_id] = true
@@ -114,6 +116,8 @@ function WikiInitializer:perform(screen)
                 end
             end
         end)
+
+        logger.log("After tracking, known civs = " .. #known_civs)
 
         -- Add all major civs (scan entity_links on all sites)
         if tracking_mode == 'all_major' then
@@ -171,6 +175,10 @@ function WikiInitializer:perform(screen)
             end
         end
 
+        logger.log("Final known civs: " .. #known_civs)
+        for _, c in ipairs(known_civs) do
+            logger.log("  - " .. tostring(c.name) .. " (id=" .. tostring(c.civ_id) .. ")")
+        end
         save_known_civs(known_civs)
 
         -- 0b. Track known forts
@@ -193,11 +201,15 @@ function WikiInitializer:perform(screen)
         -- 0c. Dynamic pages for civs and forts
         local dynamic_pages = {}
 
+        -- Build known fort set for linking in civ pages
+        local known_fort_set = {}
+        for _, f in ipairs(known_forts) do known_fort_set[f.site_id] = true end
+
         -- Render civ sub-pages
         for _, c in ipairs(known_civs) do
             local page_id = "civ:" .. tostring(c.civ_id)
             table.insert(dynamic_pages, {text=c.name, id=page_id})
-            local content = civ_template.render(c.civ_id)
+            local content = civ_template.render(c.civ_id, known_fort_set)
             safe_save(self.context, page_id, utils.sanitize_content(content), 1)
         end
 
@@ -217,121 +229,92 @@ function WikiInitializer:perform(screen)
         local forts_index_content = forts_index_template.render(known_forts, site_id)
         safe_save(self.context, 'forts', utils.sanitize_content(forts_index_content), 1)
 
-        -- 0f. Render World page (entirely pcall'd for robustness)
-        local world_content = {}
+        -- 0f. Render World page — direct save, no abstraction
+        logger.log("=== Initialization step 0f: World page ===")
+        local world_name = "World"
+        pcall(function()
+            local wd = df.global.world.world_data
+            if wd then
+                local ok_n, name_n = pcall(utils.get_readable_name, wd.name)
+                if ok_n and name_n and name_n ~= "" then world_name = name_n end
+            end
+        end)
+        logger.log("World name: " .. world_name)
+
+        local world_content = {
+            { text = "# " .. world_name, pen = COLOR_YELLOW },
+            "\n\n",
+            { text = "Current Date: ", pen = COLOR_LIGHTCYAN },
+            { text = "Year " .. tostring(df.global.cur_year or 0), pen = COLOR_WHITE },
+            "\n",
+        }
+
         pcall(function()
             local wd = df.global.world.world_data
             if not wd then return end
-
-            -- World name
-            local world_name = "World"
-            local ok_name, name_val = pcall(utils.get_readable_name, wd.name)
-            if ok_name and name_val and name_val ~= "" then world_name = name_val end
-
-            -- Season
-            local names = {"Early Spring", "Late Spring", "Early Summer", "Late Summer", "Early Autumn", "Late Autumn", "Early Winter", "Late Winter"}
-            local current_season = ""
-            if df.global.cur_year_tick then
-                local idx = math.floor(df.global.cur_year_tick / 16800) + 1
-                if idx >= 1 and idx <= #names then current_season = names[idx] end
-            end
-
-            -- Eras
-            local eras = {}
-            local ok_eras, era_list = pcall(function() return wd.eras end)
-            if ok_eras and era_list then
-                for _, era_elem in ipairs(era_list) do
+            if wd.eras and #wd.eras > 0 then
+                table.insert(world_content, "\n")
+                table.insert(world_content, { text = "## Ages of the World", pen = COLOR_YELLOW })
+                table.insert(world_content, "\n")
+                for _, era_elem in ipairs(wd.eras) do
                     local ok_en, era_name = pcall(utils.get_readable_name, era_elem.name)
                     if ok_en and era_name then
-                        table.insert(eras, { year = era_elem.first_year, name = era_name, is_current = false })
-                    end
-                end
-                table.sort(eras, function(a, b) return (a.year or 0) < (b.year or 0) end)
-                if #eras > 0 then
-                    local cur = df.global.cur_year
-                    local cur_name = eras[1].name
-                    for _, e in ipairs(eras) do
-                        if e.year <= cur then cur_name = e.name end
-                    end
-                    for _, e in ipairs(eras) do
-                        if e.name == cur_name then e.is_current = true; break end
+                        table.insert(world_content, "* Year " .. tostring(era_elem.first_year or 0) .. " — " .. era_name .. "\n")
                     end
                 end
             end
+        end)
 
-            -- Landmasses
-            local landmasses = {}
-            local ok_lm, lm_list = pcall(function() return wd.landmasses end)
-            if ok_lm and lm_list then
-                for _, lm in ipairs(lm_list) do
-                    local ok_ln, lm_name = pcall(utils.get_readable_name, lm.name)
-                    if not ok_ln or not lm_name then lm_name = "Unknown" end
-                    local known = {}
-                    local unknown_count = 0
-
-                    for _, site in ipairs(wd.sites) do
-                        if site.pos and site.pos.x >= lm.min_x and site.pos.x <= lm.max_x
-                            and site.pos.y >= lm.min_y and site.pos.y <= lm.max_y then
-                            if site.entity_links then
-                                for _, link in ipairs(site.entity_links) do
-                                    local entity = df.historical_entity.find(link.entity_id)
-                                    if entity and entity.type == df.historical_entity_type.Civilization then
-                                        local eid = entity.id
-                                        if known_map[eid] then
-                                            local already = false
-                                            for _, kc in ipairs(known) do
-                                                if kc.civ_id == eid then already = true; kc.site_count = (kc.site_count or 0) + 1; break end
-                                            end
-                                            if not already then
-                                                local ename = utils.get_readable_name(entity.name)
-                                                table.insert(known, {civ_id=eid, name=ename, site_count=1, link="civ:" .. tostring(eid)})
-                                            end
-                                        else
-                                            unknown_count = unknown_count + 1
-                                        end
-                                        break
+        pcall(function()
+            local wd = df.global.world.world_data
+            if not wd or not wd.landmasses then return end
+            local added_lm = false
+            for _, lm in ipairs(wd.landmasses) do
+                local ok_ln, lm_name = pcall(utils.get_readable_name, lm.name)
+                if not ok_ln or not lm_name then lm_name = "Unknown" end
+                for _, site in ipairs(wd.sites) do
+                    if site.pos and site.pos.x >= lm.min_x and site.pos.x <= lm.max_x
+                        and site.pos.y >= lm.min_y and site.pos.y <= lm.max_y then
+                        if site.entity_links then
+                            for _, link in ipairs(site.entity_links) do
+                                local entity = df.historical_entity.find(link.entity_id)
+                                if entity and entity.type == df.historical_entity_type.Civilization then
+                                    if not added_lm then
+                                        table.insert(world_content, "\n")
+                                        table.insert(world_content, { text = "## Inhabited Regions", pen = COLOR_YELLOW })
+                                        table.insert(world_content, "\n")
+                                        added_lm = true
                                     end
+                                    table.insert(world_content, { text = lm_name, pen = COLOR_LIGHTCYAN })
+                                    table.insert(world_content, "\n")
+                                    table.insert(world_content, "    - inhabited\n\n")
+                                    break
                                 end
                             end
                         end
                     end
-
-                    if #known > 0 or unknown_count > 0 then
-                        table.insert(landmasses, { name = lm_name, known_civs = known, unknown_count = unknown_count, site_count = #known + unknown_count })
-                    end
+                    if added_lm then break end
                 end
-                table.sort(landmasses, function(a, b) return #b.known_civs < #a.known_civs end)
             end
-
-            world_content = world_template.render({
-                world_name = world_name,
-                current_year = df.global.cur_year,
-                current_season = current_season,
-                eras = eras,
-                landmasses = landmasses,
-            })
-            logger.log("World page rendered (" .. #eras .. " eras, " .. #landmasses .. " landmasses)")
         end)
-        if #world_content == 0 then
-            world_content = {
-                { text = "# World", pen = COLOR_YELLOW },
-                "\n\n",
-                { text = "Current Date: ", pen = COLOR_LIGHTCYAN },
-                { text = "Year " .. tostring(df.global.cur_year or 0), pen = COLOR_WHITE },
-                "\n",
-            }
+
+        logger.log("Saving World page (" .. #world_content .. " spans)")
+        local w_ok, w_err = pcall(dfhack.persistent.saveSiteData, 'mfw_p_world', {content=world_content, cursor={1}})
+        if not w_ok then
+            logger.log_error("Direct world save failed: " .. tostring(w_err))
+        else
+            logger.log("Direct world save succeeded")
         end
-        safe_save(self.context, 'world', utils.sanitize_content(world_content), 1)
 
         -- 1. Citizens
         local citizens = {}
         logger.log("Fetching units...")
 
-        local units = df.global.world.units.active
-        if not units then
-            logger.log_error("df.global.world.units.active is nil!")
-            return false
-        end
+        local units = {}
+        pcall(function() units = df.global.world.units.active or {} end)
+        if #units == 0 then
+            logger.log("No active units found, skipping citizens")
+        else
         logger.log("Found " .. #units .. " total active units.")
 
         local citizen_rows = {}
@@ -396,13 +379,15 @@ function WikiInitializer:perform(screen)
             rows = citizen_rows
         })
         safe_save(self.context, 'citizens', utils.sanitize_content(citizen_root), 1)
+        end
 
         -- 2. Artifacts
         logger.log("Processing artifacts...")
         local artifacts = {}
         local artifact_rows = {}
 
-        local artifact_records = df.global.world.artifacts.all
+        local artifact_records = {}
+        pcall(function() artifact_records = df.global.world.artifacts.all or {} end)
         logger.log("Total artifact records in world: " .. #artifact_records)
 
         for i = 0, #artifact_records - 1 do
@@ -486,27 +471,33 @@ function WikiInitializer:perform(screen)
         logger.log("Saving " .. #dynamic_pages .. " dynamic pages...")
         self.context:save_dynamic_pages(dynamic_pages)
 
-        -- 3. Events page (placeholder, will be populated by catch-up + timeline)
-        local events_root = {}
-        table.insert(events_root, { text = "# Events", pen = COLOR_YELLOW })
-        table.insert(events_root, "\n\n")
-        table.insert(events_root, { text = "Loading events...", pen = COLOR_DARKGREY })
-        table.insert(events_root, "\n")
-        safe_save(self.context, 'events', utils.sanitize_content(events_root), 1)
+        -- 3. Events page
+        pcall(function()
+            local events_root = {}
+            table.insert(events_root, { text = "# Events", pen = COLOR_YELLOW })
+            table.insert(events_root, "\n\n")
+            table.insert(events_root, { text = "Loading events...", pen = COLOR_DARKGREY })
+            table.insert(events_root, "\n")
+            safe_save(self.context, 'events', utils.sanitize_content(events_root), 1)
+        end)
 
-        -- 4. Historical catch-up: scan past events for this site
-        self:catchUpEvents(site_id)
+        -- 4. Historical catch-up
+        pcall(function() self:catchUpEvents(site_id) end)
 
-        -- 5. Render timeline table + counts on Events page
-        self:renderEventsTimeline()
+        -- 5. Render timeline
+        pcall(function() self:renderEventsTimeline() end)
 
-        -- 6. Render Enemies page with registry
-        self:renderEnemiesPage()
+        -- 6. Render Enemies page
+        pcall(function() self:renderEnemiesPage() end)
 
         -- Set initialized flag
+        logger.log("Setting mfw_initialized flag")
         dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
+        local verify = dfhack.persistent.getSiteData(self.context.save_prefix .. 'initialized')
+        logger.log("Verified mfw_initialized: " .. tostring(verify))
 
         if self.on_complete then
+            logger.log("Calling on_complete")
             self.on_complete()
         end
 

@@ -328,11 +328,13 @@ function describe_world_position(civ)
 
     local description
     if x_all and y_all then
-        description = "spans the entire world"
+        description = "the entire world"
     elseif x_all then
-        description = "spans the " .. range_name(yi, Y_NAMES, "northern half", "southern half") .. " of the world"
+        local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
+        description = "the " .. y_label .. " of the world"
     elseif y_all then
-        description = "spans the " .. range_name(xi, X_NAMES, "western half", "eastern half") .. " across the world"
+        local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
+        description = "the " .. x_label .. " across the world"
     elseif x_only and y_only then
         if X_NAMES[xi[1] + 1] == "central" and Y_NAMES[yi[1] + 1] == "central" then
             description = "the central region of the world"
@@ -343,36 +345,16 @@ function describe_world_position(civ)
         end
     elseif x_only then
         local x_part = x_adj(X_NAMES[xi[1] + 1])
-        local y_part = range_name(yi, Y_NAMES, "northern half", "southern half")
-        if #yi == 2 and yi[1] == 0 and yi[#yi] == 1 then
-            description = "the " .. x_part .. " " .. y_part .. " region"
-        elseif #yi == 2 and yi[1] == 3 and yi[#yi] == 4 then
-            description = "the " .. x_part .. " " .. y_part .. " region"
-        elseif #yi <= 2 then
-            description = "the " .. x_part .. " " .. y_part .. " region"
-        else
-            description = "the " .. x_part .. " region, spanning " .. y_part
-        end
+        local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
+        description = "the " .. x_part .. " " .. y_label .. " region"
     elseif y_only then
-        local x_part = range_name(xi, X_NAMES, "western half", "eastern half")
+        local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
         local y_name = Y_NAMES[yi[1] + 1]
-        if #xi <= 2 then
-            description = "the " .. x_part .. " " .. y_name .. " region"
-        elseif xi[1] == 0 and xi[#xi] == 2 then
-            description = "the " .. x_part .. " " .. y_name .. " region"
-        elseif xi[1] == 2 and xi[#xi] == 4 then
-            description = "the " .. x_part .. " " .. y_name .. " region"
-        else
-            description = "the " .. x_part .. " of the " .. y_name .. " region"
-        end
+        description = "the " .. x_label .. " " .. y_name .. " region"
     else
-        local x_part = range_name(xi, X_NAMES, "western half", "eastern half")
-        local y_part = range_name(yi, Y_NAMES, "northern half", "southern half")
-        if x_part:match("^half") or y_part:match("^half") then
-            description = "spans " .. x_part .. ", covering " .. y_part
-        else
-            description = "spans " .. x_part .. ", reaching " .. y_part
-        end
+        local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
+        local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
+        description = "the " .. x_label .. ", reaching " .. y_label
     end
 
     -- Determine landmass(es)

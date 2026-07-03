@@ -287,22 +287,21 @@ end
 function set_preset(settings, template, preset)
     local t = settings[template]
     if not t then return end
+    local function set_all(val)
+        for _, category in pairs{'init', 'journal'} do
+            if t[category] then
+                for k, v in pairs(t[category]) do
+                    if type(v) ~= 'string' then
+                        t[category][k] = val
+                    end
+                end
+            end
+        end
+    end
     if preset == 'all' then
-        for _, category in pairs{'init', 'journal'} do
-            if t[category] then
-                for k, _ in pairs(t[category]) do
-                    t[category][k] = true
-                end
-            end
-        end
+        set_all(true)
     elseif preset == 'minimal' then
-        for _, category in pairs{'init', 'journal'} do
-            if t[category] then
-                for k, _ in pairs(t[category]) do
-                    t[category][k] = false
-                end
-            end
-        end
+        set_all(false)
     elseif preset == 'recommended' then
         if template == 'citizen' then
             t.init.values = true
@@ -313,18 +312,14 @@ function set_preset(settings, template, preset)
             t.init.medical = false
             t.init.timeline = true
             if t.journal then
-                for k, _ in pairs(t.journal) do
-                    t.journal[k] = true
-                end
-            end
-        else
-            for _, category in pairs{'init', 'journal'} do
-                if t[category] then
-                    for k, _ in pairs(t[category]) do
-                        t[category][k] = true
+                for k, v in pairs(t.journal) do
+                    if type(v) ~= 'string' then
+                        t.journal[k] = true
                     end
                 end
             end
+        else
+            set_all(true)
         end
     end
     save_settings(settings)

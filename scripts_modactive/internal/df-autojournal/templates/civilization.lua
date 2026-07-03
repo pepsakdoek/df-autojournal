@@ -16,7 +16,8 @@ end
 
 
 --- Build a table of sites belonging to the civilization.
-local function get_forts_table(civ)
+--- known_fort_set: optional set of { [site_id] = true }
+local function get_forts_table(civ, known_fort_set)
     if not civ then return nil end
     local world_data = df.global.world.world_data
     if not world_data or not world_data.sites then return nil end
@@ -38,26 +39,38 @@ local function get_forts_table(civ)
             if not owns then goto continue end
             local is_player = (site.id == current_site_id)
             local site_type = tostring(df.world_site_type[site.type] or "Unknown")
-            -- Only include fort/city type sites
-            if site.type == df.world_site_type.Fortress or site.type == df.world_site_type.City then
-                local name = utils.get_readable_name(site.name)
-                if name and name ~= "" then
-                    local type_pen = (site.type == df.world_site_type.Fortress) and COLOR_LIGHTBLUE or COLOR_LIGHTCYAN
-
-                    local row = {
-                        { text = name, pen = is_player and COLOR_LIGHTGREEN or COLOR_WHITE, link = is_player and "fort" or nil },
-                        { text = site_type, pen = type_pen },
-                    }
-
-                    if is_player then
-                        table.insert(row, { text = "Yes", pen = COLOR_GREEN })
-                    else
-                        table.insert(row, { text = "", pen = COLOR_DARKGREY })
-                    end
-
-                    table.insert(row, { text = "", pen = COLOR_DARKGREY })
-                    table.insert(rows, { row = row, is_player = is_player, name = name })
+            local name = utils.get_readable_name(site.name)
+            if name and name ~= "" then
+                local type_pen = COLOR_WHITE
+                local lower_type = site_type:lower()
+                if lower_type:match("fortress") then
+                    type_pen = COLOR_LIGHTBLUE
+                elseif lower_type:match("mountain") or lower_type:match("hall") then
+                    type_pen = COLOR_LIGHTCYAN
+                elseif lower_type:match("dark") then
+                    type_pen = COLOR_LIGHTRED
+                elseif lower_type:match("forest") or lower_type:match("tree") then
+                    type_pen = COLOR_GREEN
+                elseif lower_type:match("town") or lower_type:match("city") then
+                    type_pen = COLOR_LIGHTCYAN
+                elseif lower_type:match("hamlet") then
+                    type_pen = COLOR_DARKGREY
                 end
+
+                local has_page = known_fort_set and known_fort_set[site.id]
+                local row = {
+                    { text = name, pen = is_player and COLOR_LIGHTGREEN or (has_page and COLOR_WHITE or COLOR_DARKGREY), link = has_page and "fort:" .. tostring(site.id) or nil },
+                    { text = site_type, pen = type_pen },
+                }
+
+                if is_player then
+                    table.insert(row, { text = "Yes", pen = COLOR_GREEN })
+                else
+                    table.insert(row, { text = "", pen = COLOR_DARKGREY })
+                end
+
+                table.insert(row, { text = "", pen = COLOR_DARKGREY })
+                table.insert(rows, { row = row, is_player = is_player, name = name })
             end
             ::continue::
         end
@@ -78,7 +91,7 @@ local function get_forts_table(civ)
     return result
 end
 
-function render(civ_id)
+function render(civ_id, known_fort_set)
     local ok, result = xpcall(function()
         local cfg = mfw_settings.get_settings().civ
         local settings = cfg.init
@@ -95,9 +108,62 @@ function render(civ_id)
         table.insert(content, "\n\n")
 
         if civ then
+            local race_name = ""
+            pcall(function()
+                if civ.race then
+                    local raw = df.creature_raw.find(civ.race)
+                    if raw and raw.name then
+                        race_name = utils.sanitize(raw.name[0]) or ""
+                    end
+                end
+            end)
+
             table.insert(content, { text = "Type: ", pen = COLOR_LIGHTCYAN })
-            table.insert(content, { text = tostring(df.historical_entity_type[civ.type]), pen = COLOR_WHITE })
+            local type_str = tostring(df.historical_entity_type[civ.type] or "Unknown")
+            if race_name ~= "" then
+                table.insert(content, { text = race_name .. " " .. type_str, pen = COLOR_WHITE })
+            else
+                table.insert(content, { text = type_str, pen = COLOR_WHITE })
+            end
             table.insert(content, "\n")
+
+            -- Ruler
+            pcall(function()
+                if civ.positions and civ.positions.assignments then
+                    for _, assign in ipairs(civ.positions.assignments) do
+                        if assign and assign.histfig_id ~= -1 then
+                            local hf = df.historical_figure.find(assign.histfig_id)
+                            if hf and hf.name then
+                                local ruler_name = utils.get_readable_name(hf.name)
+                                local pos_name = "Leader"
+                                if civ.positions.own then
+                                    for _, p in ipairs(civ.positions.own) do
+                                        if p.id == assign.position_id then
+                                            local _, pname = pcall(utils.sanitize, p.name[0])
+                                            if pname then pos_name = pname end
+                                            break
+                                        end
+                                    end
+                                end
+                                local ruler_link = nil
+                                if hf.unit_id and hf.unit_id ~= -1 then
+                                    ruler_link = "citizen:" .. tostring(hf.unit_id)
+                                end
+                                table.insert(content, { text = "Ruler: ", pen = COLOR_LIGHTCYAN })
+                                if ruler_link then
+                                    table.insert(content, { text = ruler_name, pen = COLOR_LIGHTBLUE, link = ruler_link })
+                                else
+                                    table.insert(content, { text = ruler_name, pen = COLOR_WHITE })
+                                end
+                                table.insert(content, " (")
+                                table.insert(content, { text = pos_name, pen = COLOR_WHITE })
+                                table.insert(content, ")\n")
+                            end
+                        end
+                        break
+                    end
+                end
+            end)
 
             -- World position
             if settings.position then
@@ -109,10 +175,12 @@ function render(civ_id)
                     table.insert(content, { text = civ_name, pen = COLOR_LIGHTBLUE })
                     table.insert(content, " is located in ")
                     table.insert(content, { text = pos.description, pen = COLOR_WHITE })
-                    table.insert(content, " of ")
-                    table.insert(content, { text = pos.world_name, pen = COLOR_LIGHTCYAN })
+                    if not pos.description:match("world$") then
+                        table.insert(content, " of ")
+                        table.insert(content, { text = pos.world_name, pen = COLOR_LIGHTCYAN })
+                    end
                     if pos.continent and #pos.continent > 0 then
-                        table.insert(content, ", on the continent of ")
+                        table.insert(content, #pos.continent > 1 and ", on the continents of " or ", on the continent of ")
                         local cont_names = {}
                         for i, cname in ipairs(pos.continent) do
                             cont_names[i] = { text = cname, pen = COLOR_LIGHTCYAN }
@@ -145,7 +213,7 @@ function render(civ_id)
                 table.insert(content, "\n")
                 table.insert(content, { text = "## Settlements & Forts", pen = COLOR_YELLOW })
                 table.insert(content, "\n")
-                local fort_rows = get_forts_table(civ)
+                local fort_rows = get_forts_table(civ, known_fort_set)
                 if fort_rows and #fort_rows > 0 then
                     table.insert(content, {
                         type = 'table',
