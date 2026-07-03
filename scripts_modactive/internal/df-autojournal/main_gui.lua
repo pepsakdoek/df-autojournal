@@ -453,7 +453,12 @@ function WikiScreen:onPageChange(page_id, no_save)
     local prefix, id = page_id:match("^(%a+):(%d+)$")
     if prefix and id then
         if prefix == 'citizen' then
-            ctx.unit_id = tonumber(id)
+            local uid = tonumber(id)
+            ctx.unit_id = uid
+            local unit = df.unit.find(uid)
+            if unit and unit.birth_year then
+                ctx.birth_year = unit.birth_year
+            end
         elseif prefix == 'artifact' then
             ctx.item_id = tonumber(id)
         end

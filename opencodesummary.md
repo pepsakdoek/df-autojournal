@@ -325,3 +325,10 @@ Templates:
    templates/:
      fort.lua, civilization.lua, citizen.lua, artifact.lua,
      event.lua, timeline.lua, enemies.lua
+
+
+# Agent instructions
+
+* Settings and features should always be synced. 
+* If on windows, use the sync_mod.bat file after changes so the user can test.
+* Significant Changes (not bugfixes, but features) to the HyperTextArea should also be noted in the relevant README.md file 

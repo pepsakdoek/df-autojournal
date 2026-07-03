@@ -7,20 +7,10 @@
 
 local registry = {}
 
---- Register a function definition.
--- @param fn_key  unique string identifier (e.g. 'dwarf_age')
--- @param def     { label, description, args_schema, handler }
---   label:        display name shown in the function picker
---   description:  help text for the function
---   args_schema:  array of { key, label, type, required }
---   handler:      function(args) -> string (returned text, may contain newlines)
 function register_function(fn_key, def)
     registry[fn_key] = def
 end
 
---- Evaluate a function block and return the resulting string.
--- @param fn_block  { fn_key, args }
--- @return string   evaluated result (may contain newlines)
 function evaluate(fn_block)
     if not fn_block then return '' end
     local def = registry[fn_block.fn_key]
@@ -32,8 +22,6 @@ function evaluate(fn_block)
     return tostring(result)
 end
 
---- Get a sorted list of registered functions (for the modal picker).
--- Returns array of { fn_key, label, description, args_schema }
 function list_functions()
     local list = {}
     for key, def in pairs(registry) do
@@ -54,15 +42,37 @@ end
 
 register_function('dwarf_age', {
     label = 'Dwarf Age',
-    description = "Shows a dwarf's current age based on their birth year",
+    description = "Shows a dwarf's current age in years and months",
     args_schema = {
         { key = 'birth_year', label = 'Birth Year', type = 'number', required = true },
+        { key = 'unit_id', label = 'Unit ID', type = 'number', required = false },
     },
     handler = function(args)
         local birth_year = tonumber(args.birth_year)
         if not birth_year then return '[needs birth_year]' end
-        local age = df.global.cur_year - birth_year
-        return tostring(age) .. ' years'
+
+        local age_years
+        local unit_id = tonumber(args.unit_id)
+        if unit_id then
+            local unit = df.unit.find(unit_id)
+            if unit then
+                age_years = dfhack.units.getAge(unit, true)
+            end
+        end
+        if not age_years then
+            age_years = df.global.cur_year - birth_year
+        end
+
+        local years = math.floor(age_years)
+        if years < 6 then
+            local months = math.floor((age_years - years) * 12)
+            if months < 0 then months = 0 end
+            if years <= 0 then
+                return tostring(months) .. ' month' .. (months ~= 1 and 's' or '')
+            end
+            return tostring(years) .. ' year' .. (years ~= 1 and 's' or '') .. ', ' .. tostring(months) .. ' month' .. (months ~= 1 and 's' or '')
+        end
+        return tostring(years) .. ' years'
     end,
 })
 
@@ -98,9 +108,13 @@ register_function('current_skills', {
         local lines = {}
         for _, skill in ipairs(soul.skills) do
             if skill.rating and skill.rating > 0 then
-                local name = tostring(df.skill_type[skill.id] or 'Unknown')
+                local name = tostring(df.job_skill[skill.id] or 'Unknown')
                 name = name:gsub('_', ' '):lower()
-                local title = dfhack.units.getSkillTitle(skill)
+                local attr = df.job_skill.attrs[skill.id]
+                local title = attr and attr.caption_noun or nil
+                if not title then
+                    title = dfhack.units.getSkillTitle(skill)
+                end
                 local line = name .. ': ' .. tostring(skill.rating)
                 if title and #title > 0 then
                     line = line .. ' (' .. title .. ')'
@@ -125,10 +139,12 @@ register_function('current_needs', {
         local unit = df.unit.find(unit_id)
         if not unit then return 'Deceased' end
         local soul = unit.status.current_soul
-        if not soul or not soul.needs then return 'No needs data' end
+        if not soul then return 'No needs data' end
+        local personality = soul.personality
+        if not personality or not personality.needs then return 'No needs data' end
 
         local unmet = {}
-        for _, need in ipairs(soul.needs) do
+        for _, need in ipairs(personality.needs) do
             if need.focus_level and need.focus_level < 50000 then
                 local name = tostring(df.need_type[need.id] or 'Unknown')
                 name = name:gsub('_', ' '):lower()
@@ -194,51 +210,6 @@ register_function('current_mood', {
     end,
 })
 
-register_function('current_location', {
-    label = 'Current Location',
-    description = "Describes the dwarf's current position or room",
-    args_schema = {
-        { key = 'unit_id', label = 'Unit ID', type = 'number', required = true },
-    },
-    handler = function(args)
-        local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '[needs unit]' end
-        local unit = df.unit.find(unit_id)
-        if not unit then return 'Deceased' end
-
-        local pos = unit.pos
-        if not pos then return 'Unknown' end
-
-        local tile = dfhack.maps.getTileBlock(pos)
-        if not tile then return 'Undiscovered' end
-
-        local region = dfhack.maps.getRegionBiome(pos)
-        if region then
-            local bio = tostring(region.type):gsub('_', ' '):lower()
-            return bio
-        end
-        return 'Surface'
-    end,
-})
-
-register_function('current_job', {
-    label = 'Current Job',
-    description = "Shows the dwarf's current job or task",
-    args_schema = {
-        { key = 'unit_id', label = 'Unit ID', type = 'number', required = true },
-    },
-    handler = function(args)
-        local unit_id = tonumber(args.unit_id)
-        if not unit_id then return '[needs unit]' end
-        local unit = df.unit.find(unit_id)
-        if not unit then return 'Deceased' end
-
-        if not unit.job or not unit.job.job_type then return 'Idle' end
-        local job_name = tostring(df.job_type[unit.job.job_type] or 'Unknown')
-        return job_name:gsub('_', ' '):lower()
-    end,
-})
-
 register_function('population_count', {
     label = 'Fort Population',
     description = "Current number of citizens in the fort",
@@ -253,9 +224,11 @@ register_function('population_count', {
     end,
 })
 
+local CURRENCY_SYMBOL = string.char(15)
+
 register_function('fort_wealth', {
     label = 'Fort Wealth',
-    description = "Current total wealth of the fortress",
+    description = 'Current total wealth of the fortress in ' .. CURRENCY_SYMBOL,
     args_schema = {},
     handler = function()
         if not dfhack.world.isFortressMode() then return 'N/A' end
@@ -263,7 +236,7 @@ register_function('fort_wealth', {
         if not plotinfo or not plotinfo.tasks then return 'Unknown' end
         local wealth = plotinfo.tasks.wealth
         if not wealth then return 'Unknown' end
-        return tostring(wealth.total or 0) .. ' dorf bucks'
+        return tostring(wealth.total or 0) .. CURRENCY_SYMBOL
     end,
 })
 
