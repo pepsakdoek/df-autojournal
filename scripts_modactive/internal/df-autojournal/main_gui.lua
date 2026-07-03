@@ -17,8 +17,9 @@ local HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text
 --- Wiki Pages Logic
 
 local PAGES = {
-    {text='Civilization', id='civ'},
-    {text='Fort', id='fort'},
+    {text='World', id='world'},
+    {text='Civilizations', id='civilizations'},
+    {text='Forts', id='forts'},
     {text='Citizens', id='citizens'},
     {text='Artifacts', id='artifacts'},
     {text='Events', id='events'},
@@ -277,7 +278,7 @@ end
 function WikiContext:save_content(page_id, display_text, cursor)
     if dfhack.isWorldLoaded() then
         local key = self:get_key(page_id)
-        logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ")")
+        -- logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ")")
         local ok, err = pcall(dfhack.persistent.saveSiteData, key, {content=display_text, cursor={cursor}})
         if not ok then
             logger.log_error("WikiContext: Failed to persist page " .. page_id .. ": " .. tostring(err))
@@ -292,7 +293,7 @@ function WikiContext:load_content(page_id)
             return dfhack.persistent.getSiteData(key) or {}
         end)
         if not ok or not data then
-            logger.log("WikiContext: Failed to load page " .. page_id .. " or no data found.")
+            logger.log_error("WikiContext: Failed to load page " .. page_id .. " or no data found.")
             data = {}
         end
         if not data.content then
@@ -301,7 +302,7 @@ function WikiContext:load_content(page_id)
             data.content = {{text=data.content, pen=COLOR_LIGHTCYAN}}
         end
         data.cursor = data.cursor or {1}
-        logger.log("WikiContext: Loaded page " .. page_id)
+        -- logger.log("WikiContext: Loaded page " .. page_id)
         return data
     end
     return {content={}, cursor={1}}
@@ -314,13 +315,13 @@ function WikiContext:get_dynamic_pages()
     end)
     if not ok or not data then return {} end
     local pages = data.pages or {}
-    logger.log("WikiContext: Loaded " .. #pages .. " dynamic pages.")
+    -- logger.log("WikiContext: Loaded " .. #pages .. " dynamic pages.")
     return pages
 end
 
 function WikiContext:save_dynamic_pages(pages)
     if dfhack.isWorldLoaded() then
-        logger.log("WikiContext: Saving " .. #pages .. " dynamic pages.")
+        -- logger.log("WikiContext: Saving " .. #pages .. " dynamic pages.")
         dfhack.persistent.saveSiteData(self.save_prefix .. 'dynamic_pages', {pages=pages})
     end
 end
@@ -407,9 +408,15 @@ function WikiScreen:onInitialize()
     local initialized = dfhack.persistent.getSiteData(self.context.save_prefix .. 'initialized')
     if initialized then
         gui.showYesNoPrompt('Re-initialize Wiki?',
-            'The wiki has already been initialized. Re-initializing will overwrite existing pages. Continue?',
+            'You already have a wiki. Re-initializing will OVERWRITE ALL existing pages and settings. This cannot be undone. Continue?',
             COLOR_LIGHTRED,
-            function() self:performInitialization() end
+            function()
+                gui.showYesNoPrompt('REALLY Re-initialize?',
+                    'This is your final warning. ALL current wiki pages will be replaced with fresh templates. Your manual edits, notes, and custom entries will be LOST. Proceed?',
+                    COLOR_LIGHTRED,
+                    function() self:performInitialization() end
+                )
+            end
         )
     else
         self:performInitialization()

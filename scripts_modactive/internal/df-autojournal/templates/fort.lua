@@ -2,11 +2,16 @@
 local utils = reqscript('internal/df-autojournal/wiki_utils')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 
-function render()
+function render(site_id)
     local cfg = mfw_settings.get_settings().fort
     local settings = cfg.init
     local site_name = "Unknown Fort"
-    local site = dfhack.world.getCurrentSite()
+    local site
+    if site_id then
+        site = df.world_site.find(site_id)
+    else
+        site = dfhack.world.getCurrentSite()
+    end
     if site then
         site_name = utils.get_readable_name(site.name)
     end

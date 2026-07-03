@@ -5,17 +5,37 @@ local TabBar = require('gui.widgets.tab_bar')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
 
+local CycleHotkeyLabel = require('gui.widgets').CycleHotkeyLabel
 local logger = reqscript('internal/df-autojournal/logger')
 
-local TEMPLATE_IDS = {'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies'}
-local TEMPLATE_LABELS = {'Civ', 'Fort', 'Citizen', 'Artifact', 'Event', 'Enemies'}
+local TEMPLATE_IDS = {'world', 'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies'}
+local TEMPLATE_LABELS = {'World', 'Civ', 'Fort', 'Citizen', 'Artifact', 'Event', 'Enemies'}
 local LABEL_WIDTH = 20
+
+local CYCLE_OPTIONS = {
+    tracking = {
+        { label = 'Player Only', value = 'player' },
+        { label = '+ Diplomatic', value = 'diplomatic' },
+        { label = 'All Major', value = 'all_major' },
+    },
+    landmass_detail = {
+        { label = 'Contact Only', value = 'contact' },
+        { label = 'Show All', value = 'all' },
+    },
+}
 
 local function capitalize(str)
     return (str:gsub("^%l", string.upper):gsub("_", " "))
 end
 
 local SETTING_DESCRIPTIONS = {
+    world = {
+        init = {
+            era_timeline = "Show the world's age timeline from history",
+            landmass_list = "Show inhabited landmasses and their civilizations",
+            landmass_detail = "How to list civilizations on landmasses: name known, count or name all",
+        },
+    },
     civ = {
         init = {
             leadership = "Show leadership hierarchy and government positions",
@@ -25,6 +45,7 @@ local SETTING_DESCRIPTIONS = {
             wars = "Show war and conflict records",
             position = "Show world map position of the civilization",
             forts = "Show a list of all civilization forts with player fort marked",
+            tracking = "Which civilizations get wiki pages: player only, add diplomatic, or all major races",
         },
         journal = {
             diplomacy = "Auto-record diplomatic events and treaty changes",
@@ -131,6 +152,26 @@ local function make_toggle(tab_id, category, key, initial_val, row)
     }
 end
 
+local function make_cycle(tab_id, category, key, initial_val, row)
+    local display_name = capitalize(key)
+    local padding = string.rep(' ', LABEL_WIDTH - #display_name)
+    local options = CYCLE_OPTIONS[key] or {}
+    return CycleHotkeyLabel{
+        view_id='cycle_' .. tab_id .. '_' .. category .. '_' .. key,
+        frame={t=row, l=0, r=0},
+        label=display_name .. padding .. ' ',
+        options=options,
+        initial_option=initial_val,
+        on_change=function(val)
+            local s = mfw_settings.get_settings()
+            if s[tab_id] and s[tab_id][category] then
+                s[tab_id][category][key] = val
+                mfw_settings.save_settings(s)
+            end
+        end,
+    }
+end
+
 local function create_tab_panel(tab_id)
     local settings = mfw_settings.get_settings()
     local t = settings[tab_id]
@@ -153,26 +194,33 @@ local function create_tab_panel(tab_id)
     for k, _ in pairs(t.init) do table.insert(init_keys, k) end
     table.sort(init_keys)
     for _, key in ipairs(init_keys) do
-        table.insert(subviews, make_toggle(tab_id, 'init', key, t.init[key], row))
+        local val = t.init[key]
+        if type(val) == 'string' then
+            table.insert(subviews, make_cycle(tab_id, 'init', key, val, row))
+        else
+            table.insert(subviews, make_toggle(tab_id, 'init', key, val, row))
+        end
         row = row + 1
     end
 
-    row = row + 1
-
-    table.insert(subviews, widgets.Label{
-        view_id='section_journal_' .. tab_id,
-        frame={t=row, l=0},
-        text='Auto-Journaling',
-        text_pen=COLOR_LIGHTCYAN,
-    })
-    row = row + 1
-
-    local journal_keys = {}
-    for k, _ in pairs(t.journal) do table.insert(journal_keys, k) end
-    table.sort(journal_keys)
-    for _, key in ipairs(journal_keys) do
-        table.insert(subviews, make_toggle(tab_id, 'journal', key, t.journal[key], row))
+    if t.journal and next(t.journal) then
         row = row + 1
+
+        table.insert(subviews, widgets.Label{
+            view_id='section_journal_' .. tab_id,
+            frame={t=row, l=0},
+            text='Auto-Journaling',
+            text_pen=COLOR_LIGHTCYAN,
+        })
+        row = row + 1
+
+        local journal_keys = {}
+        for k, _ in pairs(t.journal) do table.insert(journal_keys, k) end
+        table.sort(journal_keys)
+        for _, key in ipairs(journal_keys) do
+            table.insert(subviews, make_toggle(tab_id, 'journal', key, t.journal[key], row))
+            row = row + 1
+        end
     end
 
     return widgets.Panel{
@@ -186,9 +234,9 @@ local settings_instance = nil
 SettingsWindow = defclass(SettingsWindow, widgets.Window)
 SettingsWindow.ATTRS {
     frame_title='Wiki Settings',
-    frame={w=76, h=26},
+    frame={w=90, h=28},
     resizable=true,
-    resize_min={w=76, h=18},
+    resize_min={w=84, h=18},
 }
 
 function SettingsWindow:init()
@@ -244,10 +292,10 @@ function SettingsWindow:updateHoverHelp()
         if panel.visible then
             for _, sv in ipairs(panel.subviews) do
                 local vid = sv.view_id
-                if vid and vid:match('^toggle_') then
+                if vid and (vid:match('^toggle_') or vid:match('^cycle_')) then
                     local mx, my = sv:getMousePos()
                     if mx then
-                        local tab_id, category, key = vid:match('^toggle_(%w+)_(%w+)_(.+)$')
+                        local tab_id, category, key = vid:match('^[^_]+_(%w+)_(%w+)_(.+)$')
                         if tab_id then
                             self.subviews.help_bar:setText(desc(tab_id, category, key))
                             found = true

@@ -314,25 +314,65 @@ function describe_world_position(civ)
     local x_all = xi[1] == 0 and xi[#xi] == 4
     local y_all = yi[1] == 0 and yi[#yi] == 4
 
+    -- Produce range name without leading "the"
+    local function range_name(indices, names, half_left, half_right)
+        local first, last = indices[1], indices[#indices]
+        if first == last then return names[first + 1] end
+        if first == 0 and last == 1 then return "far " .. names[2] end
+        if first == 0 and last == 2 then return half_left end
+        if first == 2 and last == 4 then return half_right end
+        if first == 3 and last == 4 then return "far " .. names[last] end
+        if first == 0 and last == 4 then return "the world" end
+        return "from " .. names[first + 1] .. " to " .. names[last + 1]
+    end
+
     local description
     if x_all and y_all then
         description = "spans the entire world"
     elseif x_all then
-        description = "covers " .. strip_the(range_label(yi, Y_NAMES, "northern half", "southern half")) .. " of the world"
+        description = "spans the " .. range_name(yi, Y_NAMES, "northern half", "southern half") .. " of the world"
     elseif y_all then
-        description = "covers " .. strip_the(range_label(xi, X_NAMES, "western half", "eastern half")) .. " across the world"
+        description = "spans the " .. range_name(xi, X_NAMES, "western half", "eastern half") .. " across the world"
     elseif x_only and y_only then
         if X_NAMES[xi[1] + 1] == "central" and Y_NAMES[yi[1] + 1] == "central" then
             description = "the central region of the world"
+        elseif X_NAMES[xi[1] + 1] == "central" then
+            description = "the central " .. Y_NAMES[yi[1] + 1] .. " region"
         else
             description = "the " .. X_NAMES[xi[1] + 1] .. " " .. Y_NAMES[yi[1] + 1] .. " region"
         end
     elseif x_only then
-        description = "the " .. x_adj(X_NAMES[xi[1] + 1]) .. " " .. strip_the(range_label(yi, Y_NAMES, "northern half", "southern half")) .. " region"
+        local x_part = x_adj(X_NAMES[xi[1] + 1])
+        local y_part = range_name(yi, Y_NAMES, "northern half", "southern half")
+        if #yi == 2 and yi[1] == 0 and yi[#yi] == 1 then
+            description = "the " .. x_part .. " " .. y_part .. " region"
+        elseif #yi == 2 and yi[1] == 3 and yi[#yi] == 4 then
+            description = "the " .. x_part .. " " .. y_part .. " region"
+        elseif #yi <= 2 then
+            description = "the " .. x_part .. " " .. y_part .. " region"
+        else
+            description = "the " .. x_part .. " region, spanning " .. y_part
+        end
     elseif y_only then
-        description = "the " .. strip_the(range_label(xi, X_NAMES, "western half", "eastern half")) .. " " .. Y_NAMES[yi[1] + 1] .. " region"
+        local x_part = range_name(xi, X_NAMES, "western half", "eastern half")
+        local y_name = Y_NAMES[yi[1] + 1]
+        if #xi <= 2 then
+            description = "the " .. x_part .. " " .. y_name .. " region"
+        elseif xi[1] == 0 and xi[#xi] == 2 then
+            description = "the " .. x_part .. " " .. y_name .. " region"
+        elseif xi[1] == 2 and xi[#xi] == 4 then
+            description = "the " .. x_part .. " " .. y_name .. " region"
+        else
+            description = "the " .. x_part .. " of the " .. y_name .. " region"
+        end
     else
-        description = "covers " .. range_label(xi, X_NAMES, "western half", "eastern half") .. " and " .. range_label(yi, Y_NAMES, "northern half", "southern half")
+        local x_part = range_name(xi, X_NAMES, "western half", "eastern half")
+        local y_part = range_name(yi, Y_NAMES, "northern half", "southern half")
+        if x_part:match("^half") or y_part:match("^half") then
+            description = "spans " .. x_part .. ", covering " .. y_part
+        else
+            description = "spans " .. x_part .. ", reaching " .. y_part
+        end
     end
 
     -- Determine landmass(es)

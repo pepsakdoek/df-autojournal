@@ -3,7 +3,7 @@
 -- Logs to wiki_debug.log in the DF root directory
 
 local LOG_FILE = dfhack.getDFPath() .. "/wiki_debug.log"
-local DEBUG_MODE = false -- Set to false to disable logging
+local DEBUG_MODE = true -- Set to false to disable logging
 
 function log(msg)
     if not DEBUG_MODE then return end

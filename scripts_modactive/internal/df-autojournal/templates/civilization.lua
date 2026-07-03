@@ -78,11 +78,11 @@ local function get_forts_table(civ)
     return result
 end
 
-function render()
+function render(civ_id)
     local ok, result = xpcall(function()
         local cfg = mfw_settings.get_settings().civ
         local settings = cfg.init
-        local civ_id = utils.get_civ_id()
+        civ_id = civ_id or utils.get_civ_id()
         local civ = df.historical_entity.find(civ_id)
         local civ_name = "Unknown Civilization"
         if civ then

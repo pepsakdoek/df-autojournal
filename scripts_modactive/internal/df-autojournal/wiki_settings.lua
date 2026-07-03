@@ -12,6 +12,7 @@ local DEFAULT_SETTINGS = {
             wars = true,
             position = true,
             forts = true,
+            tracking = 'diplomatic',
         },
         journal = {
             diplomacy = true,
@@ -92,6 +93,14 @@ local DEFAULT_SETTINGS = {
             kill_list = true,
             notable_victories = true,
         }
+    },
+    world = {
+        init = {
+            era_timeline = true,
+            landmass_list = true,
+            landmass_detail = 'contact',
+        },
+        journal = {},
     }
 }
 
@@ -115,6 +124,7 @@ local DEFAULT_JOURNAL = {
         siege_events = true,
     },
     enemies = { encounter_log = true, kill_list = true, notable_victories = true },
+    world = {},
 }
 
 local logger = reqscript('internal/df-autojournal/logger')
@@ -122,7 +132,7 @@ local json = require('json')
 
 local function has_init_structure(settings)
     if type(settings) ~= 'table' then return false end
-    for _, t in ipairs{'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies'} do
+    for _, t in ipairs{'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies', 'world'} do
         if type(settings[t]) == 'table' then
             if settings[t].init ~= nil then
                 return true
@@ -206,69 +216,69 @@ function get_settings()
         return deep_copy(DEFAULT_SETTINGS)
     end
     if not data then
-        logger.log("LOAD: getSiteData returned nil")
+        -- logger.log("LOAD: getSiteData returned nil")
         return deep_copy(DEFAULT_SETTINGS)
     end
 
-    logger.log("LOAD: data type=" .. type(data))
+    -- logger.log("LOAD: data type=" .. type(data))
     if data then
         local keys = ""
         for k, _ in pairs(data) do keys = keys .. tostring(k) .. "," end
-        logger.log("LOAD: data keys={" .. keys .. "}")
+        -- logger.log("LOAD: data keys={" .. keys .. "}")
     end
 
     if data.val then
-        logger.log("LOAD: data.val type=" .. type(data.val) ..
-                   (type(data.val) == "string" and " length=" .. #data.val or ""))
+        -- logger.log("LOAD: data.val type=" .. type(data.val) ..
+        --            (type(data.val) == "string" and " length=" .. #data.val or ""))
 
         if type(data.val) == "string" then
             local ok2, decoded = pcall(json.decode, data.val)
-            logger.log("LOAD: json.decode ok=" .. tostring(ok2) .. " decoded type=" .. type(decoded))
+            -- logger.log("LOAD: json.decode ok=" .. tostring(ok2) .. " decoded type=" .. type(decoded))
             if ok2 and type(decoded) == "table" then
-                logger.log("LOAD: decoded.civ.init.leadership=" .. tostring(decoded.civ.init.leadership) ..
-                           " ethics=" .. tostring(decoded.civ.init.ethics))
+                -- logger.log("LOAD: decoded.civ.init.leadership=" .. tostring(decoded.civ.init.leadership) ..
+                --            " ethics=" .. tostring(decoded.civ.init.ethics))
                 if not has_init_structure(decoded) then
-                    logger.log("LOAD: migrating old-format JSON")
+                    -- logger.log("LOAD: migrating old-format JSON")
                     decoded = migrate_from_old(decoded)
                     save_settings(decoded)
                 end
                 local merged = merge_with_defaults(decoded)
-                logger.log("LOAD: merged.civ.init.leadership=" .. tostring(merged.civ.init.leadership) ..
-                           " ethics=" .. tostring(merged.civ.init.ethics))
+                -- logger.log("LOAD: merged.civ.init.leadership=" .. tostring(merged.civ.init.leadership) ..
+                --            " ethics=" .. tostring(merged.civ.init.ethics))
                 return merged
             end
         elseif type(data.val) == "table" then
-            logger.log("LOAD: legacy table format, has_init=" .. tostring(has_init_structure(data.val)))
+            -- logger.log("LOAD: legacy table format, has_init=" .. tostring(has_init_structure(data.val)))
             local tbl = data.val
             if not has_init_structure(tbl) then
-                logger.log("LOAD: migrating old-format table")
+                -- logger.log("LOAD: migrating old-format table")
                 tbl = migrate_from_old(tbl)
             end
             save_settings(tbl)
             return merge_with_defaults(tbl)
         end
     else
-        logger.log("LOAD: data.val is nil")
+        -- logger.log("LOAD: data.val is nil")
     end
-    logger.log("LOAD: falling through to defaults")
+    -- logger.log("LOAD: falling through to defaults")
     return deep_copy(DEFAULT_SETTINGS)
 end
 
 function save_settings(settings)
-    logger.log("SAVE: civ.init.leadership=" .. tostring(settings.civ.init.leadership) ..
-               " civ.init.ethics=" .. tostring(settings.civ.init.ethics))
+    -- logger.log("SAVE: civ.init.leadership=" .. tostring(settings.civ.init.leadership) ..
+    --            " civ.init.ethics=" .. tostring(settings.civ.init.ethics))  
 
     local ok, encoded = pcall(json.encode, settings)
     if not ok then
         logger.log_error("SAVE: json.encode failed: " .. tostring(encoded))
         return
     end
-    logger.log("SAVE: json OK length=" .. #encoded .. " preview=" .. encoded:sub(1, 250))
+    -- logger.log("SAVE: json OK length=" .. #encoded .. " preview=" .. encoded:sub(1, 250))
 
     local ok2, result = pcall(dfhack.persistent.saveSiteData, SETTINGS_KEY, {val=encoded})
-    logger.log("SAVE: saveSiteData ok=" .. tostring(ok2) .. " result=" .. tostring(result))
+    -- logger.log("SAVE: saveSiteData ok=" .. tostring(ok2) .. " result=" .. tostring(result))
     if ok2 and result ~= false then
-        logger.log("SAVE: success")
+        -- logger.log("SAVE: success")
     else
         logger.log_error("SAVE: failed (" .. tostring(ok2) .. ", " .. tostring(result) .. ")")
     end
