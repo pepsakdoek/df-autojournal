@@ -10,6 +10,8 @@ local DEFAULT_SETTINGS = {
             relations = true,
             history = true,
             wars = true,
+            position = true,
+            forts = true,
         },
         journal = {
             diplomacy = true,

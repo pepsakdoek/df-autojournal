@@ -3,8 +3,10 @@
 -- Logs to wiki_debug.log in the DF root directory
 
 local LOG_FILE = dfhack.getDFPath() .. "/wiki_debug.log"
+local DEBUG_MODE = false -- Set to false to disable logging
 
 function log(msg)
+    if not DEBUG_MODE then return end
     local f = io.open(LOG_FILE, "a")
     if f then
         f:write(os.date("%Y-%m-%d %H:%M:%S") .. " - " .. tostring(msg) .. "\n")
@@ -18,6 +20,7 @@ function log(msg)
 end
 
 function log_error(msg)
+    -- always log errors regardless of DEBUG_MODE
     local trace = debug.traceback()
     log("ERROR: " .. tostring(msg) .. "\n" .. trace)
     dfhack.printerr("df-autojournal Error: " .. tostring(msg))

@@ -13,7 +13,7 @@ LinkModal.ATTRS {
 }
 
 function LinkModal:init()
-    local pages = {"Civilisation", "Fort", "Citizens", "Artifacts", "Events", "Constructions", "Main"}
+    local pages = {"Civilization", "Fort", "Citizens", "Artifacts", "Events", "Constructions", "Main"}
     
     self.text_input = widgets.EditField{
         frame = {t=1, l=0, r=0},

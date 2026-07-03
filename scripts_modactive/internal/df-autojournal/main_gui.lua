@@ -17,7 +17,7 @@ local HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text
 --- Wiki Pages Logic
 
 local PAGES = {
-    {text='Civilisation', id='civ'},
+    {text='Civilization', id='civ'},
     {text='Fort', id='fort'},
     {text='Citizens', id='citizens'},
     {text='Artifacts', id='artifacts'},

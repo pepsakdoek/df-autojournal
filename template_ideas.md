@@ -58,7 +58,6 @@ This is just a list of ideas of things that might be of interest to users, and m
     * For all tables longer than 10 entries (total entries not 'just' displayed entries), it should have the word: "SEARCH:" at the top and when you select the table the cursor should move there. Blank shows all
     * The user should be able to disable / remove the search bar in the edit table UI, but by default all tables should have it
     * Don't link it to a hotkey, it must be dependent on where the cursor is. (in the table or 'outside it') 
-* Settings and features should always be synced. 
 * The function Modal popup has a weird behaviour (sometimes) when you select a function with the mouse where the 'statusbar' (bottom of the UI 'Enter: Insert | Escape : Cancel') gets hidden
 * Create the actual HTML export
 

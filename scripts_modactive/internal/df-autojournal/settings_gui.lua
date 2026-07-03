@@ -23,6 +23,8 @@ local SETTING_DESCRIPTIONS = {
             relations = "Show diplomatic relationships with other civilizations",
             history = "Show major historical events of the civilization",
             wars = "Show war and conflict records",
+            position = "Show world map position of the civilization",
+            forts = "Show a list of all civilization forts with player fort marked",
         },
         journal = {
             diplomacy = "Auto-record diplomatic events and treaty changes",

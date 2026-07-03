@@ -195,3 +195,153 @@ end
 function note(text)
     return colored(text, COLOR_DARKGREY)
 end
+
+--- Describe a civilization's position on the world map using a 5x5 grid system.
+--- Returns nil if no position data is available.
+--- Otherwise returns a table:
+---   { description = "the far northwestern region", world_name = "The World", site_count = 5, continent = "The Continent" }
+local X_NAMES = { "far west", "west", "central", "east", "far east" }
+local Y_NAMES = { "far north", "north", "central", "south", "far south" }
+
+--- Determine which landmasses (continents) the civ's sites are on.
+--- Uses bounding box check since landmasses have min/max x/y fields.
+local function get_landmasses_for_sites(site_positions, world_data)
+    if not world_data.landmasses then return nil end
+    local result, seen = {}, {}
+
+    for _, pos in ipairs(site_positions) do
+        for _, lm in ipairs(world_data.landmasses) do
+            if not seen[lm.index] and pos.x >= lm.min_x and pos.x <= lm.max_x and pos.y >= lm.min_y and pos.y <= lm.max_y then
+                seen[lm.index] = true
+                local name = get_readable_name(lm.name)
+                if name and name ~= "" then
+                    table.insert(result, name)
+                end
+            end
+        end
+    end
+
+    return #result > 0 and result or nil
+end
+
+function describe_world_position(civ)
+    if not civ then return nil end
+    local world_data = df.global.world.world_data
+    if not world_data or not world_data.sites then return nil end
+    local world_width = world_data.world_width or 1
+    local world_height = world_data.world_height or 1
+    if world_width <= 0 or world_height <= 0 then return nil end
+
+    local world_name = get_readable_name(world_data.name) or "the world"
+    local bands_x, bands_y, count = {}, {}, 0
+    local civ_id = civ.id
+    local site_positions = {}
+
+    for _, site in ipairs(world_data.sites) do
+        if site and site.pos then
+            local owns = false
+            if site.entity_links then
+                for _, link in ipairs(site.entity_links) do
+                    if link.entity_id == civ_id then
+                        owns = true
+                        break
+                    end
+                end
+            end
+            if owns then
+                table.insert(site_positions, site.pos)
+                local bx = math.max(0, math.min(4, math.floor(site.pos.x / world_width * 5)))
+                local by = math.max(0, math.min(4, math.floor(site.pos.y / world_height * 5)))
+                bands_x[bx] = true
+                bands_y[by] = true
+                count = count + 1
+            end
+        end
+    end
+
+    if count == 0 then return nil end
+
+    local xi, yi = {}, {}
+    for k in pairs(bands_x) do xi[#xi+1] = k end
+    for k in pairs(bands_y) do yi[#yi+1] = k end
+    table.sort(xi)
+    table.sort(yi)
+
+    local function is_contiguous(arr)
+        if #arr <= 1 then return true end
+        for i = 2, #arr do
+            if arr[i] ~= arr[i-1] + 1 then return false end
+        end
+        return true
+    end
+
+    if not is_contiguous(xi) or not is_contiguous(yi) then
+        return {
+            description = "scattered across the world",
+            world_name = world_name,
+            site_count = count,
+            continent = nil,
+        }
+    end
+
+    local function range_label(indices, names, half_left, half_right)
+        local first, last = indices[1], indices[#indices]
+        if first == last then
+            return names[first + 1]
+        end
+        if first == 0 and last == 1 then return "the far " .. names[2] end
+        if first == 0 and last == 2 then return "the " .. half_left end
+        if first == 2 and last == 4 then return "the " .. half_right end
+        if first == 3 and last == 4 then return "the far " .. names[last] end
+        if first == 0 and last == 4 then return "the entire world" end
+        return "from " .. names[first + 1] .. " to " .. names[last + 1]
+    end
+
+    -- Convert an X band name to its adjective form for use in "the <x> <y> region"
+    local function x_adj(name)
+        if name == "central" then return "central" end
+        return name .. "ern"
+    end
+
+    -- Strip leading "the " for use in compound descriptions
+    local function strip_the(s)
+        return s:gsub("^the ", "")
+    end
+
+    -- Build description
+    local x_only = #xi == 1
+    local y_only = #yi == 1
+    local x_all = xi[1] == 0 and xi[#xi] == 4
+    local y_all = yi[1] == 0 and yi[#yi] == 4
+
+    local description
+    if x_all and y_all then
+        description = "spans the entire world"
+    elseif x_all then
+        description = "covers " .. strip_the(range_label(yi, Y_NAMES, "northern half", "southern half")) .. " of the world"
+    elseif y_all then
+        description = "covers " .. strip_the(range_label(xi, X_NAMES, "western half", "eastern half")) .. " across the world"
+    elseif x_only and y_only then
+        if X_NAMES[xi[1] + 1] == "central" and Y_NAMES[yi[1] + 1] == "central" then
+            description = "the central region of the world"
+        else
+            description = "the " .. X_NAMES[xi[1] + 1] .. " " .. Y_NAMES[yi[1] + 1] .. " region"
+        end
+    elseif x_only then
+        description = "the " .. x_adj(X_NAMES[xi[1] + 1]) .. " " .. strip_the(range_label(yi, Y_NAMES, "northern half", "southern half")) .. " region"
+    elseif y_only then
+        description = "the " .. strip_the(range_label(xi, X_NAMES, "western half", "eastern half")) .. " " .. Y_NAMES[yi[1] + 1] .. " region"
+    else
+        description = "covers " .. range_label(xi, X_NAMES, "western half", "eastern half") .. " and " .. range_label(yi, Y_NAMES, "northern half", "southern half")
+    end
+
+    -- Determine landmass(es)
+    local continent = get_landmasses_for_sites(site_positions, world_data)
+
+    return {
+        description = description,
+        world_name = world_name,
+        site_count = count,
+        continent = continent,
+    }
+end
