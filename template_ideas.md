@@ -4,16 +4,8 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Civilisation
 
-* If possible describe where the civilisation finds itself on the world map. It might be a bit difficult if the civ is 'all over' but then the discription should be 'all over' the world.
-* Civ should have a table of forts, with a field if it has ever been a player fort. The default sort should put that at the top. And the fort names that was player owned must have Links to the relevant pages 
-
 # Fort(s)
 
-* We should enable having multiple forts in the 'wiki' as the save will 'keep' the old wiki as the user changes forts.
-    * The impacts of multiple forts:
-        * Citizen should (optionally) show which fort is his residence
-        * Civilisation page should include a list of player forts (clickable links?)
-        * The forts page should also be a 'root' page, and the current fort should be a child.
 * Add the continent and the general area's name to the fort template. 
     * Maybe put the fort's position on the world map in terms of compass directions as well:
     * Fort XXX is located in the west of the world (maybe give world name). Or Central

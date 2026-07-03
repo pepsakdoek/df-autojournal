@@ -229,74 +229,102 @@ function WikiInitializer:perform(screen)
         local forts_index_content = forts_index_template.render(known_forts, site_id)
         safe_save(self.context, 'forts', utils.sanitize_content(forts_index_content), 1)
 
-        -- 0f. Render World page — direct save, no abstraction
+        -- 0f. Render World page via template
         logger.log("=== Initialization step 0f: World page ===")
         local world_name = "World"
+        local world_eras = {}
+        local world_landmasses = {}
+        local world_season = ""
         pcall(function()
-            local wd = df.global.world.world_data
-            if wd then
-                local ok_n, name_n = pcall(utils.get_readable_name, wd.name)
-                if ok_n and name_n and name_n ~= "" then world_name = name_n end
+            local names = {"Early Spring", "Late Spring", "Early Summer", "Late Summer", "Early Autumn", "Late Autumn", "Early Winter", "Late Winter"}
+            if df.global.cur_year_tick then
+                local idx = math.floor(df.global.cur_year_tick / 16800) + 1
+                if idx >= 1 and idx <= #names then world_season = names[idx] end
             end
         end)
-        logger.log("World name: " .. world_name)
-
-        local world_content = {
-            { text = "# " .. world_name, pen = COLOR_YELLOW },
-            "\n\n",
-            { text = "Current Date: ", pen = COLOR_LIGHTCYAN },
-            { text = "Year " .. tostring(df.global.cur_year or 0), pen = COLOR_WHITE },
-            "\n",
-        }
 
         pcall(function()
             local wd = df.global.world.world_data
             if not wd then return end
-            if wd.eras and #wd.eras > 0 then
-                table.insert(world_content, "\n")
-                table.insert(world_content, { text = "## Ages of the World", pen = COLOR_YELLOW })
-                table.insert(world_content, "\n")
+
+            local ok_n, name_n = pcall(utils.get_readable_name, wd.name)
+            if ok_n and name_n and name_n ~= "" then world_name = name_n end
+
+            -- Eras
+            if wd.eras then
                 for _, era_elem in ipairs(wd.eras) do
                     local ok_en, era_name = pcall(utils.get_readable_name, era_elem.name)
                     if ok_en and era_name then
-                        table.insert(world_content, "* Year " .. tostring(era_elem.first_year or 0) .. " — " .. era_name .. "\n")
+                        table.insert(world_eras, { year = era_elem.first_year, name = era_name, is_current = false })
+                    end
+                end
+                table.sort(world_eras, function(a, b) return (a.year or 0) < (b.year or 0) end)
+                if #world_eras > 0 then
+                    local cur = df.global.cur_year
+                    local cur_name = world_eras[1].name
+                    for _, e in ipairs(world_eras) do
+                        if e.year <= cur then cur_name = e.name end
+                    end
+                    for _, e in ipairs(world_eras) do
+                        if e.name == cur_name then e.is_current = true; break end
                     end
                 end
             end
-        end)
 
-        pcall(function()
-            local wd = df.global.world.world_data
-            if not wd or not wd.landmasses then return end
-            local added_lm = false
-            for _, lm in ipairs(wd.landmasses) do
-                local ok_ln, lm_name = pcall(utils.get_readable_name, lm.name)
-                if not ok_ln or not lm_name then lm_name = "Unknown" end
-                for _, site in ipairs(wd.sites) do
-                    if site.pos and site.pos.x >= lm.min_x and site.pos.x <= lm.max_x
-                        and site.pos.y >= lm.min_y and site.pos.y <= lm.max_y then
-                        if site.entity_links then
-                            for _, link in ipairs(site.entity_links) do
-                                local entity = df.historical_entity.find(link.entity_id)
-                                if entity and entity.type == df.historical_entity_type.Civilization then
-                                    if not added_lm then
-                                        table.insert(world_content, "\n")
-                                        table.insert(world_content, { text = "## Inhabited Regions", pen = COLOR_YELLOW })
-                                        table.insert(world_content, "\n")
-                                        added_lm = true
+            -- Landmasses
+            if wd.landmasses then
+                for _, lm in ipairs(wd.landmasses) do
+                    local ok_ln, lm_name = pcall(utils.get_readable_name, lm.name)
+                    if not ok_ln or not lm_name then lm_name = "Unknown" end
+                    local known = {}
+                    local unknown_count = 0
+
+                    for _, site in ipairs(wd.sites) do
+                        if site.pos and site.pos.x >= lm.min_x and site.pos.x <= lm.max_x
+                            and site.pos.y >= lm.min_y and site.pos.y <= lm.max_y then
+                            if site.entity_links then
+                                for _, link in ipairs(site.entity_links) do
+                                    local entity = df.historical_entity.find(link.entity_id)
+                                    if entity and entity.type == df.historical_entity_type.Civilization then
+                                        local eid = entity.id
+                                        if known_map[eid] then
+                                            local already = false
+                                            for _, kc in ipairs(known) do
+                                                if kc.civ_id == eid then already = true; kc.site_count = (kc.site_count or 0) + 1; break end
+                                            end
+                                            if not already then
+                                                local ename = utils.get_readable_name(entity.name)
+                                                table.insert(known, {civ_id=eid, name=ename, site_count=1, link="civ:" .. tostring(eid)})
+                                            end
+                                        else
+                                            unknown_count = unknown_count + 1
+                                        end
+                                        break
                                     end
-                                    table.insert(world_content, { text = lm_name, pen = COLOR_LIGHTCYAN })
-                                    table.insert(world_content, "\n")
-                                    table.insert(world_content, "    - inhabited\n\n")
-                                    break
                                 end
                             end
                         end
                     end
-                    if added_lm then break end
+
+                    if #known > 0 or unknown_count > 0 then
+                        table.insert(world_landmasses, { name = lm_name, known_civs = known, unknown_count = unknown_count, site_count = #known + unknown_count })
+                    end
                 end
+                table.sort(world_landmasses, function(a, b) return #b.known_civs < #a.known_civs end)
             end
         end)
+
+        local world_content = world_template.render({
+            world_name = world_name,
+            current_year = df.global.cur_year,
+            current_season = world_season or "",
+            eras = world_eras,
+            landmasses = world_landmasses,
+        })
+
+        if not world_content or #world_content == 0 then
+            world_content = { { text = "# " .. world_name, pen = COLOR_YELLOW }, "\n\n", { text = "Current Date: ", pen = COLOR_LIGHTCYAN }, { text = "Year " .. tostring(df.global.cur_year or 0), pen = COLOR_WHITE }, "\n" }
+        end
 
         logger.log("Saving World page (" .. #world_content .. " spans)")
         local w_ok, w_err = pcall(dfhack.persistent.saveSiteData, 'mfw_p_world', {content=world_content, cursor={1}})
