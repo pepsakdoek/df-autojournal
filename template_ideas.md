@@ -2,6 +2,11 @@
 
 This is just a list of ideas of things that might be of interest to users, and might make the world feel more alive.
 
+# World
+
+* List of inhabited landmasses
+* Era
+
 # Civilisation
 
 # Fort(s)
@@ -52,7 +57,8 @@ This is just a list of ideas of things that might be of interest to users, and m
     * Don't link it to a hotkey, it must be dependent on where the cursor is. (in the table or 'outside it') 
 * The function Modal popup has a weird behaviour (sometimes) when you select a function with the mouse where the 'statusbar' (bottom of the UI 'Enter: Insert | Escape : Cancel') gets hidden
 * Create the actual HTML export
-* We probably want a progressbar for the initialization process
+* We probably want a progressbar for the initialization process, and maybe during save (we must still determine the impact of the listener to the performance of the game, if it's heavy we should 'sync' changes when the wiki is opened or when the game is saved) - on a big fort we will want that progressbar anyway, because it can probably take 1 minute or so.
+
 
 
     

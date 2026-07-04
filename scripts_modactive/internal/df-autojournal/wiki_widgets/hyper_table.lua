@@ -94,12 +94,51 @@ function HyperTable:calc_column_widths(avail_width)
             local avail_for_auto = avail - fixed_total
             if avail_for_auto < 1 then avail_for_auto = 1 end
             if #auto_cols > 0 then
+                -- Save natural widths (from Phase 1) before clamping
+                local natural = {}
+                local total_overflow = 0
+                for _, j in ipairs(auto_cols) do
+                    natural[j] = widths[j]
+                    local overflow = math.max(0, widths[j] - self.columns[j].min_width)
+                    total_overflow = total_overflow + overflow
+                end
+
+                -- Clamp all auto columns to min_width
                 local remaining = avail_for_auto
                 for _, j in ipairs(auto_cols) do
                     widths[j] = self.columns[j].min_width
                     remaining = remaining - widths[j]
                 end
-                if remaining > 0 then
+
+                if remaining > 0 and total_overflow > 0 then
+                    -- Distribute remaining space proportionally by content need
+                    local orig_remaining = remaining
+                    for _, j in ipairs(auto_cols) do
+                        if remaining <= 0 then break end
+                        local overflow = math.max(0, natural[j] - self.columns[j].min_width)
+                        if overflow > 0 then
+                            local share = math.floor(overflow * orig_remaining / total_overflow)
+                            local give = math.min(share, remaining, overflow)
+                            widths[j] = widths[j] + give
+                            remaining = remaining - give
+                        end
+                    end
+                    -- Give any rounding leftovers to the column with most need
+                    if remaining > 0 then
+                        for _, j in ipairs(auto_cols) do
+                            if remaining <= 0 then break end
+                            local overflow = math.max(0, natural[j] - self.columns[j].min_width)
+                            local taken = widths[j] - self.columns[j].min_width
+                            local headroom = overflow - taken
+                            if headroom > 0 then
+                                local give = math.min(headroom, remaining)
+                                widths[j] = widths[j] + give
+                                remaining = remaining - give
+                            end
+                        end
+                    end
+                elseif remaining > 0 then
+                    -- All at min_width, no content overflow: equal distribution
                     local each = math.floor(remaining / #auto_cols)
                     local extra = remaining - each * #auto_cols
                     for idx, j in ipairs(auto_cols) do
