@@ -82,6 +82,7 @@ function FunctionModal:onFunctionSelected(idx)
 
     self.arg_fields = {}
     local schema = choice.args_schema or {}
+    local n = #schema
     local subviews = {}
     for i, arg in ipairs(schema) do
         local label = arg.label or arg.key
@@ -103,7 +104,28 @@ function FunctionModal:onFunctionSelected(idx)
         table.insert(subviews, field)
         self.arg_fields[arg.key] = field
     end
-    self.arg_panel.subviews = subviews
+
+    -- Properly replace subviews: set parent, call updateLayout
+    for _, sv in ipairs(self.arg_panel.subviews) do
+        sv.parent = nil
+    end
+    self.arg_panel.subviews = {}
+    for _, sv in ipairs(subviews) do
+        sv.parent = self.arg_panel
+        table.insert(self.arg_panel.subviews, sv)
+    end
+    local panel_h = math.max(2, n + 1)
+    self.arg_panel.frame.h = panel_h
+    self.arg_panel.frame.b = 1
+
+    -- Shift siblings to fit the resized panel
+    self.desc_label.frame.b = panel_h + 2
+    self.desc_label.frame.h = 2
+    self.fn_list.frame.b = panel_h + 5
+
+    self.arg_panel:updateLayout()
+    self.desc_label:updateLayout()
+    self.fn_list:updateLayout()
 end
 
 function FunctionModal:collect_args()

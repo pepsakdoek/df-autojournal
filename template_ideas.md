@@ -54,8 +54,8 @@ This is just a list of ideas of things that might be of interest to users, and m
     * For all tables longer than 10 entries (total entries not 'just' displayed entries), it should have the word: "SEARCH:" at the top and when you select the table the cursor should move there. Blank shows all
     * The user should be able to disable / remove the search bar in the edit table UI, but by default all tables should have it
     * Don't link it to a hotkey, it must be dependent on where the cursor is. (in the table or 'outside it') 
-* The function Modal popup has a weird behaviour (sometimes) when you select a function with the mouse where the 'statusbar' (bottom of the UI 'Enter: Insert | Escape : Cancel') gets hidden
 * Create the actual HTML export
+* Function editor probably needs to be resizable, and default a bit wider. We may want to add an actual 'line' to indicate the end of the function list vs the 'information bar' 
 * We probably want a progressbar for the initialization process, and maybe during save (we must still determine the impact of the listener to the performance of the game, if it's heavy we should 'sync' changes when the wiki is opened or when the game is saved) - on a big fort we will want that progressbar anyway, because it can probably take 1 minute or so.
 
 
