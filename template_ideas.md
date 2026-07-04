@@ -46,10 +46,9 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
-* The table seems to have some issues when it's constrained (meaning the window width is less than the total widths required to display it well)
-    * The symptom is that the Name column gets cut off a lot before the Birth Year column starts 
+
 * I can't copy and paste tables (even the display parts)
-* Editing a table removes the links (understandably tricky)
+* Table editor should be able to insert both links and functions into them (I think it already supports it programatically, but not the editor)
 * FEATURE: HyperTextArea tables should have a field at the top that searches. (it should match all fields in the table)
     * Essentially it should search the whole 'row' of a table (could be a concatenated string) and if it hits any of the fields it's included
     * For all tables longer than 10 entries (total entries not 'just' displayed entries), it should have the word: "SEARCH:" at the top and when you select the table the cursor should move there. Blank shows all

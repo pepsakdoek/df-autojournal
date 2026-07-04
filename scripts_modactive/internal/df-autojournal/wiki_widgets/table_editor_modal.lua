@@ -96,17 +96,32 @@ local function read_text(editor)
     return rows
 end
 
-local function build_row_data(data_rows, col_count)
+local function build_row_data(data_rows, col_count, original_rows)
     local rows = {}
-    for _, row in ipairs(data_rows) do
+    for i, row in ipairs(data_rows) do
         local r = {}
         for j = 1, col_count do
             local text = (row and row[j]) or ''
-            table.insert(r, { text = text, pen = nil, link = nil })
+            local orig_cell = original_rows and original_rows[i] and original_rows[i][j]
+            local pen = orig_cell and orig_cell.pen or nil
+            local link = orig_cell and orig_cell.link or nil
+            table.insert(r, { text = text, pen = pen, link = link })
         end
         table.insert(rows, r)
     end
     return rows
+end
+
+local function copy_rows(rows)
+    if not rows then return nil end
+    local result = {}
+    for i, row in ipairs(rows) do
+        result[i] = {}
+        for j, cell in ipairs(row) do
+            result[i][j] = { text = cell.text, pen = cell.pen, link = cell.link }
+        end
+    end
+    return result
 end
 
 -- ---------------------------------------------------------------------------
@@ -123,6 +138,7 @@ function TableEditorModal:init()
     local existing = self.table_block
     local existing_cols = existing and existing.columns
     local existing_name = existing and existing.name or ''
+    self._original_rows = copy_rows(existing and existing.rows)
 
     -- Table name – single line
     local name_text = existing_name ~= '' and existing_name or '(unnamed)'
@@ -331,7 +347,7 @@ function TableEditorModal:submit()
     local data_raw = read_text(self.data_editor)
     local rows
     if #data_raw >= 1 then
-        rows = build_row_data(data_raw, #cols)
+        rows = build_row_data(data_raw, #cols, self._original_rows)
     else
         rows = {}
     end
