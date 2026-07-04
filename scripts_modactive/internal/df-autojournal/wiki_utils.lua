@@ -367,3 +367,118 @@ function describe_world_position(civ)
         continent = continent,
     }
 end
+
+--- Describe a single site's position on the world map.
+--- Returns nil if no position data is available.
+--- Otherwise returns a table:
+---   { description = "the far northwestern region", world_name = "The World",
+---     continent = "Great Forest", temperature = "cold, with heavy snowfall",
+---     region_name = "Copper Mountains" }
+function describe_site_position(site)
+    if not site or not site.pos then return nil end
+    local world_data = df.global.world.world_data
+    if not world_data then return nil end
+    local world_width = world_data.world_width or 1
+    local world_height = world_data.world_height or 1
+    if world_width <= 0 or world_height <= 0 then return nil end
+
+    local world_name = get_readable_name(world_data.name) or "the world"
+
+    -- Compass direction using same grid system as civ position
+    local bx = math.max(0, math.min(4, math.floor(site.pos.x / world_width * 5)))
+    local by = math.max(0, math.min(4, math.floor(site.pos.y / world_height * 5)))
+    local dir_x = X_NAMES[bx + 1]
+    local dir_y = Y_NAMES[by + 1]
+
+    local function x_adj(name)
+        if name == "central" then return "central" end
+        return name .. "ern"
+    end
+
+    local dir_desc
+    if dir_x == "central" and dir_y == "central" then
+        dir_desc = "the central region of the world"
+    elseif dir_x == "central" then
+        dir_desc = "the central " .. dir_y .. " region"
+    elseif dir_y == "central" then
+        dir_desc = "the " .. x_adj(dir_x) .. " central region"
+    else
+        dir_desc = "the " .. x_adj(dir_x) .. " " .. dir_y .. " region"
+    end
+
+    -- Region map data for biome, continent, temperature
+    local region_ent = dfhack.maps.getRegionBiome(site.pos.x, site.pos.y)
+
+    -- Continent name from landmass
+    local continent = nil
+    if region_ent and region_ent.landmass_id >= 0 then
+        local lm = df.world_landmass.find(region_ent.landmass_id)
+        if lm then
+            local name = get_readable_name(lm.name)
+            if name and name ~= "" then
+                continent = name
+            end
+        end
+    end
+
+    -- Region/area name from world_region
+    local region_name = nil
+    if region_ent and region_ent.region_id >= 0 then
+        local wr = df.world_region.find(region_ent.region_id)
+        if wr then
+            local rname = get_readable_name(wr.name)
+            if rname and rname ~= "" then
+                region_name = rname
+            end
+        end
+    end
+
+    -- Temperature description
+    local temp_desc = nil
+    if region_ent then
+        local temp = region_ent.temperature
+        local snowfall = region_ent.snowfall or 0
+
+        if temp < 10000 then
+            if snowfall > 500 then
+                temp_desc = "frigid, with heavy snow"
+            else
+                temp_desc = "frigid"
+            end
+        elseif temp < 10100 then
+            if snowfall > 500 then
+                temp_desc = "very cold, with snow"
+            elseif snowfall > 0 then
+                temp_desc = "cold, with occasional snow"
+            else
+                temp_desc = "very cold"
+            end
+        elseif temp < 10300 then
+            if snowfall > 300 then
+                temp_desc = "cold, with snowfall"
+            elseif snowfall > 0 then
+                temp_desc = "cold, with light snow"
+            else
+                temp_desc = "cold"
+            end
+        elseif temp < 10500 then
+            temp_desc = "cool"
+        elseif temp < 10800 then
+            temp_desc = "temperate"
+        elseif temp < 11200 then
+            temp_desc = "warm"
+        elseif temp < 11600 then
+            temp_desc = "hot"
+        else
+            temp_desc = "scorching"
+        end
+    end
+
+    return {
+        description = dir_desc,
+        world_name = world_name,
+        continent = continent,
+        temperature = temp_desc,
+        region_name = region_name,
+    }
+end

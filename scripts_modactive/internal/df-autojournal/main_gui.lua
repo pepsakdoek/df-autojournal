@@ -1,5 +1,6 @@
 --@ module = true
 local gui = require('gui')
+local dialogs = require('gui.dialogs')
 local widgets = require('gui.widgets')
 local json = require('json')
 
@@ -329,6 +330,30 @@ function WikiContext:save_dynamic_pages(pages)
     end
 end
 
+function WikiContext:reset_all_data()
+    if not dfhack.isWorldLoaded() then return end
+    local function clear_key(key)
+        pcall(dfhack.persistent.saveSiteData, key, nil)
+    end
+    local keys_to_clear = {
+        'initialized', 'catchup_last_id', 'event_timeline', 'enemies',
+        'seen_units', 'dynamic_pages',
+    }
+    for _, suffix in ipairs(keys_to_clear) do
+        clear_key(self.save_prefix .. suffix)
+    end
+    -- Clear all wiki page content keys (mfw_p_*)
+    local known_dynamic = self:get_dynamic_pages()
+    for _, page in ipairs(known_dynamic) do
+        clear_key(self:get_key(page.id))
+    end
+    -- Clear root pages
+    for _, page in ipairs(PAGES) do
+        clear_key(self:get_key(page.id))
+    end
+    logger.log("reset_all_data: wiped all wiki data")
+end
+
 function WikiContext:save_window_frame(frame)
     if dfhack.isWorldLoaded() then
         dfhack.persistent.saveSiteData(self.save_prefix .. 'window_frame', frame)
@@ -413,18 +438,19 @@ function WikiScreen:onInitialize()
     if initialized then
         self._reinit_stage = 1
         logger.log("onInitialize: showing first reinit dialog")
-        gui.showYesNoPrompt('Re-initialize Wiki?',
+        dialogs.showYesNoPrompt('Re-initialize Wiki?',
             'You already have a wiki. Re-initializing will OVERWRITE ALL existing pages. This cannot be undone. Continue?',
             COLOR_LIGHTRED,
             function()
                 logger.log("onReinitConfirmed: stage 1 confirmed")
                 self._reinit_stage = 2
-                gui.showYesNoPrompt('REALLY Re-initialize?',
+                dialogs.showYesNoPrompt('REALLY Re-initialize?',
                     'FINAL WARNING: All wiki pages will be replaced with fresh templates. Manual edits, notes, and custom entries will be LOST. Proceed?',
                     COLOR_LIGHTRED,
                     function()
                         logger.log("onReinitConfirmed: stage 2 confirmed, running init")
                         self._reinit_stage = nil
+                        self.context:reset_all_data()
                         self:performInitialization()
                     end
                 )

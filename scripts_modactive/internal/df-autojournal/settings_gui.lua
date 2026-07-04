@@ -61,6 +61,7 @@ local SETTING_DESCRIPTIONS = {
             defense = "Show military and defense capabilities",
             links = "Show economic and political links to other sites",
             timeline = "Show founding and historical timeline",
+            location = "Show world map position, continent, region, and climate description",
         },
         journal = {
             population = "Auto-record population changes and migration waves",

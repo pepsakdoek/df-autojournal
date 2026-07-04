@@ -28,6 +28,7 @@ local DEFAULT_SETTINGS = {
             defense = true,
             links = true,
             timeline = true,
+            location = true,
         },
         journal = {
             population = true,
