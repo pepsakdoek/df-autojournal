@@ -119,6 +119,25 @@ editor:addTable(
 )
 ```
 
+### Table Search
+
+Tables with more than 10 rows (or when a search is active) show a `SEARCH:` bar
+at the top (below the column headers). To activate search, place the cursor at
+the table boundary and start typing — characters are routed to the search query
+instead of the document text.
+
+| Key | Action |
+|-----|--------|
+| Any printable char | Appends to search query, filters rows in real time |
+| `Backspace` | Removes last character from query |
+| `Escape` | Clears the search query |
+
+Search is case-insensitive and matches against all columns. Rows that don't
+match are hidden. If no rows match, a `(no matches)` indicator is shown.
+
+The search query is stored in the table block as `search_query` (not persisted
+to disk — reset on page reload).
+
 Column attributes:
 
 | Field      | Default   | Description |
@@ -137,6 +156,7 @@ Table options:
 | `sort_col` | `nil`     | Column index to sort by (nil = unsorted) |
 | `sort_asc` | `true`    | Sort direction |
 | `max_rows` | `nil`     | Max visible rows (excess hidden with "... and N more") |
+| `search_query` | `''` | Active search filter (display-only, not persisted) |
 
 ### Editing Tables via the UI
 

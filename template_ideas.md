@@ -4,8 +4,9 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # World
 
-* List of inhabited landmasses
-* Era
+## Bugs 
+* List of inhabited landmasses doesn't show
+* Era doesn't show
 
 # Civilisation
 
@@ -15,6 +16,15 @@ This is just a list of ideas of things that might be of interest to users, and m
     * Maybe put the fort's position on the world map in terms of compass directions as well:
     * Fort XXX is located in the west of the world (maybe give world name). Or Central
     * Maybe describe the general temperature? Does it snow or not?
+* Fort should maybe be the default 'homepage' for the player, meaning all important-ish things gets logged here.
+    * Artifacts that get generated here
+    * Immigrations
+    * Emmigrations (when a dwarf gets 'expelled')
+    * Deaths
+    * 'Visitors' like monster slayers / entertainers etc.
+    * Sieges
+    * Maybe even the whole events / enemies should maybe be 'sub-sections' of Fort - thinking about a 'multi-fort' save game. Events at Fort 1 should not be part of Fort 2's events.
+
 ## Bugs
 
 * Fort 'founding' is linked to when it gets journaled/initialized and not the actual founding date. 

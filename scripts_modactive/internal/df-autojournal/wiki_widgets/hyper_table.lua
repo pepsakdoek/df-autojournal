@@ -16,11 +16,12 @@ local CH_DN = string.char(31)  -- ▼ CP437 down triangle
 HyperTable = defclass(HyperTable)
 
 HyperTable.ATTRS {
-    columns  = {},
-    rows     = {},
-    sort_col = DEFAULT_NIL,
-    sort_asc = true,
-    max_rows = DEFAULT_NIL,
+    columns      = {},
+    rows         = {},
+    sort_col     = DEFAULT_NIL,
+    sort_asc     = true,
+    max_rows     = DEFAULT_NIL,
+    search_query = '',
 }
 
 function HyperTable:init()
@@ -301,8 +302,8 @@ function HyperTable:render_header(col_widths)
     return line, spans
 end
 
-function HyperTable:render_row(row_idx, col_widths)
-    local row = self.rows[row_idx]
+function HyperTable:render_row(row, col_widths)
+    if type(row) == 'number' then row = self.rows[row] end
     local spans = {}
     local line_parts = {}
     for j, col in ipairs(self.columns) do
@@ -323,6 +324,43 @@ function HyperTable:render_row(row_idx, col_widths)
     return line, spans
 end
 
+function HyperTable:get_filtered_rows()
+    local query = self.search_query or ''
+    if #query == 0 then return self.rows end
+    local lower = query:lower()
+    local result = {}
+    for _, row in ipairs(self.rows) do
+        local match = false
+        for _, cell in ipairs(row) do
+            if cell and cell.text and cell.text:lower():find(lower, 1, true) then
+                match = true
+                break
+            end
+        end
+        if match then
+            table.insert(result, row)
+        end
+    end
+    return result
+end
+
+function HyperTable:render_search_bar(cw)
+    local query = self.search_query or ''
+    local filtered = self:get_filtered_rows()
+    local count = #filtered
+    local total = #self.rows
+    local text
+    local pen
+    if #query > 0 then
+        text = "SEARCH: " .. query .. " (" .. count .. "/" .. total .. ")"
+        pen = COLOR_LIGHTCYAN
+    else
+        text = "SEARCH: (" .. total .. " entries)"
+        pen = COLOR_GREY
+    end
+    return text, {{ text = text, pen = pen }}
+end
+
 -- ---------------------------------------------------------------------------
 -- Public render  – returns (lines[], line_spans[])
 -- ---------------------------------------------------------------------------
@@ -339,17 +377,33 @@ function HyperTable:render(avail_width)
     end
 
     local cw = self:calc_column_widths(avail_width)
+    local query = self.search_query or ''
+    local show_search = #query > 0 or #self.rows > 10
 
     local lines, line_spans = {}, {}
     local hdr_line, hdr_spans = self:render_header(cw)
+
+    if show_search then
+        local sl, ss = self:render_search_bar(cw)
+        table.insert(lines, sl)
+        table.insert(line_spans, ss)
+    end
+
     table.insert(lines, hdr_line)
     table.insert(line_spans, hdr_spans)
 
-    local target = self.max_rows and math.min(self.max_rows, #self.rows) or #self.rows
+    local data_rows = self:get_filtered_rows()
+    local target = self.max_rows and math.min(self.max_rows, #data_rows) or #data_rows
     for i = 1, target do
-        local dl, ds = self:render_row(i, cw)
+        local dl, ds = self:render_row(data_rows[i], cw)
         table.insert(lines, dl)
         table.insert(line_spans, ds)
+    end
+
+    if #query > 0 and #data_rows == 0 then
+        local msg = "(no matches)"
+        table.insert(lines, msg)
+        table.insert(line_spans, {{ text = msg, pen = COLOR_GREY }})
     end
 
     if self.max_rows and #self.rows > self.max_rows then
@@ -366,28 +420,30 @@ end
 -- Hit-testing
 -- ---------------------------------------------------------------------------
 
--- Given a 1-based x position and a table-local line index (1 = header),
--- return {type='sort', col=j} for header clicks,
--- {type='link', data=link} for data-cell link clicks,
--- or nil.
+-- Given a 1-based x position and a table-local line index (1 = header, or
+-- 1 = search bar when visible), return {type='sort', col=j} for header
+-- clicks, {type='link', data=link} for data-cell link clicks, or nil.
 function HyperTable:get_handler_at(local_y, x)
     local cw = self:calc_column_widths(self._last_avail_width)
+    local query = self.search_query or ''
+    local has_search = #query > 0 or #self.rows > 10
+    local header_line = has_search and 2 or 1
+    local data_offset = has_search and 2 or 1
+    local data_rows = self:get_filtered_rows()
 
     local col_start = 1
     for j, col in ipairs(self.columns) do
         local w = cw[j]
         if x >= col_start and x < col_start + w then
-            if local_y == 1 then
+            if local_y == header_line then
                 return { type = 'sort', col = j }
             end
-            local data_idx = local_y - 1
-            if data_idx >= 1 and data_idx <= #self.rows then
-                if not self.max_rows or data_idx <= self.max_rows then
-                    local row = self.rows[data_idx]
-                    local cell = row[j]
-                    if cell and cell.link then
-                        return { type = 'link', data = cell.link }
-                    end
+            local data_idx = local_y - data_offset
+            if data_idx >= 1 and data_idx <= #data_rows then
+                local row = data_rows[data_idx]
+                local cell = row[j]
+                if cell and cell.link then
+                    return { type = 'link', data = cell.link }
                 end
             end
             return nil

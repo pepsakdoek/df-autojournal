@@ -92,11 +92,12 @@ function HyperWrappedText:update(display_text, wrap_width, fn_evaluator)
             flush_text()
 
             local tbl = HyperTable{
-                columns  = entry.columns,
-                rows     = entry.rows,
-                sort_col = entry.sort_col,
-                sort_asc = (entry.sort_asc ~= false),
-                max_rows = entry.max_rows,
+                columns      = entry.columns,
+                rows         = entry.rows,
+                sort_col     = entry.sort_col,
+                sort_asc     = (entry.sort_asc ~= false),
+                max_rows     = entry.max_rows,
+                search_query = entry.search_query or '',
             }
             tbl:sort_column_internal()
 

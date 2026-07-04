@@ -118,13 +118,14 @@ function HyperTextAreaContent:_extract_special_blocks()
                 self._next_table_id = id + 1
             end
             table.insert(self.table_blocks, {
-                pos      = text_pos,
-                columns  = copyall(entry.columns),
-                rows     = copyall(entry.rows),
-                sort_col = entry.sort_col,
-                sort_asc = entry.sort_asc,
-                max_rows = entry.max_rows,
-                id       = id,
+                pos          = text_pos,
+                columns      = copyall(entry.columns),
+                rows         = copyall(entry.rows),
+                sort_col     = entry.sort_col,
+                sort_asc     = entry.sort_asc,
+                max_rows     = entry.max_rows,
+                id           = id,
+                search_query = '',
             })
         elseif HUtils.is_function_block(entry) then
             table.insert(self.fn_blocks, {
@@ -175,14 +176,15 @@ function HyperTextAreaContent:rebuild_display_text()
             -- Insert table block entry
             local tb = self.table_blocks[tbi]
             table.insert(display, {
-                type     = 'table',
-                columns  = tb.columns,
-                rows     = tb.rows,
-                sort_col = tb.sort_col,
-                sort_asc = tb.sort_asc,
-                max_rows = tb.max_rows,
-                id       = tb.id,
-                name     = tb.name,
+                type         = 'table',
+                columns      = tb.columns,
+                rows         = tb.rows,
+                sort_col     = tb.sort_col,
+                sort_asc     = tb.sort_asc,
+                max_rows     = tb.max_rows,
+                id           = tb.id,
+                name         = tb.name,
+                search_query = tb.search_query or '',
             })
             tbi = tbi + 1
             -- char_idx stays at table position
@@ -251,6 +253,22 @@ function HyperTextAreaContent:_find_table_pos(entry_id)
         end
     end
     return nil
+end
+
+--- Re-render a table after its search_query changes.
+function HyperTextAreaContent:_rerender_table_by_id(tb_id)
+    for range_idx, tr in ipairs(self.wrapped_text.table_ranges) do
+        if tr.entry.id == tb_id then
+            for _, tb in ipairs(self.table_blocks) do
+                if tb.id == tb_id then
+                    tr.table.search_query = tb.search_query or ''
+                    break
+                end
+            end
+            self.wrapped_text:rerender_table(range_idx)
+            break
+        end
+    end
 end
 
 --- Adjust table block positions after a character insert.
@@ -463,16 +481,49 @@ function HyperTextAreaContent:setClipboardText(text)
     end
 end
 
+function HyperTextAreaContent:_serialize_table(tb)
+    local parts = {}
+    local hdrs = {}
+    for _, col in ipairs(tb.columns) do
+        table.insert(hdrs, col.header or '')
+    end
+    table.insert(parts, table.concat(hdrs, '|'))
+    for _, row in ipairs(tb.rows) do
+        local cells = {}
+        for j, col in ipairs(tb.columns) do
+            local cell = row[j]
+            table.insert(cells, (cell and cell.text) or '')
+        end
+        table.insert(parts, table.concat(cells, '|'))
+    end
+    return table.concat(parts, '\n') .. '\n'
+end
+
 function HyperTextAreaContent:copy()
     if not self:hasSelection() then return end
     local from, to = self.cursor, self.sel_end
     if from > to then from, to = to, from end
-    
-    local selected_chars = {}
-    for i = from, to - 1 do
-        table.insert(selected_chars, self.char_list[i].char)
+
+    -- Build lookup of table blocks within selection range
+    local tb_lookup = {}
+    for _, tb in ipairs(self.table_blocks) do
+        if tb.pos >= from and tb.pos < to then
+            tb_lookup[tb.pos] = tb_lookup[tb.pos] or {}
+            table.insert(tb_lookup[tb.pos], tb)
+        end
     end
-    self:setClipboardText(table.concat(selected_chars))
+
+    local parts = {}
+    for i = from, to - 1 do
+        if tb_lookup[i] then
+            for _, tb in ipairs(tb_lookup[i]) do
+                table.insert(parts, self:_serialize_table(tb))
+            end
+        end
+        table.insert(parts, self.char_list[i].char)
+    end
+
+    self:setClipboardText(table.concat(parts))
 end
 
 function HyperTextAreaContent:cut()
@@ -531,6 +582,25 @@ function HyperTextAreaContent:onRenderBody(dc)
         end
     end
 
+    -- Build selected-table set: which table IDs are within the selection
+    local selected_table_ids = {}
+    if sel_from then
+        for _, tb in ipairs(self.table_blocks) do
+            if tb.pos >= sel_from and tb.pos < sel_to then
+                selected_table_ids[tb.id] = true
+            end
+        end
+    end
+    -- Map line index to whether its table is selected
+    local table_selected_at = {}
+    for _, tr in ipairs(self.wrapped_text.table_ranges) do
+        if selected_table_ids[tr.entry.id] then
+            for y = tr.start_line, tr.end_line do
+                table_selected_at[y] = true
+            end
+        end
+    end
+
     for line_idx = start_y, end_y do
         local frags   = line_spans[line_idx]
         local draw_y  = line_idx - start_y
@@ -548,8 +618,12 @@ function HyperTextAreaContent:onRenderBody(dc)
 
                 for i = 1, #frag_text do
                     local c = frag_text:sub(i, i)
-                    local is_selected = not is_table_line and
-                        sel_from and (char_idx >= sel_from and char_idx < sel_to)
+                    local is_selected
+                    if is_table_line then
+                        is_selected = sel_from and table_selected_at[line_idx]
+                    else
+                        is_selected = sel_from and (char_idx >= sel_from and char_idx < sel_to)
+                    end
                     
                     local pen
                     if is_selected then
@@ -831,9 +905,40 @@ end
 
 function HyperTextAreaContent:onTextManipulationInput(keys)
     if self:cursor_at_table() then
-        -- Block all text input when cursor is at a table boundary
+        -- Route text input to table search when cursor is at a table boundary
+        local function table_at_cursor()
+            for _, tb in ipairs(self.table_blocks) do
+                if tb.pos == self.cursor then return tb end
+            end
+            return nil
+        end
+        local tb = table_at_cursor()
+        if tb then
+            if keys._STRING == 0 or keys.KEY_BACKSPACE then
+                local q = tb.search_query or ''
+                if #q > 0 then
+                    tb.search_query = q:sub(1, -2)
+                    self:_rerender_table_by_id(tb.id)
+                end
+                return true
+            elseif keys._STRING then
+                local char = string.char(keys._STRING)
+                if char:match('[ -~]') then
+                    tb.search_query = (tb.search_query or '') .. char
+                    self:_rerender_table_by_id(tb.id)
+                    return true
+                end
+            elseif keys.LEAVESCREEN then
+                if #(tb.search_query or '') > 0 then
+                    tb.search_query = ''
+                    self:_rerender_table_by_id(tb.id)
+                    return true
+                end
+            end
+        end
+        -- Block destructive text input at table boundaries
         if keys.SELECT or keys.KEY_ENTER or keys._STRING or keys._STRING == 13 or keys._STRING == 10
-           or keys.KEY_BACKSPACE or keys.KEY_DELETE or keys.KEYBOARD_CURSOR_DELETE or keys.CUSTOM_DELETE then
+           or keys.KEY_DELETE or keys.KEYBOARD_CURSOR_DELETE or keys.CUSTOM_DELETE then
             return true
         end
     end
