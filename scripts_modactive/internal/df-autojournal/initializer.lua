@@ -762,8 +762,7 @@ function WikiInitializer:renderVisitorsPage()
                 -- Only include units that the game considers visitors/merchants/diplomats
                 local is_known_visitor = false
                 pcall(function() is_known_visitor = dfhack.units.isVisitor(unit) or dfhack.units.isMerchant(unit) or dfhack.units.isDiplomat(unit) end)
-                if not is_known_visitor then goto continue end
-
+                if is_known_visitor then
                 local name = utils.sanitize(dfhack.units.getReadableName(unit))
                 if name and name ~= "" then
                     local key = name:lower():gsub("[^%w]", "_")
@@ -802,7 +801,8 @@ function WikiInitializer:renderVisitorsPage()
                         })
                     end
                 end
-                ::continue::
+                end
+            end
         end
     end)
 
