@@ -357,13 +357,22 @@ function HyperTable:render_search_bar(cw)
     local text
     local pen
     if #query > 0 then
-        text = "SEARCH: " .. query .. " (" .. count .. "/" .. total .. ")"
+        text = "SEARCH: " .. query
         pen = COLOR_LIGHTCYAN
     else
-        text = "SEARCH: (" .. total .. " entries)"
+        text = "SEARCH:"
         pen = COLOR_GREY
     end
-    return text, {{ text = text, pen = pen }}
+    -- Right-align the entry count on the same line
+    local count_text = "(" .. total .. " entries)"
+    if #query > 0 then
+        count_text = "(" .. count .. "/" .. total .. ")"
+    end
+    local avail = self._last_avail_width or 80
+    local min_pad = 2
+    local pad = math.max(min_pad, avail - #text - #count_text)
+    local full_text = text .. string.rep(" ", pad) .. count_text
+    return full_text, {{ text = full_text, pen = pen }}
 end
 
 -- ---------------------------------------------------------------------------

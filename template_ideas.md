@@ -18,6 +18,8 @@ This is just a list of ideas of things that might be of interest to users, and m
 * Diplomatic Relations
 * Ethics and Values
 * Major History (we should probably remove this - though it could be cool?)
+* Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
+* Elf Civs don't show all of their Retreats. (They seem to all be called Forest Retreats)
 
 
 # Forts Root Page
@@ -47,7 +49,8 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 ## Bugs
 
-* Fort 'founding' is linked to when it gets journaled/initialized and not the actual founding date. 
+* Fort 'founding' is linked to when it gets journaled/initialized and not the actual founding date. - check might be resolved
+* I suspect the "climate" calc is wrong
 
 # Citizen Root page
 
@@ -61,6 +64,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 * Get the actual arrival date per citizen (especially on initialization)
 * Auto-journaling settings should include timeline and arrivals, new relationships, new skills (upon reaching master level), new medical requirements and history
 * Military history (notable kills)
+
 
 ## Citizen Root page
 
@@ -81,7 +85,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
-* Tables should always add a row below it so that I can select everything to copy and paste it -- I think at the moment it's an invisible row (a previous attempt to fix it). I do not want an invisible row, I want a 'non table' row below each table so that I can move the cursor below the table.
+
 * Table editor:
     * should be able to insert both links and functions into them (I think it already supports it programatically, but not the editor)
     * We want the same UI as on the main toolbar to insert functions and links (but the output once entered can just be the 'raw' values like (link)[fortress] or however we define a function in the text)
@@ -101,7 +105,8 @@ This is just a list of ideas of things that might be of interest to users, and m
     [+]   Events
     [+]   Enemies
     [+]   Visitors
-    
+
+* Wiki Wide search... (should be in the main ToC page)
 * Inititializing needs an option to include dead dwarfs (should be off by default)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal

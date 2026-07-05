@@ -118,23 +118,6 @@ function HyperTextAreaContent:_extract_special_blocks()
                 self._next_table_id = id + 1
             end
             local rows = copyall(entry.rows)
-            -- Ensure a trailing empty row in the data so it persists
-            if #rows > 0 then
-                local last = rows[#rows]
-                local has_content = false
-                for _, cell in ipairs(last) do
-                    if cell and cell.text and cell.text ~= '' then
-                        has_content = true; break
-                    end
-                end
-                if has_content then
-                    local new_row = {}
-                    for _ in ipairs(entry.columns) do
-                        table.insert(new_row, { text = '', pen = nil, link = nil })
-                    end
-                    table.insert(rows, new_row)
-                end
-            end
             table.insert(self.table_blocks, {
                 pos          = text_pos,
                 columns      = copyall(entry.columns),
@@ -193,25 +176,6 @@ function HyperTextAreaContent:rebuild_display_text()
             end
             -- Insert table block entry
             local tb = self.table_blocks[tbi]
-
-            -- Ensure a trailing empty row in the data so it persists
-            -- across saves and gives a visual blank line after the table.
-            if #tb.rows > 0 then
-                local last = tb.rows[#tb.rows]
-                local has_content = false
-                for _, cell in ipairs(last) do
-                    if cell and cell.text and cell.text ~= '' then
-                        has_content = true; break
-                    end
-                end
-                if has_content then
-                    local new_row = {}
-                    for _ in ipairs(tb.columns) do
-                        table.insert(new_row, { text = '', pen = nil, link = nil })
-                    end
-                    table.insert(tb.rows, new_row)
-                end
-            end
 
             table.insert(display, {
                 type         = 'table',
@@ -373,29 +337,13 @@ function HyperTextAreaContent:postComputeFrame()
     self:recomputeLines()
 end
 
-function HyperTextAreaContent:_ensure_table_trailing_row(rows, columns)
-    if #rows == 0 then return end
-    local last = rows[#rows]
-    local has_content = false
-    for _, cell in ipairs(last) do
-        if cell and cell.text and cell.text ~= '' then has_content = true; break end
-    end
-    if has_content then
-        local new_row = {}
-        for _ in ipairs(columns) do
-            table.insert(new_row, { text = '', pen = nil, link = nil })
-        end
-        table.insert(rows, new_row)
-    end
-end
-
 function HyperTextAreaContent:recomputeLines()
     if not self.frame_body then
         self.char_list = self:_build_char_list_with_fns(self.display_text)
         self.raw_text = HUtils.char_list_to_raw(self.char_list)
         return
     end
-    -- Sync trailing empty rows from table_blocks into display_text
+    -- Sync table data from table_blocks into display_text
     for _, entry in ipairs(self.display_text) do
         if HUtils.is_table_block(entry) then
             for _, tb in ipairs(self.table_blocks) do
@@ -721,6 +669,20 @@ function HyperTextAreaContent:onRenderBody(dc)
     local show_focus = not self:hasSelection() and (self.focus and gui.blink_visible(500))
     if show_focus then
         local cx, cy = self.wrapped_text:indexToCoords(self.cursor)
+        -- If cursor is at a table position, place it on the search bar after "SEARCH: "
+        for _, tb in ipairs(self.table_blocks) do
+            if tb.pos == self.cursor then
+                for _, tr in ipairs(self.wrapped_text.table_ranges) do
+                    if tr.entry.id == tb.id then
+                        cy = tr.start_line
+                        local q = tr.entry.search_query or ''
+                        cx = 9 + #q
+                        break
+                    end
+                end
+                break
+            end
+        end
         local draw_y = cy - start_y
         if draw_y >= 0 and draw_y < dc.height then
             dc:pen(COLOR_WHITE):seek(cx - 1, draw_y):string("_")
@@ -849,16 +811,8 @@ function HyperTextAreaContent:onInput(keys)
             local modifiers = dfhack.internal.getModifiers()
             local wx, wy = mx + 1, my + self.render_start_line_y
 
-            -- Don't start a drag selection on table lines
-            local tr = self.wrapped_text:get_table_at_line(wy)
-            if tr then
-                self.sel_end = nil
-                if tr.entry then
-                    local tb_pos = self:_find_table_pos(tr.entry.id)
-                    if tb_pos then
-                        self:setCursor(tb_pos)
-                    end
-                end
+            -- Skip table lines during drag — don't modify selection state
+            if self.wrapped_text:get_table_at_line(wy) then
                 return true
             end
 
@@ -937,13 +891,23 @@ function HyperTextAreaContent:onCursorInput(keys)
         local x, y = self.wrapped_text:indexToCoords(self.cursor)
         local last_x = self.last_cursor_x or x
         local target_y = y + 1
-        while target_y <= #self.wrapped_text.lines and (self.wrapped_text:is_table_line(target_y) or #self.wrapped_text.lines[target_y] == 0) do
+        while target_y <= #self.wrapped_text.lines and self.wrapped_text:is_table_line(target_y) do
             target_y = target_y + 1
         end
         if target_y <= #self.wrapped_text.lines then
             self:setCursor(self.wrapped_text:coordsToIndex(last_x, target_y))
         else
-            self:setCursor(#self.char_list + 1)
+            -- Past end: if the document ends with a table with no text after it,
+            -- insert a newline so the cursor can type below the table.
+            local last_entry = self.display_text[#self.display_text]
+            if last_entry and HUtils.is_table_block(last_entry) then
+                self.history:store(HISTORY_ENTRY.WHITESPACE_BLOCK, self.char_list, self.cursor, self.table_blocks, self.fn_blocks)
+                table.insert(self.char_list, {char = '\n', pen = self.active_pen, link = self.active_link})
+                self:setCursor(#self.char_list + 1)
+                self:updateContent()
+            else
+                self:setCursor(#self.char_list + 1)
+            end
         end
         self.last_cursor_x = last_x
         return true
