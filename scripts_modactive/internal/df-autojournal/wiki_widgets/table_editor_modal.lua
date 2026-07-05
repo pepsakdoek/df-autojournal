@@ -11,12 +11,21 @@
 --                Number columns (inferred from data) default to right align
 --   Data       – pipe-delimited rows (all rows are data)
 --
+-- A toolbar in the data area provides link and function insertion buttons,
+-- plus a colour picker for cell text.
+--
 -- Alt+S saves, Esc cancels.  Window is resizable.
 
 local gui     = require('gui')
 local widgets = require('gui.widgets')
 local Scrollbar = require('gui.widgets.scrollbar')
 local HyperTextAreaContent = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area_content').HyperTextAreaContent
+local LinkModal = reqscript('internal/df-autojournal/wiki_widgets/link_modal').LinkModal
+local FunctionModal = reqscript('internal/df-autojournal/wiki_widgets/function_modal').FunctionModal
+local wiki_functions = reqscript('internal/df-autojournal/wiki_functions')
+
+local LINK_ICON     = string.char(21)  -- §
+local FUNCTION_ICON = string.char(228) -- Σ
 
 -- ---------------------------------------------------------------------------
 -- Serialisation helpers
@@ -165,6 +174,7 @@ function TableEditorModal:init()
     local existing_cols = existing and existing.columns
     local existing_name = existing and existing.name or ''
     self._original_rows = copy_rows(existing and existing.rows)
+    self.selected_color = 15
 
     -- Table name – single line
     local name_text = existing_name ~= '' and existing_name or '(unnamed)'
@@ -176,15 +186,20 @@ function TableEditorModal:init()
         link_hover_pen = COLOR_WHITE,
     }
 
-    -- Column editor – HyperTextAreaContent so multi-line text renders
-    -- correctly in CP437 (each column on its own line).
+    -- Column editor – with scrollbar
     local col_text = columns_to_text(existing_cols)
+    self.col_render_start = 1
     self.col_editor = HyperTextAreaContent{
-        frame = {l=0, r=0, t=3, h=5},
+        frame = {l=0, r=1, t=3, h=6},
         display_text = { col_text },
         text_pen  = COLOR_LIGHTCYAN,
         link_pen  = COLOR_LIGHTBLUE,
         link_hover_pen = COLOR_WHITE,
+        on_text_change = function() self:updateColScrollbar() end,
+    }
+    self.col_scrollbar = Scrollbar{
+        frame = {r=0, t=3, h=6},
+        on_scroll = function(spec) self:onColScroll(spec) end,
     }
 
     -- Data editor
@@ -205,7 +220,7 @@ function TableEditorModal:init()
     self.data_render_start = 1
 
     self.data_editor = HyperTextAreaContent{
-        frame = {l=0, r=1, t=10, b=4},
+        frame = {l=1, r=1, t=11, b=4},
         display_text = { data_text == '' and '(empty table)' or data_text },
         text_pen  = COLOR_LIGHTCYAN,
         link_pen  = COLOR_LIGHTBLUE,
@@ -214,12 +229,12 @@ function TableEditorModal:init()
     }
 
     self.data_scrollbar = Scrollbar{
-        frame = {r=0, t=10, b=4},
+        frame = {r=0, t=11, b=4},
         on_scroll = function(spec) self:onDataScroll(spec) end,
     }
 
     self.max_rows_editor = HyperTextAreaContent{
-        frame = {l=29, r=0, b=2, h=1},
+        frame = {l=29, r=0, b=1, h=1},
         display_text = { max_rows_text },
         text_pen  = COLOR_LIGHTCYAN,
         link_pen  = COLOR_LIGHTBLUE,
@@ -228,9 +243,10 @@ function TableEditorModal:init()
 
     self:addviews{
         widgets.Window{
-            frame = {w=70, h=26},
+            frame = {w=70, h=30},
             frame_title = 'Edit Table',
             resizable = true,
+            resize_min = {w=60, h=22},
             subviews = {
                 widgets.Label{
                     frame = {t=0, l=0},
@@ -245,43 +261,78 @@ function TableEditorModal:init()
                     frame = {t=2, l=0},
                     text = {
                         {text = "Columns", pen = COLOR_YELLOW},
-                        "  name|align|stretch|min_width  (defaults: left, stretch, 10)",
+                        "  name|align|stretch|min_width",
                     },
                     pen = COLOR_GREY,
                 },
                 self.col_editor,
+                self.col_scrollbar,
                 widgets.Label{
-                    frame = {t=9, l=0},
+                    frame = {t=10, l=0},
                     text = {
                         {text = "Data", pen = COLOR_YELLOW},
-                        "  pipe | separated data rows",
+                        "  pipe | separated  ",
+                    },
+                    pen = COLOR_GREY,
+                },
+                -- Link & Function toolbar buttons
+                widgets.Label{
+                    view_id='toolbar_link',
+                    frame = {t=10, l=27, w=8},
+                    text = {
+                        {text = LINK_ICON, pen = COLOR_LIGHTBLUE},
+                        " Link ",
                     },
                     pen = COLOR_GREY,
                 },
                 widgets.Label{
-                    frame = {t=9, l=27},
+                    view_id='toolbar_fn',
+                    frame = {t=10, l=35, w=6},
                     text = {
-                        {text = "[text]", pen = COLOR_LIGHTCYAN},
-                        "(page) for links",
+                        {text = FUNCTION_ICON, pen = COLOR_GREEN},
+                        " Fn",
+                    },
+                    pen = COLOR_GREY,
+                },
+                widgets.Label{
+                    frame = {t=10, l=46},
+                    text = {
+                        {text = "[t]", pen = COLOR_LIGHTCYAN},
+                        "(p) links",
                     },
                     pen = COLOR_GREY,
                 },
                 self.data_editor,
                 self.data_scrollbar,
-                widgets.Label{
-                    frame = {b=2, l=0},
-                    text = {
-                        {text = "Max Rows", pen = COLOR_YELLOW},
-                        " (blank = show all):",
-                    },
-                    pen = COLOR_GREY,
+                -- Divider creating a status-bar section at the bottom
+                widgets.Divider{
+                    frame = {l=0, r=0, b=2, h=1},
+                    frame_style_l = false,
+                    frame_style_r = false,
+                    interior_l = true,
                 },
-                self.max_rows_editor,
+                widgets.Panel{
+                    frame = {b=1, l=0, r=0, h=1},
+                    frame_inset = {l=1, r=1},
+                    subviews = {
+                        widgets.Label{
+                            frame = {l=0},
+                            text = {
+                                {text = "Max Rows", pen = COLOR_YELLOW},
+                                " (blank = show all):",
+                            },
+                            pen = COLOR_GREY,
+                        },
+                        self.max_rows_editor,
+                    }
+                },
                 widgets.Label{
                     frame = {b=0, l=0},
                     text = {
                         {text = "Alt+S", pen = COLOR_LIGHTCYAN}, ": Save  ",
-                        {text = "Esc", pen = COLOR_LIGHTCYAN}, ": Cancel",
+                        {text = "Esc", pen = COLOR_LIGHTCYAN}, ": Cancel  ",
+                        {text = "Ctrl+Ins", pen = COLOR_LIGHTCYAN}, ": Link  ",
+                        {text = "Alt+Ins", pen = COLOR_LIGHTCYAN}, ": Function",
                     },
                     pen = COLOR_GREY,
                 },
@@ -299,6 +350,16 @@ function TableEditorModal:onInput(keys)
     end
     if keys.LEAVESCREEN then
         self:dismiss()
+        return true
+    end
+
+    -- Ctrl+Insert = insert link, Alt+Insert = insert function
+    if keys.CUSTOM_CTRL_INSERT then
+        if self.data_editor.focus then self:insertLink() end
+        return true
+    end
+    if keys.CUSTOM_ALT_INSERT then
+        if self.data_editor.focus then self:insertFunction() end
         return true
     end
 
@@ -322,22 +383,118 @@ function TableEditorModal:onInput(keys)
             self:updateDataScrollbar()
             return TableEditorModal.super.onInput(self, keys)
         end
+        -- Click on toolbar link/function icons
+        if self.data_editor.focus then
+            local win = self.subviews[1]
+            for _, sv in ipairs(win.subviews) do
+                if sv.view_id == 'toolbar_link' and sv:getMousePos() then
+                    self:insertLink(); return true
+                end
+                if sv.view_id == 'toolbar_fn' and sv:getMousePos() then
+                    self:insertFunction(); return true
+                end
+            end
+        end
         if self.max_rows_editor:getMousePos() then
             focus_editor(self.max_rows_editor)
             return TableEditorModal.super.onInput(self, keys)
         end
     end
 
-    if keys._MOUSE_WHEEL_DOWN and self.data_editor:getMousePos() then
-        self:onDataScroll('down_small')
-        return true
+    if keys._MOUSE_WHEEL_DOWN then
+        if self.data_editor:getMousePos() then
+            self:onDataScroll('down_small')
+            return true
+        end
+        if self.col_editor:getMousePos() then
+            self:onColScroll('down_small')
+            return true
+        end
     end
-    if keys._MOUSE_WHEEL_UP and self.data_editor:getMousePos() then
-        self:onDataScroll('up_small')
-        return true
+    if keys._MOUSE_WHEEL_UP then
+        if self.data_editor:getMousePos() then
+            self:onDataScroll('up_small')
+            return true
+        end
+        if self.col_editor:getMousePos() then
+            self:onColScroll('up_small')
+            return true
+        end
     end
 
     return TableEditorModal.super.onInput(self, keys)
+end
+
+function TableEditorModal:insertLink()
+    LinkModal{
+        on_submit = function(text, page)
+            local content = self.data_editor
+            local link_text = "[" .. text .. "](" .. page .. ")"
+            for i = 1, #link_text do
+                table.insert(content.char_list, content.cursor, {
+                    char = link_text:sub(i, i),
+                    pen = COLOR_LIGHTBLUE,
+                    link = page,
+                })
+                content.cursor = content.cursor + 1
+            end
+            content:updateContent()
+        end
+    }:show()
+end
+
+function TableEditorModal:insertFunction()
+    local fns = wiki_functions and wiki_functions.list_functions()
+    if not fns or #fns == 0 then return end
+    FunctionModal{
+        functions = fns,
+        context   = {},
+        on_submit = function(fn_key, args)
+            local content = self.data_editor
+            local fn_block = { fn_key = fn_key, args = args or {} }
+            local result = ''
+            if wiki_functions and wiki_functions.evaluate then
+                result = wiki_functions.evaluate(fn_block) or ''
+            end
+            if result ~= '' then
+                for i = 1, #result do
+                    table.insert(content.char_list, content.cursor, {
+                        char = result:sub(i, i),
+                        pen = COLOR_GREEN,
+                    })
+                    content.cursor = content.cursor + 1
+                end
+                content:updateContent()
+            end
+        end,
+    }:show()
+end
+
+function TableEditorModal:updateColScrollbar()
+    local lines_count = #self.col_editor.wrapped_text.lines
+    local view_h = self.col_editor.frame_body and self.col_editor.frame_body.height or 1
+    local clamped = math.max(1, math.min(self.col_render_start, lines_count - view_h + 1))
+    if view_h >= lines_count then clamped = 1 end
+    self.col_render_start = clamped
+    self.col_scrollbar:update(clamped, view_h, lines_count)
+    self.col_editor:setRenderStartLineY(clamped)
+end
+
+function TableEditorModal:onColScroll(scroll_spec)
+    local lines_count = #self.col_editor.wrapped_text.lines
+    local view_h = self.col_editor.frame_body and self.col_editor.frame_body.height or 1
+    local line = self.col_render_start
+    if     scroll_spec == 'down_large' then line = line + math.ceil(view_h / 2)
+    elseif scroll_spec == 'up_large'   then line = line - math.ceil(view_h / 2)
+    elseif scroll_spec == 'down_small' then line = line + 1
+    elseif scroll_spec == 'up_small'   then line = line - 1
+    else                                    line = tonumber(scroll_spec)
+    end
+    local clamped = math.max(1, math.min(line, lines_count - view_h + 1))
+    if view_h >= lines_count then clamped = 1 end
+    self.col_render_start = clamped
+    self.col_scrollbar:update(clamped, view_h, lines_count)
+    self.col_editor:setRenderStartLineY(clamped)
 end
 
 function TableEditorModal:updateDataScrollbar()

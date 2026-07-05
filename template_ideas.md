@@ -86,12 +86,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 # Code issues and other possible irritations and issues
 
 
-* Table editor:
-    * should be able to insert both links and functions into them (I think it already supports it programatically, but not the editor)
-    * We want the same UI as on the main toolbar to insert functions and links (but the output once entered can just be the 'raw' values like (link)[fortress] or however we define a function in the text)
-    * The column and row 'areas' should get scrollbars.
-    * Add a divider byween the Max Rows and the parts above it
-* Function editor needs to be resizable, and default a bit wider. We may want to add an actual 'line' to indicate the end of the function list vs the 'information bar' - we have a line, but it's somehow at the top rather than the bottom
+
 * We want a progressbar for the initialization process, and maybe during save (we must still determine the impact of the listener to the performance of the game, if it's heavy we should 'sync' changes when the wiki is opened or when the game is saved) - on a big fort we will want that progressbar anyway, because it can probably take 1 minute or so, as well as the HTML export (though maybe it can be 'asynchronous' - saving while you are continuing with the game)
 * We need support for pages that go down multiple levels - Because Citizens, Artifacts, Events, Enemies, Visitors are all actually sub sections of the Fort. The way it should be implemented:
     * At the moment every 'root' level page has left space for the [+]/[-] part (this should remain)
