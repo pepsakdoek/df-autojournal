@@ -248,6 +248,7 @@ local PAGE_PARENT_RULES = {
     {prefix='artifact:', parent='artifacts'},
     {prefix='civ:', parent='civilizations'},
     {prefix='fort:', parent='forts'},
+    {prefix='visitor:', parent='visitors'},
 }
 
 function get_page_parent(page_id)

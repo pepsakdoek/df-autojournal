@@ -95,6 +95,22 @@ local DEFAULT_SETTINGS = {
             notable_victories = true,
         }
     },
+    visitors = {
+        init = {
+            registry = true,
+            departed = true,
+            create_pages = false,
+        },
+        journal = {
+            track_traders = true,
+            track_entertainers = true,
+            track_scholars = true,
+            track_monster_slayers = true,
+            track_mercenaries = true,
+            track_diplomats = true,
+            track_petitioners = true,
+        }
+    },
     world = {
         init = {
             era_timeline = true,
@@ -125,6 +141,7 @@ local DEFAULT_JOURNAL = {
         siege_events = true,
     },
     enemies = { encounter_log = true, kill_list = true, notable_victories = true },
+    visitors = { track_traders = true, track_entertainers = true, track_scholars = true, track_monster_slayers = true, track_mercenaries = true, track_diplomats = true, track_petitioners = true },
     world = {},
 }
 
@@ -133,7 +150,7 @@ local json = require('json')
 
 local function has_init_structure(settings)
     if type(settings) ~= 'table' then return false end
-    for _, t in ipairs{'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies', 'world'} do
+    for _, t in ipairs{'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies', 'visitors', 'world'} do
         if type(settings[t]) == 'table' then
             if settings[t].init ~= nil then
                 return true

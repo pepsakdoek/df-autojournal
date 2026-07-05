@@ -13,6 +13,7 @@ local civ_template = reqscript('internal/df-autojournal/templates/civilization')
 local event_template = reqscript('internal/df-autojournal/templates/event')
 local timeline_template = reqscript('internal/df-autojournal/templates/timeline')
 local enemies_template = reqscript('internal/df-autojournal/templates/enemies')
+local visitors_template = reqscript('internal/df-autojournal/templates/visitors')
 local world_template = reqscript('internal/df-autojournal/templates/world')
 local civilizations_template = reqscript('internal/df-autojournal/templates/civilizations')
 local forts_index_template = reqscript('internal/df-autojournal/templates/forts')
@@ -518,6 +519,9 @@ function WikiInitializer:perform(screen)
         -- 6. Render Enemies page
         pcall(function() self:renderEnemiesPage() end)
 
+        -- 7. Render Visitors page
+        pcall(function() self:renderVisitorsPage() end)
+
         -- Set initialized flag
         logger.log("Setting mfw_initialized flag")
         dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
@@ -742,6 +746,143 @@ function WikiInitializer:renderEnemiesPage()
     local content = enemies_template.render(enemies, settings, kills)
     safe_save(self.context, 'enemies', utils.sanitize_content(content), 1)
     logger.log("Enemies page rendered with " .. #enemies .. " entries")
+end
+
+function WikiInitializer:renderVisitorsPage()
+    -- Scan visible non-citizen units for visitors currently on the map
+    local visitors = {}
+    local seen = {}
+
+    pcall(function()
+        local units = df.global.world.units.active or {}
+        for i = 0, #units - 1 do
+            local unit = units[i]
+            if unit and dfhack.units.isAlive(unit) and not dfhack.units.isCitizen(unit)
+                and not dfhack.units.isInvader(unit) and not dfhack.units.isAnimal(unit) then
+                -- Only include units that the game considers visitors/merchants/diplomats
+                local is_known_visitor = false
+                pcall(function() is_known_visitor = dfhack.units.isVisitor(unit) or dfhack.units.isMerchant(unit) or dfhack.units.isDiplomat(unit) end)
+                if not is_known_visitor then goto continue end
+
+                local name = utils.sanitize(dfhack.units.getReadableName(unit))
+                if name and name ~= "" then
+                    local key = name:lower():gsub("[^%w]", "_")
+                    if not seen[key] then
+                        seen[key] = true
+
+                        local visitor_type = "petitioner"
+                        pcall(function()
+                            local prof = dfhack.units.getProfessionName(unit) or ""
+                            local pl = prof:lower()
+                            if dfhack.units.isMerchant(unit) then
+                                visitor_type = "trader"
+                            elseif dfhack.units.isDiplomat(unit) then
+                                visitor_type = "diplomat"
+                            elseif pl:match("bard") or pl:match("poet") or pl:match("dancer") or pl:match("musician") or pl:match("performer") or pl:match("storyteller") or pl:match("entertain") then
+                                visitor_type = "entertainer"
+                            elseif pl:match("scholar") or pl:match("researcher") or pl:match("student") or pl:match("scientist") then
+                                visitor_type = "scholar"
+                            elseif pl:match("slayer") or pl:match("hunter") or pl:match("monster") then
+                                visitor_type = "monster_slayer"
+                            elseif pl:match("mercenary") or pl:match("soldier") or pl:match("sword") or pl:match("spear") or pl:match("crossbow") or pl:match("axe") then
+                                visitor_type = "mercenary"
+                            end
+                        end)
+
+                        table.insert(visitors, {
+                            name = name,
+                            visitor_type = visitor_type,
+                            first_year = df.global.cur_year,
+                            first_season = "",
+                            last_year = df.global.cur_year,
+                            last_season = "",
+                            encounters = 1,
+                            departed = false,
+                            notes = "",
+                        })
+                    end
+                end
+                ::continue::
+        end
+    end)
+
+    -- Merge with existing registry from persistent storage
+    local existing = {}
+    if event_listener.load_visitors then
+        existing = event_listener.load_visitors()
+    end
+    for _, v in ipairs(existing) do
+        local key = (v.name or ""):lower():gsub("[^%w]", "_")
+        if not seen[key] then
+            seen[key] = true
+            table.insert(visitors, v)
+        end
+    end
+
+    -- Save merged registry
+    pcall(function()
+        local save_data = {}
+        for _, v in ipairs(visitors) do
+            local key = (v.name or ""):lower():gsub("[^%w]", "_")
+            save_data[key] = v
+        end
+        dfhack.persistent.saveSiteData('mfw_visitors', {visitors=save_data})
+    end)
+
+    local settings = wiki_settings.get_settings().visitors or { init={registry=true, departed=true}, journal={} }
+    logger.log("renderVisitorsPage: settings.init.create_pages=" .. tostring(settings.init and settings.init.create_pages) .. ", visitors count=" .. #visitors)
+
+    -- Optionally create individual sub-pages for each visitor
+    local create_pages = settings.init and settings.init.create_pages
+    if create_pages and #visitors > 0 then
+        local ok_pages, err_pages = pcall(function()
+            logger.log("create_pages: starting for " .. #visitors .. " visitors")
+            local dynamic_pages = self.context:get_dynamic_pages()
+            logger.log("create_pages: loaded " .. #dynamic_pages .. " existing dynamic pages")
+            local had_new_pages = false
+            for _, v in ipairs(visitors) do
+                local safe_name = tostring(v.name or "")
+                if safe_name ~= "" then
+                    local page_key = safe_name:lower():gsub("[^%w]", "_")
+                    local page_id = "visitor:" .. page_key
+                    logger.log("create_pages: checking " .. page_id)
+                    local already = false
+                    for _, dp in ipairs(dynamic_pages) do
+                        if dp.id == page_id then already = true; break end
+                    end
+                    if not already then
+                        local page_content = {
+                            { text = "# " .. safe_name, pen = COLOR_YELLOW },
+                            "\n\n",
+                            { text = "Type: ", pen = COLOR_LIGHTCYAN },
+                            { text = (v.visitor_type or "unknown"), pen = COLOR_WHITE },
+                            "\n\n",
+                            { text = "## Visits", pen = COLOR_YELLOW },
+                            "\n",
+                        }
+                        safe_save(self.context, page_id, utils.sanitize_content(page_content), 1)
+                        table.insert(dynamic_pages, { text = safe_name, id = page_id })
+                        had_new_pages = true
+                        logger.log("create_pages: created page " .. page_id)
+                    end
+                end
+            end
+            if had_new_pages then
+                self.context:save_dynamic_pages(dynamic_pages)
+                logger.log("create_pages: saved " .. #dynamic_pages .. " dynamic pages")
+            end
+        end)
+        if not ok_pages then
+            logger.log_error("create_pages FAILED: " .. tostring(err_pages))
+        end
+    end
+
+    logger.log("renderVisitorsPage: about to render template")
+    local content = visitors_template.render(visitors, settings)
+    logger.log("renderVisitorsPage: template rendered, " .. #content .. " spans")
+    safe_save(self.context, 'visitors', utils.sanitize_content(content), 1)
+    logger.log("renderVisitorsPage: saved visitors root page")
+    logger.log("Visitors page rendered with " .. #visitors .. " entries")
 end
 
 return _ENV

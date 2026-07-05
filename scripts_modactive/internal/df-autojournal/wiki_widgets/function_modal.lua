@@ -39,8 +39,10 @@ function FunctionModal:init()
 
     self:addviews{
         widgets.Window{
-            frame = {w=50, h=24},
+            frame = {w=60, h=28},
             frame_title = 'Insert Function',
+            resizable = true,
+            resize_min = {w=50, h=20},
             subviews = {
                 widgets.Label{
                     frame = {t=0, l=0},
@@ -49,6 +51,9 @@ function FunctionModal:init()
                 self.fn_list,
                 self.desc_label,
                 self.arg_panel,
+                widgets.Divider{
+                    frame = {b=9, l=0, r=0},
+                },
                 widgets.Label{
                     frame = {b=0, l=0},
                     text = 'Enter: Insert | Esc: Cancel',

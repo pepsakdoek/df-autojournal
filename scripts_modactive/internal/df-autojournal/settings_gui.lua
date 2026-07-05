@@ -8,8 +8,8 @@ local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
 local CycleHotkeyLabel = require('gui.widgets').CycleHotkeyLabel
 local logger = reqscript('internal/df-autojournal/logger')
 
-local TEMPLATE_IDS = {'world', 'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies'}
-local TEMPLATE_LABELS = {'World', 'Civ', 'Fort', 'Citizen', 'Artifact', 'Event', 'Enemies'}
+local TEMPLATE_IDS = {'world', 'civ', 'fort', 'citizen', 'artifact', 'event', 'enemies', 'visitors'}
+local TEMPLATE_LABELS = {'World', 'Civ', 'Fort', 'Citizen', 'Artifact', 'Event', 'Enemies', 'Visitors'}
 local LABEL_WIDTH = 20
 
 local CYCLE_OPTIONS = {
@@ -126,6 +126,22 @@ local SETTING_DESCRIPTIONS = {
             encounter_log = "Auto-record threat encounters and invasions on the enemies page",
             kill_list = "Auto-record enemies and animals killed by the fort",
             notable_victories = "Auto-record when named enemies are defeated",
+        },
+    },
+    visitors = {
+        init = {
+            registry = "Show the visitor registry table with names, types and arrival details",
+            departed = "Show departure status (whether the visitor has left the fort)",
+            create_pages = "Create individual wiki pages for each visitor (off by default)",
+        },
+        journal = {
+            track_traders = "Record merchant caravan arrivals and departures",
+            track_entertainers = "Record bards, poets, dancers, musicians, and other performers",
+            track_scholars = "Record visiting scholars and researchers",
+            track_monster_slayers = "Record monster slayers and hunters passing through",
+            track_mercenaries = "Record mercenary companies and soldiers for hire",
+            track_diplomats = "Record diplomat visits and liaison arrivals",
+            track_petitioners = "Record petitions from long-term residents and settlers",
         },
     },
 }

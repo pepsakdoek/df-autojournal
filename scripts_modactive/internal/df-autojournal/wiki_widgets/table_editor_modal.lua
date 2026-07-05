@@ -76,9 +76,18 @@ local function data_to_text(rows, columns)
     for _, row in ipairs(rows) do
         local cells = {}
         for j = 1, ncols do
-            table.insert(cells, (row[j] and row[j].text) or '')
+            local cell = row[j]
+            local cell_text = (cell and cell.text) or ''
+            if cell and cell.link then
+                cell_text = '[' .. cell_text .. '](' .. cell.link .. ')'
+            end
+            table.insert(cells, cell_text)
         end
         table.insert(lines, table.concat(cells, '|'))
+    end
+    -- Ensure exactly one trailing blank row (for editing below last real row)
+    if lines[#lines] ~= '' then
+        table.insert(lines, '')
     end
     return table.concat(lines, '\n')
 end
@@ -96,6 +105,15 @@ local function read_text(editor)
     return rows
 end
 
+local function parse_cell_markup(text)
+    -- Parse [display](page-id) syntax
+    local display, link = text:match("^%[([^%]]+)%]%((.+)%)$")
+    if link then
+        return display, link
+    end
+    return text, nil
+end
+
 local function build_row_data(data_rows, col_count, original_rows)
     local rows = {}
     for i, row in ipairs(data_rows) do
@@ -103,9 +121,17 @@ local function build_row_data(data_rows, col_count, original_rows)
         for j = 1, col_count do
             local text = (row and row[j]) or ''
             local orig_cell = original_rows and original_rows[i] and original_rows[i][j]
+            local display_text, link = parse_cell_markup(text)
+            -- If no explicit markup and original cell had a link, check if text changed
+            if not link and orig_cell and orig_cell.link then
+                local orig_text = (orig_cell and orig_cell.text) or ''
+                if text == orig_text then
+                    link = orig_cell.link
+                    display_text = orig_cell.text
+                end
+            end
             local pen = orig_cell and orig_cell.pen or nil
-            local link = orig_cell and orig_cell.link or nil
-            table.insert(r, { text = text, pen = pen, link = link })
+            table.insert(r, { text = display_text, pen = pen, link = link })
         end
         table.insert(rows, r)
     end
@@ -232,6 +258,14 @@ function TableEditorModal:init()
                     },
                     pen = COLOR_GREY,
                 },
+                widgets.Label{
+                    frame = {t=9, l=27},
+                    text = {
+                        {text = "[text]", pen = COLOR_LIGHTCYAN},
+                        "(page) for links",
+                    },
+                    pen = COLOR_GREY,
+                },
                 self.data_editor,
                 self.data_scrollbar,
                 widgets.Label{
@@ -345,6 +379,16 @@ function TableEditorModal:submit()
     end
 
     local data_raw = read_text(self.data_editor)
+    -- Keep at most one trailing empty row for editing convenience
+    while #data_raw > 1 do
+        local last = data_raw[#data_raw]
+        local all_empty = true
+        for _, cell in ipairs(last) do
+            if cell and cell ~= '' then all_empty = false; break end
+        end
+        if all_empty then table.remove(data_raw)
+        else break end
+    end
     local rows
     if #data_raw >= 1 then
         rows = build_row_data(data_raw, #cols, self._original_rows)

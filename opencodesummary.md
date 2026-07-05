@@ -313,18 +313,92 @@ Flow for historical catch-up (during initialization):
      - Files in `internal/` directories are SKIPPED by foreach_module_script() (line 18 of
        script-manager.lua: `f.path:startswith('internal/')`)
 
+   DFHack persistent API (dfhack.persistent):
+     - saveSiteData(key, nil) effectively deletes a key (used in reset_all_data)
+     - getSiteData returns nil for missing keys (not an error)
+     - Keys used: mfw_p_<page_id> (content), mfw_settings (JSON-encoded),
+       mfw_event_timeline, mfw_enemies, mfw_seen_units, mfw_catchup_last_id,
+       mfw_initialized, mfw_dynamic_pages, mfw_window_frame
+
+   Interpreting Lua truthiness with DFHack input keys:
+     - keys._STRING is the typed character's code (0-255)
+     - CRITICAL: 0 is truthy in Lua! So `if keys._STRING then` catches both
+       printable chars AND backspace (which sends _STRING=0). Always check
+       `keys._STRING == 0` BEFORE `keys._STRING` for printable chars.
+
+   Dialog API (gui.dialogs vs gui):
+     - showYesNoPrompt lives in require('gui.dialogs'), NOT in require('gui')
+     - Signature: showYesNoPrompt(title, text, tcolor, on_accept, on_cancel, on_pause, on_settings)
+
+   Panel subviews lifecycle:
+     - Direct assignment `panel.subviews = {...}` does NOT set .parent on children
+       and does NOT call updateLayout(). This causes children to render with
+       stale/nil frame_body, potentially overlapping siblings.
+     - Proper replacement: clear old subviews' .parent, set new subviews' .parent,
+       then call panel:updateLayout() on each modified widget.
+     - When dynamically resizing a child panel, also update sibling frame attrs
+       to prevent overlap (desc_label, fn_list in function_modal).
+
+  HyperTextArea data architecture (hyper_text_area_content.lua):
+     - display_text is the canonical content: array of text spans, table blocks,
+       and function blocks.
+     - char_list is derived from display_text but SKIPS table blocks entirely
+       (tables have no character-level representation).
+     - table_blocks are extracted into a separate array with {pos, columns, rows,
+       sort_col, sort_asc, max_rows, id, search_query}. The `pos` field is the
+       character position in char_list where the table logically sits (between
+       surrounding text).
+     - fn_blocks similarly track function block positions.
+     - rebuild_display_text() merges char_list + table_blocks + fn_blocks back
+       into display_text for persistence.
+     - updateContent() rebuilds display_text and re-renders wrapped_text but does
+       NOT re-extract special blocks (table_blocks/fn_blocks persist in memory).
+
+   Table rendering (hyper_table.lua):
+     - calc_column_widths runs 3 phases: base widths from content → shrink
+       proportionally to fit → stretch remaining space.
+     - Proportional shrink: columns with more content overflow (text beyond
+       min_width) get a larger share of constrained space, replacing the old
+       equal-distribution that gave "Name" and "Age" the same width.
+     - render_row takes a row OBJECT (not an index), so filtered rows can be
+       passed directly during search.
+     - get_handler_at must account for search bar line offset when present.
+
+   Table search feature:
+     - Search query is stored in table_blocks (in-memory only, not persisted).
+     - Searching re-renders just the affected table via rerender_table() in
+       hyper_wrapped_text.lua, which replaces lines in-place and handles
+       insertion/removal if line count changes.
+     - Search input is routed when cursor is at a table boundary position
+       (cursor == tb.pos). Printable chars append to query, backspace removes,
+       escape clears. This intercept happens in onTextManipulationInput.
+
+   Table copy/paste:
+     - copy() was extended to serialize table blocks within the selection range
+       as pipe-delimited text (same format as table editor).
+     - Table positions in the selection are detected by checking tb.pos against
+       sel_from/sel_to ranges during char_list iteration.
+     - Visual selection highlighting was added for table lines by building a
+       table_selected_at[] line map from table_ranges.
+
+   Function modal dynamic layout (function_modal.lua):
+     - arg_panel height is dynamically set based on args_schema count.
+     - Sibling frames (desc_label, fn_list) must be shifted accordingly to
+       prevent overlap with the statusbar.
+     - updateLayout() must be called on each modified widget after frame changes.
+
 Widget dependencies:
    DFHack gui/gui.widgets (standard) + Custom widgets:
-     wiki_widgets/:
-       toolbar.lua, link_modal.lua, hyper_wrapped_text.lua,
-       hyper_text_area_content.lua, hyper_text_area.lua,
-       hyper_table.lua, table_editor_modal.lua, hta_utils.lua,
-       history_store.lua, hta_context.lua
+      wiki_widgets/:
+        toolbar.lua, link_modal.lua, hyper_wrapped_text.lua,
+        hyper_text_area_content.lua, hyper_text_area.lua,
+        hyper_table.lua, table_editor_modal.lua, hta_utils.lua,
+        history_store.lua, hta_context.lua
 
 Templates:
    templates/:
-     fort.lua, civilization.lua, citizen.lua, artifact.lua,
-     event.lua, timeline.lua, enemies.lua
+      fort.lua, civilization.lua, citizen.lua, artifact.lua,
+      event.lua, timeline.lua, enemies.lua
 
 
 # Agent instructions
@@ -334,3 +408,4 @@ Templates:
 * If on windows, use the sync_mod.bat file after changes so the user can test.
 * Significant Changes (not bugfixes, but features) to the HyperTextArea should also be noted in the relevant README.md file 
 * Ask the user to explore objects using gui/gm-editor if you are struggling to find the exact name for an object
+* Use git functions to read changes, but DO NOT COMMIT

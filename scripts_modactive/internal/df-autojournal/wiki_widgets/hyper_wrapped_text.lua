@@ -99,7 +99,10 @@ function HyperWrappedText:update(display_text, wrap_width, fn_evaluator)
                 max_rows     = entry.max_rows,
                 search_query = entry.search_query or '',
             }
-            tbl:sort_column_internal()
+            -- Do NOT sort here — sort only on explicit header click.
+            -- Re-sorting on every render (including resize) causes dynamic
+            -- function-valued cells to re-order on each re-evaluation.
+            -- tbl:sort_column_internal()
 
             local tbl_lines, tbl_spans = tbl:render(wrap_width)
             local start_line = #self.lines + 1

@@ -202,6 +202,81 @@ local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeat
     pcall(dfhack.persistent.saveSiteData, ENEMIES_KEY, {enemies=data.enemies})
 end
 
+local VISITORS_KEY = 'mfw_visitors'
+
+local function register_visitor(visitor_name, visitor_type, year, season, has_departed)
+    if not visitor_name or visitor_name == "" then return end
+
+    local data = {}
+    local ok_load = pcall(function()
+        local raw = dfhack.persistent.getSiteData(VISITORS_KEY)
+        if raw and raw.visitors then
+            data.visitors = raw.visitors
+        end
+    end)
+    if not ok_load or not data.visitors then
+        data.visitors = {}
+    end
+
+    local key = visitor_name:lower():gsub("[^%w]", "_")
+    local record = data.visitors[key]
+
+    if record then
+        record.encounters = (record.encounters or 1) + 1
+        record.last_year = year
+        record.last_season = season or ""
+        if has_departed then
+            record.departed = true
+        elseif record.departed then
+            record.departed = false
+        end
+    else
+        record = {
+            name = visitor_name,
+            visitor_type = visitor_type or "unknown",
+            first_year = year,
+            first_season = season or "",
+            last_year = year,
+            last_season = season or "",
+            encounters = 1,
+            departed = has_departed or false,
+            notes = "",
+        }
+        data.visitors[key] = record
+    end
+
+    pcall(dfhack.persistent.saveSiteData, VISITORS_KEY, {visitors=data.visitors})
+end
+
+local function load_visitors()
+    local data = {}
+    local ok = pcall(function()
+        local raw = dfhack.persistent.getSiteData(VISITORS_KEY)
+        if raw and raw.visitors then
+            local list = {}
+            for _, rec in pairs(raw.visitors) do
+                table.insert(list, rec)
+            end
+            table.sort(list, function(a, b)
+                local ay = a.last_year or a.first_year or 0
+                local by = b.last_year or b.first_year or 0
+                return ay > by
+            end)
+            data = list
+        end
+    end)
+    return data
+end
+
+--- Check if a visitor type is enabled in settings.
+local function is_visitor_type_enabled(visitor_type)
+    local settings = mfw_settings.get_settings()
+    local vj = settings.visitors and settings.visitors.journal
+    if not vj then return false end
+    local key = "track_" .. (visitor_type or "unknown")
+    return vj[key] == true
+end
+
 --- Load enemy kill data aggregated from the registry.
 --- Returns a table keyed by normalized enemy name: { count, victims[] }
 local function load_enemy_kills()
@@ -291,6 +366,17 @@ local function route_parsed(parsed)
             parsed.year or df.global.cur_year,
             parsed.enemy_defeated or false,
             kill_inc
+        )
+    end
+
+    -- Register visitor if this event has a visitor name (and type is enabled in settings)
+    if parsed.visitor_name and is_visitor_type_enabled(parsed.visitor_type) then
+        register_visitor(
+            parsed.visitor_name,
+            parsed.visitor_type or "unknown",
+            parsed.year or df.global.cur_year,
+            parsed.season or "",
+            false
         )
     end
 end
@@ -505,6 +591,9 @@ EventListener.register_timeline_entry = register_timeline_entry
 EventListener.register_enemy_encounter = register_enemy_encounter
 EventListener.load_enemies = load_enemies
 EventListener.load_enemy_kills = load_enemy_kills
+EventListener.register_visitor = register_visitor
+EventListener.load_visitors = load_visitors
+EventListener.is_visitor_type_enabled = is_visitor_type_enabled
 
 -- Export EventListener functions to the module environment so reqscript callers
 -- find them.  DFHack returns _ENV for --@ module = true scripts.

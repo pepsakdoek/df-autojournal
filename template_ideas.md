@@ -8,14 +8,34 @@ This is just a list of ideas of things that might be of interest to users, and m
 * List of inhabited landmasses doesn't show
 * Era doesn't show
 
-# Civilisation
 
-# Fort(s)
+# Civilization Root Template
+
+* Add a total Population 
+
+# Civilization Template 
+
+* Diplomatic Relations
+* Ethics and Values
+* Major History (we should probably remove this - though it could be cool?)
+
+
+# Forts Root Page
+
+# Fort Template
 
 * Add the continent and the general area's name to the fort template. 
     * Maybe put the fort's position on the world map in terms of compass directions as well:
     * Fort XXX is located in the west of the world (maybe give world name). Or Central
     * Maybe describe the general temperature? Does it snow or not?
+* Existing Headings should work
+    * Economic links (maybe it's working and my current test fort just doesn't have it)
+    * Infrastructure & Districts
+        * A function for allocated bedrooms
+        * A function for unallocated bedrooms
+        * A guildhalls table
+        * Defense status could be added (like count of traps, and a list of military squads)
+        * History & Timeline should be combined with Fort Timeline (they are the same, and should come last in the template)
 * Fort should maybe be the default 'homepage' for the player, meaning all important-ish things gets logged here.
     * Artifacts that get generated here
     * Immigrations
@@ -29,8 +49,13 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 * Fort 'founding' is linked to when it gets journaled/initialized and not the actual founding date. 
 
+# Citizen Root page
 
-# Citizen
+* Maybe should be called Citizens and Visitors?
+* Currently says Total Citizens, but I assume those are 'alive' and not dead ones.
+
+
+# Citizen Template
 
 * Now that we have functions, change the birth year to age
 * Get the actual arrival date per citizen (especially on initialization)
@@ -56,18 +81,15 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
-
-* I can't copy and paste tables (even the display parts)
+* Tables should always add a row below it so that I can select everything to copy and paste it -- I think at the moment it's an invisible row (a previous attempt to fix it). I do not want an invisible row, I want a 'non table' row below each table so that I can move the cursor below the table.
 * Table editor should be able to insert both links and functions into them (I think it already supports it programatically, but not the editor)
-* FEATURE: HyperTextArea tables should have a field at the top that searches. (it should match all fields in the table)
-    * Essentially it should search the whole 'row' of a table (could be a concatenated string) and if it hits any of the fields it's included
-    * For all tables longer than 10 entries (total entries not 'just' displayed entries), it should have the word: "SEARCH:" at the top and when you select the table the cursor should move there. Blank shows all
-    * The user should be able to disable / remove the search bar in the edit table UI, but by default all tables should have it
-    * Don't link it to a hotkey, it must be dependent on where the cursor is. (in the table or 'outside it') 
+    * We want the same UI as on the main toolbar to insert functions and links (but the output once entered can just be the 'raw' values like (link)[fortress] or however we define a function in the text)
+* Function editor needs to be resizable, and default a bit wider. We may want to add an actual 'line' to indicate the end of the function list vs the 'information bar' - we have a line, but it's somehow at the top rather than the bottom
+* We want a progressbar for the initialization process, and maybe during save (we must still determine the impact of the listener to the performance of the game, if it's heavy we should 'sync' changes when the wiki is opened or when the game is saved) - on a big fort we will want that progressbar anyway, because it can probably take 1 minute or so.
+
+* Inititializing needs an option to include dead dwarfs (should be off by default)
+
+-- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export
-* Function editor probably needs to be resizable, and default a bit wider. We may want to add an actual 'line' to indicate the end of the function list vs the 'information bar' 
-* We probably want a progressbar for the initialization process, and maybe during save (we must still determine the impact of the listener to the performance of the game, if it's heavy we should 'sync' changes when the wiki is opened or when the game is saved) - on a big fort we will want that progressbar anyway, because it can probably take 1 minute or so.
-
-
 
     

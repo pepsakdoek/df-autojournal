@@ -323,16 +323,48 @@ function EventParser._format_achievement_entry(report_text, report_obj, event_ty
     return entry_line(date .. ": " .. name_part .. text)
 end
 
+local function extract_visitor_name(report_text)
+    if not report_text then return nil end
+    local safe = sanitize_report_text(report_text)
+    -- Try to find a named visitor: "The bard Some Name arrives" or "Some Name, a scholar"
+    local name = safe:match("^The [%w_]+ ([%w%s]+) arrives")
+        or safe:match("^([%w%s]+), a [%w_]+")
+        or safe:match("^([%w%s]+) has arrived")
+        or safe:match("caravan from ([%w%s]+) has arrived")
+    if name then return name:gsub("^%s*(.-)%s*$", "%1") end
+    -- Fallback: first phrase before punctuation
+    name = safe:match("^(.-)[%.:!]")
+    return name and name:gsub("^%s*(.-)%s*$", "%1") or nil
+end
+
 function EventParser._format_social_entry(report_text, report_obj, event_type)
     local date = formatted_date(df.global.cur_year, df.global.cur_year_tick)
     local text = sanitize_report_text(report_text) or event_type
-    return entry_line(date .. ": " .. text)
+    local visitor_name = nil
+    if event_type == "guest_arrival" then
+        local unit = extract_speaker_from_report(report_obj)
+        if unit then
+            visitor_name = utils.sanitize(dfhack.units.getReadableName(unit))
+        else
+            visitor_name = extract_visitor_name(report_text)
+        end
+    end
+    return entry_line(date .. ": " .. text), visitor_name
 end
 
 function EventParser._format_trade_entry(report_text, report_obj, event_type)
     local date = formatted_date(df.global.cur_year, df.global.cur_year_tick)
     local text = sanitize_report_text(report_text) or event_type
-    return entry_line(date .. ": " .. text)
+    local visitor_name = nil
+    local visitor_type = nil
+    if event_type:match("caravan") or event_type:match("merchant") then
+        visitor_name = event_type
+        visitor_type = "trader"
+    elseif event_type:match("diplomat") or event_type:match("liaison") then
+        visitor_name = extract_visitor_name(report_text) or event_type
+        visitor_type = "diplomat"
+    end
+    return entry_line(date .. ": " .. text), visitor_name, visitor_type
 end
 
 function EventParser._format_crisis_entry(report_text, report_obj, event_type)
@@ -388,9 +420,13 @@ local function make_result(info, entry, extra_targets, enemy_name, enemy_type, e
         table.insert(targets, { page_id = "events", section = "Achievements", entry = entry })
     elseif info.category == "social" then
         table.insert(targets, { page_id = "events", section = "Social Events", entry = entry })
+        if info.type == "guest_arrival" then
+            table.insert(targets, { page_id = "visitors", section = "Visitor Log", entry = entry })
+        end
     elseif info.category == "trade" then
         table.insert(targets, { page_id = "fort", section = "Trade & Diplomacy", entry = entry })
         table.insert(targets, { page_id = "events", section = "Fort Timeline", entry = entry })
+        table.insert(targets, { page_id = "visitors", section = "Visitor Log", entry = entry })
     elseif info.category == "crisis" then
         table.insert(targets, { page_id = "events", section = "Incidents & Crises", entry = entry })
     elseif info.category == "military" then
@@ -469,14 +505,17 @@ function EventParser.parse_report(report_type, report_text, report_obj)
     local entry = nil
     local enemy_name = nil
     local enemy_type = nil
+    local visitor_name = nil
+    local visitor_type = nil
     if info.category == "threat" then
         entry, enemy_name, enemy_type = EventParser._format_threat_entry(report_text, report_obj, info.type)
     elseif info.category == "achievement" then
         entry = EventParser._format_achievement_entry(report_text, report_obj, info.type)
     elseif info.category == "social" then
-        entry = EventParser._format_social_entry(report_text, report_obj, info.type)
+        entry, visitor_name = EventParser._format_social_entry(report_text, report_obj, info.type)
+        if visitor_name then visitor_type = "entertainer" end
     elseif info.category == "trade" then
-        entry = EventParser._format_trade_entry(report_text, report_obj, info.type)
+        entry, visitor_name, visitor_type = EventParser._format_trade_entry(report_text, report_obj, info.type)
     elseif info.category == "crisis" then
         entry = EventParser._format_crisis_entry(report_text, report_obj, info.type)
     elseif info.category == "military" then
@@ -491,7 +530,12 @@ function EventParser.parse_report(report_type, report_text, report_obj)
 
     if not entry then return nil end
 
-    return make_result(info, entry, nil, enemy_name, enemy_type)
+    local result = make_result(info, entry, nil, enemy_name, enemy_type)
+    if visitor_name then
+        result.visitor_name = visitor_name
+        result.visitor_type = visitor_type or "unknown"
+    end
+    return result
 end
 
 ---------------------------------------------------------------------------

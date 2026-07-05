@@ -117,10 +117,28 @@ function HyperTextAreaContent:_extract_special_blocks()
             elseif id >= self._next_table_id then
                 self._next_table_id = id + 1
             end
+            local rows = copyall(entry.rows)
+            -- Ensure a trailing empty row in the data so it persists
+            if #rows > 0 then
+                local last = rows[#rows]
+                local has_content = false
+                for _, cell in ipairs(last) do
+                    if cell and cell.text and cell.text ~= '' then
+                        has_content = true; break
+                    end
+                end
+                if has_content then
+                    local new_row = {}
+                    for _ in ipairs(entry.columns) do
+                        table.insert(new_row, { text = '', pen = nil, link = nil })
+                    end
+                    table.insert(rows, new_row)
+                end
+            end
             table.insert(self.table_blocks, {
                 pos          = text_pos,
                 columns      = copyall(entry.columns),
-                rows         = copyall(entry.rows),
+                rows         = rows,
                 sort_col     = entry.sort_col,
                 sort_asc     = entry.sort_asc,
                 max_rows     = entry.max_rows,
@@ -175,6 +193,26 @@ function HyperTextAreaContent:rebuild_display_text()
             end
             -- Insert table block entry
             local tb = self.table_blocks[tbi]
+
+            -- Ensure a trailing empty row in the data so it persists
+            -- across saves and gives a visual blank line after the table.
+            if #tb.rows > 0 then
+                local last = tb.rows[#tb.rows]
+                local has_content = false
+                for _, cell in ipairs(last) do
+                    if cell and cell.text and cell.text ~= '' then
+                        has_content = true; break
+                    end
+                end
+                if has_content then
+                    local new_row = {}
+                    for _ in ipairs(tb.columns) do
+                        table.insert(new_row, { text = '', pen = nil, link = nil })
+                    end
+                    table.insert(tb.rows, new_row)
+                end
+            end
+
             table.insert(display, {
                 type         = 'table',
                 columns      = tb.columns,
@@ -335,11 +373,38 @@ function HyperTextAreaContent:postComputeFrame()
     self:recomputeLines()
 end
 
+function HyperTextAreaContent:_ensure_table_trailing_row(rows, columns)
+    if #rows == 0 then return end
+    local last = rows[#rows]
+    local has_content = false
+    for _, cell in ipairs(last) do
+        if cell and cell.text and cell.text ~= '' then has_content = true; break end
+    end
+    if has_content then
+        local new_row = {}
+        for _ in ipairs(columns) do
+            table.insert(new_row, { text = '', pen = nil, link = nil })
+        end
+        table.insert(rows, new_row)
+    end
+end
+
 function HyperTextAreaContent:recomputeLines()
     if not self.frame_body then
         self.char_list = self:_build_char_list_with_fns(self.display_text)
         self.raw_text = HUtils.char_list_to_raw(self.char_list)
         return
+    end
+    -- Sync trailing empty rows from table_blocks into display_text
+    for _, entry in ipairs(self.display_text) do
+        if HUtils.is_table_block(entry) then
+            for _, tb in ipairs(self.table_blocks) do
+                if tb.id == entry.id then
+                    entry.rows = tb.rows
+                    break
+                end
+            end
+        end
     end
     self.wrapped_text:update(
         self.display_text,

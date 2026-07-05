@@ -205,6 +205,28 @@ local function compare_cells(a, b)
     return ta:lower() < tb:lower()
 end
 
+local function is_empty_row(row)
+    for _, cell in ipairs(row) do
+        if cell and cell.text and cell.text ~= '' then return false end
+    end
+    return true
+end
+
+local function sort_with_empty_guard(rows, col, asc)
+    table.sort(rows, function(a, b)
+        local ea, eb = is_empty_row(a), is_empty_row(b)
+        if ea and eb then return false end
+        if ea then return false end
+        if eb then return true end
+        local ca, cb = a[col], b[col]
+        if asc then
+            return compare_cells(ca, cb)
+        else
+            return compare_cells(cb, ca)
+        end
+    end)
+end
+
 -- ---------------------------------------------------------------------------
 -- Sorting
 -- ---------------------------------------------------------------------------
@@ -212,16 +234,7 @@ end
 -- Apply the current sort_col/sort_asc state without toggling.
 function HyperTable:sort_column_internal()
     if self.sort_col and self.sort_col > 0 then
-        local col = self.sort_col
-        local asc = self.sort_asc
-        table.sort(self.rows, function(a, b)
-            local ca, cb = a[col], b[col]
-            if asc then
-                return compare_cells(ca, cb)
-            else
-                return compare_cells(cb, ca)
-            end
-        end)
+        sort_with_empty_guard(self.rows, self.sort_col, self.sort_asc)
     end
 end
 
@@ -233,15 +246,7 @@ function HyperTable:sort_column(col_idx)
         self.sort_col = col_idx
         self.sort_asc = true
     end
-    local asc = self.sort_asc
-    table.sort(self.rows, function(a, b)
-        local ca, cb = a[col_idx], b[col_idx]
-        if asc then
-            return compare_cells(ca, cb)
-        else
-            return compare_cells(cb, ca)
-        end
-    end)
+    sort_with_empty_guard(self.rows, col_idx, self.sort_asc)
 end
 
 -- ---------------------------------------------------------------------------

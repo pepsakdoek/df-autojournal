@@ -25,6 +25,7 @@ local PAGES = {
     {text='Artifacts', id='artifacts'},
     {text='Events', id='events'},
     {text='Enemies', id='enemies'},
+    {text='Visitors', id='visitors'},
 }
 
 WikiWindow = defclass(WikiWindow, widgets.Window)
@@ -337,7 +338,7 @@ function WikiContext:reset_all_data()
     end
     local keys_to_clear = {
         'initialized', 'catchup_last_id', 'event_timeline', 'enemies',
-        'seen_units', 'dynamic_pages',
+        'visitors', 'seen_units', 'dynamic_pages',
     }
     for _, suffix in ipairs(keys_to_clear) do
         clear_key(self.save_prefix .. suffix)
