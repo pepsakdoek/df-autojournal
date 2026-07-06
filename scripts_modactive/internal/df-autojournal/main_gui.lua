@@ -22,11 +22,6 @@ local PAGES = {
     {text='World', id='world'},
     {text='Civilizations', id='civilizations'},
     {text='Forts', id='forts'},
-    {text='Citizens', id='citizens'},
-    {text='Artifacts', id='artifacts'},
-    {text='Events', id='events'},
-    {text='Enemies', id='enemies'},
-    {text='Visitors', id='visitors'},
 }
 
 WikiWindow = defclass(WikiWindow, widgets.Window)
@@ -382,7 +377,7 @@ WikiScreen.ATTRS {
 
 function WikiScreen:init()
     self.context = WikiContext{}
-    self.current_page_id = 'fort'
+    self.current_page_id = 'fort:' .. tostring(utils.get_site_id() or '')
     self.expanded = {}
 
     -- Start background chronicle if not already running
@@ -410,7 +405,13 @@ end
 function WikiScreen:refreshPageList()
     local dynamic = self.context:get_dynamic_pages()
 
-    local page_tree = wiki_widgets.build_page_tree(PAGES, dynamic)
+    local membership = {}
+    pcall(function()
+        local data = dfhack.persistent.getSiteData('mfw_fort_members')
+        if data and data.members then membership = data.members end
+    end)
+
+    local page_tree = wiki_widgets.build_page_tree(PAGES, dynamic, membership)
     local flat = wiki_widgets.flatten_page_tree(page_tree, self.expanded)
 
     local list = self.subviews.wiki_window.subviews.wiki_page_list
@@ -479,6 +480,7 @@ function WikiScreen:performInitialization()
             'World page',
             'Citizens',
             'Artifacts',
+            'Creating section pages',
             'Saving dynamic pages',
             'Historical catch-up',
             'Finalizing',
@@ -527,7 +529,8 @@ function WikiScreen:onPageChange(page_id, no_save)
     -- Set editor context based on page type (for function arg pre-fill)
     local editor = self.subviews.wiki_window.subviews.editor
     local ctx = {}
-    local prefix, id = page_id:match("^(%a+):(%d+)$")
+    local entity_id = page_id:match('/([^/]+)$') or page_id
+    local prefix, id = entity_id:match("^(%a+):(%d+)$")
     if prefix and id then
         if prefix == 'citizen' then
             local uid = tonumber(id)

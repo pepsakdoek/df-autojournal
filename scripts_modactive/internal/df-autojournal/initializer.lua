@@ -21,6 +21,7 @@ local forts_index_template = reqscript('internal/df-autojournal/templates/forts'
 
 local KNOWN_CIVS_KEY = 'mfw_known_civs'
 local KNOWN_FORTS_KEY = 'mfw_known_forts'
+local FORT_MEMBERS_KEY = 'mfw_fort_members'
 
 local function safe_save(context, page_id, content, cursor)
     local ok, err = pcall(context.save_content, context, page_id, content, cursor)
@@ -57,6 +58,19 @@ local function save_known_forts(forts)
     pcall(dfhack.persistent.saveSiteData, KNOWN_FORTS_KEY, {forts=forts})
 end
 
+local function load_fort_members()
+    local members = {}
+    pcall(function()
+        local raw = dfhack.persistent.getSiteData(FORT_MEMBERS_KEY)
+        if raw and raw.members then members = raw.members end
+    end)
+    return members
+end
+
+local function save_fort_members(members)
+    pcall(dfhack.persistent.saveSiteData, FORT_MEMBERS_KEY, {members=members})
+end
+
 WikiInitializer = defclass(WikiInitializer)
 
 function WikiInitializer:init(args)
@@ -74,6 +88,7 @@ function WikiInitializer:perform(screen)
         self:_step_world()
         self:_step_citizens()
         self:_step_artifacts()
+        self:_step_create_sections()
         self:_step_save_dynamic()
         self:_step_events_and_catchup()
         self:_step_finalize()
@@ -92,6 +107,7 @@ end
 
 function WikiInitializer:_step_setup()
     self._site_id = utils.get_site_id()
+    self._membership_map = {}
     logger.log("Current Site ID: " .. tostring(self._site_id))
     if not self._site_id or self._site_id == -1 then
         logger.log_error("No valid site ID found. Initialization aborted.")
@@ -355,6 +371,8 @@ function WikiInitializer:_step_citizens()
         return
     end
 
+    local fort_section = 'fort:' .. self._site_id .. '/citizens'
+
     logger.log("Found " .. #units .. " total active units.")
     local citizen_rows = {}
     for i = 0, #units - 1 do
@@ -363,6 +381,7 @@ function WikiInitializer:_step_citizens()
             local raw_name = dfhack.units.getReadableName(unit)
             local name = utils.sanitize(raw_name)
             local id = 'citizen:' .. tostring(unit.id)
+            self._membership_map[id] = fort_section
 
             table.insert(citizens, {name=name, id=id})
             table.insert(self._dynamic_pages, {text=name, id=id})
@@ -414,6 +433,7 @@ function WikiInitializer:_step_citizens()
         rows = citizen_rows
     })
     safe_save(self.context, 'citizens', utils.sanitize_content(citizen_root), 1)
+    safe_save(self.context, 'fort:' .. self._site_id .. '/citizens', utils.sanitize_content(citizen_root), 1)
 end
 
 function WikiInitializer:_step_artifacts()
@@ -443,6 +463,7 @@ function WikiInitializer:_step_artifacts()
         if pos then
             local name = utils.sanitize(dfhack.items.getReadableDescription(item))
             local id = 'artifact:' .. tostring(art_record.id)
+            self._membership_map[id] = 'fort:' .. self._site_id .. '/artifacts'
             logger.log("Found artifact on site: " .. name .. " (ID: " .. art_record.id .. ")")
             table.insert(artifacts, {name=name, id=id})
             self._dynamic_pages[#self._dynamic_pages + 1] = {text=name, id=id}
@@ -500,11 +521,44 @@ function WikiInitializer:_step_artifacts()
         max_rows = 50,
     })
     safe_save(self.context, 'artifacts', utils.sanitize_content(artifact_root), 1)
+    safe_save(self.context, 'fort:' .. self._site_id .. '/artifacts', utils.sanitize_content(artifact_root), 1)
+end
+
+function WikiInitializer:_step_create_sections()
+    local fort_id = 'fort:' .. self._site_id
+    local function capitalize(str)
+        return str:gsub("^%l", string.upper)
+    end
+
+    -- Desired order: Citizens, Artifacts, Events, Visitors, Enemies
+    local all_sections = {
+        {id = fort_id .. '/citizens',  title = 'Citizens'},
+        {id = fort_id .. '/artifacts', title = 'Artifacts'},
+        {id = fort_id .. '/events',    title = 'Events'},
+        {id = fort_id .. '/visitors',  title = 'Visitors'},
+        {id = fort_id .. '/enemies',   title = 'Enemies'},
+    }
+    for _, sec in ipairs(all_sections) do
+        -- Citizens and Artifacts were already saved during their steps; skip saving
+        local already_saved = sec.id:match('/citizens$') or sec.id:match('/artifacts$')
+        if not already_saved then
+            local content = {
+                { text = '# ' .. sec.title, pen = COLOR_YELLOW },
+                "\n\n",
+                { text = 'This fort\'s ' .. sec.title:lower() .. '.', pen = COLOR_WHITE },
+                "\n",
+            }
+            safe_save(self.context, sec.id, utils.sanitize_content(content), 1)
+            logger.log("Created section page: " .. sec.id)
+        end
+        table.insert(self._dynamic_pages, {text=sec.title, id=sec.id})
+    end
 end
 
 function WikiInitializer:_step_save_dynamic()
     logger.log("Saving " .. #self._dynamic_pages .. " dynamic pages...")
     self.context:save_dynamic_pages(self._dynamic_pages)
+    save_fort_members(self._membership_map)
 end
 
 function WikiInitializer:_step_events_and_catchup()
@@ -552,6 +606,7 @@ function WikiInitializer:perform_async()
             {name='World page',                     fn=function() self:_step_world() end},
             {name='Citizens',                       fn=function() self:_step_citizens() end},
             {name='Artifacts',                      fn=function() self:_step_artifacts() end},
+            {name='Creating section pages',         fn=function() self:_step_create_sections() end},
             {name='Saving dynamic pages',           fn=function() self:_step_save_dynamic() end},
             {name='Historical catch-up',            fn=function() self:_step_events_and_catchup() end},
             {name='Finalizing',                     fn=function() self:_step_finalize() end},
@@ -618,6 +673,16 @@ function WikiInitializer:catchUpEvents(site_id)
 
     logger.log("Catch-up: scanning events " .. last_done .. " to " .. current_max)
 
+    -- Map generic page_ids to this fort's section pages
+    local function fortify(id)
+        if id == "fort" then return "fort:" .. site_id
+        elseif id == "events" then return "fort:" .. site_id .. "/events"
+        elseif id == "enemies" then return "fort:" .. site_id .. "/enemies"
+        elseif id == "visitors" then return "fort:" .. site_id .. "/visitors"
+        end
+        return id
+    end
+
     local batch_size = 500
     local total_scanned = 0
     local total_matched = 0
@@ -644,7 +709,7 @@ function WikiInitializer:catchUpEvents(site_id)
             local parsed = event_parser.parse(ev)
             if parsed and parsed.page_id then
                 local entry_text = "* " .. parsed.text .. "\n"
-                event_listener.append_to_page(parsed.page_id, parsed.section, entry_text)
+                event_listener.append_to_page(fortify(parsed.page_id), parsed.section, entry_text)
                 total_matched = total_matched + 1
 
                 -- Register in timeline registry

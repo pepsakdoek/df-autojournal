@@ -10,10 +10,11 @@ local widgets = require('gui.widgets')
 LinkModal = defclass(LinkModal, gui.ZScreen)
 LinkModal.ATTRS {
     on_submit = DEFAULT_NIL,
+    pages = DEFAULT_NIL,
 }
 
 function LinkModal:init()
-    local pages = {"world", "civilizations", "forts", "citizens", "artifacts", "events", "enemies"}
+    local pages = self.pages or {"world", "civilizations", "forts"}
     
     self.text_input = widgets.EditField{
         frame = {t=1, l=0, r=0},

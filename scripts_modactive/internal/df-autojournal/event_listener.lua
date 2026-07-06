@@ -6,6 +6,7 @@
 local logger = reqscript('internal/df-autojournal/logger')
 local event_parser = reqscript('internal/df-autojournal/event_parser')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
+local utils = reqscript('internal/df-autojournal/wiki_utils')
 
 local LISTENER_KEY = 'mfw_auto_journal_enabled'
 local SEEN_UNITS_KEY = 'mfw_seen_units'
@@ -339,19 +340,36 @@ local function is_enemies_section_enabled(section_title)
 end
 
 --- Route a parsed event result to all its target pages
+local function fortify_page_id(page_id)
+    -- Route generic root page_ids to the current fort's section pages
+    if page_id == "fort" then
+        return "fort:" .. utils.get_site_id()
+    elseif page_id == "events" then
+        return "fort:" .. utils.get_site_id() .. "/events"
+    elseif page_id == "enemies" then
+        return "fort:" .. utils.get_site_id() .. "/enemies"
+    elseif page_id == "visitors" then
+        return "fort:" .. utils.get_site_id() .. "/visitors"
+    end
+    return page_id
+end
+
 local function route_parsed(parsed)
     if not parsed or not parsed.targets then return end
 
     -- Skip if this event category is disabled in settings
     if not is_category_enabled(parsed.category) then return end
 
+    local site_ok = utils.get_site_id() and utils.get_site_id() ~= -1
+
     for _, target in ipairs(parsed.targets) do
         if target.page_id and target.section and target.entry then
+            local routed_id = site_ok and fortify_page_id(target.page_id) or target.page_id
             -- Check enemies page section-level settings
-            if target.page_id == "enemies" and not is_enemies_section_enabled(target.section) then
+            if routed_id:match("/enemies$") and not is_enemies_section_enabled(target.section) then
                 -- Skip this target if the section is disabled in enemies settings
             else
-                append_to_page(target.page_id, target.section, target.entry)
+                append_to_page(routed_id, target.section, target.entry)
             end
         end
     end

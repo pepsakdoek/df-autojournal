@@ -133,11 +133,6 @@ local PROGRESS_DISABLED_LEFT  = make_bracket_pen(COLOR_CYAN,     4, string.byte(
 local PROGRESS_DISABLED_MID   = make_bracket_pen(COLOR_DARKGREY, 5, string.byte('x'))
 local PROGRESS_DISABLED_RIGHT = make_bracket_pen(COLOR_CYAN,     6, string.byte(']'))
 
-local PROGRESS_LEFT = string.char(17)
-local PROGRESS_RIGHT = string.char(16)
-local PROGRESS_FULL = string.char(219)
-local PROGRESS_PART = string.char(176)
-
 local STEP_COLORS = {
     done = COLOR_LIGHTCYAN,
     current = COLOR_WHITE,
@@ -219,26 +214,24 @@ function ProgressBarScreen:renderContent()
     end
 
     table.insert(text, NEWLINE)
-    table.insert(text, { text = PROGRESS_LEFT, pen = COLOR_LIGHTCYAN })
-    local bar_width = 20
+    table.insert(text, { tile = PROGRESS_ENABLED_LEFT })
+    local bar_width = 16
     local filled = total > 0 and math.floor(self.current_step / total * bar_width) or 0
     for j = 1, bar_width do
-        local ch = j <= filled and PROGRESS_FULL or PROGRESS_PART
-        local pen = j <= filled and COLOR_LIGHTGREEN or COLOR_DARKGREY
-        table.insert(text, { text = ch, pen = pen })
+        local tile = j <= filled and PROGRESS_ENABLED_MID or PROGRESS_DISABLED_MID
+        table.insert(text, { tile = tile })
     end
-    table.insert(text, { text = PROGRESS_RIGHT, pen = COLOR_LIGHTCYAN })
+    table.insert(text, { tile = PROGRESS_DISABLED_RIGHT })
     table.insert(text, NEWLINE)
 
     if self.sub_total > 0 and self.sub_completed < self.sub_total then
-        table.insert(text, { text = PROGRESS_LEFT, pen = COLOR_LIGHTCYAN })
+        table.insert(text, { tile = PROGRESS_ENABLED_LEFT })
         local sub_filled = math.floor(self.sub_completed / math.max(self.sub_total, 1) * bar_width)
         for j = 1, bar_width do
-            local ch = j <= sub_filled and PROGRESS_FULL or PROGRESS_PART
-            local pen = j <= sub_filled and COLOR_LIGHTGREEN or COLOR_DARKGREY
-            table.insert(text, { text = ch, pen = pen })
+            local tile = j <= sub_filled and PROGRESS_ENABLED_MID or PROGRESS_DISABLED_MID
+            table.insert(text, { tile = tile })
         end
-        table.insert(text, { text = PROGRESS_RIGHT, pen = COLOR_LIGHTCYAN })
+        table.insert(text, { tile = PROGRESS_DISABLED_RIGHT })
         table.insert(text, NEWLINE)
         table.insert(text, { text = self.status_text, pen = COLOR_LIGHTCYAN })
     elseif self.status_text and self.status_text ~= '' then
@@ -372,7 +365,7 @@ function TableOfContents:reload(text, cursor)
 end
 
 --------------------------------------------------------------------------------
---- Page Tree helpers for collapsible Wiki TOC
+--- Page Tree helpers for collapsible Wiki TOC (multi-level)
 
 local PAGE_PARENT_RULES = {
     {prefix='citizen:', parent='citizens'},
@@ -382,7 +375,14 @@ local PAGE_PARENT_RULES = {
     {prefix='visitor:', parent='visitors'},
 }
 
+-- Resolve parent page_id for multi-level nested IDs.
+-- Path-based IDs (fort:100/citizens -> fort:100) take priority.
+-- Falls back to prefix rules for flat IDs (citizen:12345 -> citizens).
 function get_page_parent(page_id)
+    local slash = page_id:find('/')
+    if slash then
+        return page_id:sub(1, slash - 1)
+    end
     for _, rule in ipairs(PAGE_PARENT_RULES) do
         if page_id:sub(1, #rule.prefix) == rule.prefix then
             return rule.parent
@@ -391,61 +391,110 @@ function get_page_parent(page_id)
     return nil
 end
 
-function build_page_tree(static_pages, dynamic_pages)
-    local tree = {}
+-- Build an N-level page tree from a flat list of page descriptors.
+-- membership_map, if provided, maps entity page_ids to their section page_ids
+-- (e.g. "citizen:12345" -> "fort:100/citizens"), overriding get_page_parent.
+function build_page_tree(static_pages, dynamic_pages, membership_map)
+    local node_map = {}
+    local children_of = {}
+    local root_nodes = {}
+
     for _, p in ipairs(static_pages) do
-        local children = {}
-        local is_parent = false
-        for _, dp in ipairs(dynamic_pages) do
-            local parent = get_page_parent(dp.id)
-            if parent == p.id then
-                table.insert(children, dp)
-                is_parent = true
+        local node = {text = p.text, id = p.id, children = {}}
+        node_map[p.id] = node
+        children_of[p.id] = children_of[p.id] or {}
+        table.insert(root_nodes, node)
+    end
+
+    for _, dp in ipairs(dynamic_pages) do
+        local node = node_map[dp.id] or {text = dp.text, id = dp.id, children = {}}
+        node_map[dp.id] = node
+        children_of[dp.id] = children_of[dp.id] or {}
+
+        -- membership_map takes priority over prefix rules (places entities under their fort section)
+        local parent_id = membership_map and membership_map[dp.id]
+        if not parent_id then
+            parent_id = get_page_parent(dp.id)
+        end
+
+        if parent_id then
+            children_of[parent_id] = children_of[parent_id] or {}
+            table.insert(children_of[parent_id], node)
+        else
+            table.insert(root_nodes, node)
+        end
+    end
+
+    -- Ensure parent stub nodes exist for any parent_id referenced by path-based IDs
+    for parent_id, kids in pairs(children_of) do
+        if #kids > 0 and not node_map[parent_id] then
+            local label = parent_id:gsub("^%l", string.upper)
+            local stub = {text = label, id = parent_id, children = kids}
+            node_map[parent_id] = stub
+            local grandparent = get_page_parent(parent_id)
+            if grandparent then
+                children_of[grandparent] = children_of[grandparent] or {}
+                table.insert(children_of[grandparent], stub)
+            else
+                table.insert(root_nodes, stub)
             end
         end
-        table.insert(tree, {
-            text = p.text,
-            id = p.id,
-            children = is_parent and children or nil,
-        })
     end
-    for _, dp in ipairs(dynamic_pages) do
-        local parent = get_page_parent(dp.id)
-        if not parent or not tree_contains_id(tree, parent) then
-            table.insert(tree, {
-                text = dp.text,
-                id = dp.id,
-                children = nil,
-            })
+
+    -- Attach children to each node
+    for id, node in pairs(node_map) do
+        local kids = children_of[id]
+        node.children = (kids and #kids > 0) and kids or nil
+    end
+
+    -- Rebuild root_nodes in static order, preserving any extra orphans appended
+    local ordered = {}
+    for _, p in ipairs(static_pages) do
+        if node_map[p.id] then
+            table.insert(ordered, node_map[p.id])
+            node_map[p.id] = nil
         end
     end
-    return tree
+    for _, node in ipairs(root_nodes) do
+        if node_map[node.id] then
+            table.insert(ordered, node)
+            node_map[node.id] = nil
+        end
+    end
+
+    return ordered
 end
 
 function tree_contains_id(tree, id)
     for _, node in ipairs(tree) do
         if node.id == id then return true end
+        if node.children then
+            for _, child in ipairs(node.children) do
+                if child.id == id then return true end
+            end
+        end
     end
     return false
 end
 
-function flatten_page_tree(tree, expanded)
+-- Recursively flatten an N-level tree into a flat choice list.
+-- The [+] / [-] icon stays at column 0; text is indented depth+1 spaces.
+function flatten_page_tree(tree, expanded, depth)
+    depth = depth or 0
     local result = {}
     for _, node in ipairs(tree) do
         local has_children = node.children and #node.children > 0
-        local icon = has_children and (expanded[node.id] and '[-] ' or '[+] ') or '    '
+        local icon = has_children and (expanded[node.id] and '[-]' or '[+]') or '   '
+        local pad = string.rep(' ', depth + 1)
         table.insert(result, {
-            text = icon .. node.text,
+            text = icon .. pad .. node.text,
             id = node.id,
             is_parent = has_children,
         })
         if has_children and expanded[node.id] then
-            for _, child in ipairs(node.children) do
-                table.insert(result, {
-                    text = '  ' .. child.text,
-                    id = child.id,
-                    is_parent = false,
-                })
+            local kids = flatten_page_tree(node.children, expanded, depth + 1)
+            for _, child in ipairs(kids) do
+                table.insert(result, child)
             end
         end
     end

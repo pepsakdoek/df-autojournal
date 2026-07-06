@@ -170,6 +170,7 @@ end
 
 function HyperTextArea:openLinkModal()
     LinkModal{
+        pages = self.link_pages,
         on_submit = function(text, page)
             local content = self.hyper_text_area
             local insert_start = content.cursor

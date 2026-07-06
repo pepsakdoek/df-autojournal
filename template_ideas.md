@@ -89,20 +89,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
-
-* We need support for pages that go down multiple levels - Because Citizens, Artifacts, Events, Enemies, Visitors are all actually sub sections of the Fort. The way it should be implemented:
-    * At the moment every 'root' level page has left space for the [+]/[-] part (this should remain)
-    * The [+]/[-] parts should always be in the same place to make programming the mouse code easier (we should probably code keyboard shortcuts for navigating that part)
-    * Every level 'below' the root must be indented by 1
-    Example:
-    [-] Forts
-    [-]  Shellrelics
-    [+]   Citizens
-    [+]   Artifacts
-    [+]   Events
-    [+]   Enemies
-    [+]   Visitors
-
 * Wiki Wide search... (should be in the main ToC page)
 * Inititializing needs an option to include dead dwarfs (should be off by default)
 
