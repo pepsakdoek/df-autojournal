@@ -121,6 +121,137 @@ function Shifter:toggle(state)
 end
 
 --------------------------------------------------------------------------------
+--- ProgressBarScreen — modal ZScreen showing initialization progress
+local function make_bracket_pen(fg, tile_offset, ch)
+    return dfhack.pen.parse{fg=fg, tile=utils.curry(textures.tp_control_panel, tile_offset), ch=ch}
+end
+
+local PROGRESS_ENABLED_LEFT  = make_bracket_pen(COLOR_CYAN,      1, string.byte('['))
+local PROGRESS_ENABLED_MID   = make_bracket_pen(COLOR_LIGHTGREEN,2, 251)
+local PROGRESS_ENABLED_RIGHT = make_bracket_pen(COLOR_CYAN,      3, string.byte(']'))
+local PROGRESS_DISABLED_LEFT  = make_bracket_pen(COLOR_CYAN,     4, string.byte('['))
+local PROGRESS_DISABLED_MID   = make_bracket_pen(COLOR_DARKGREY, 5, string.byte('x'))
+local PROGRESS_DISABLED_RIGHT = make_bracket_pen(COLOR_CYAN,     6, string.byte(']'))
+
+local PROGRESS_LEFT = string.char(17)
+local PROGRESS_RIGHT = string.char(16)
+local PROGRESS_FULL = string.char(219)
+local PROGRESS_PART = string.char(176)
+
+local STEP_COLORS = {
+    done = COLOR_LIGHTCYAN,
+    current = COLOR_WHITE,
+    pending = COLOR_DARKGREY,
+}
+
+ProgressBarScreen = defclass(ProgressBarScreen, gui.ZScreen)
+ProgressBarScreen.ATTRS{
+    focus_path = 'mfw-progress',
+    pass_pause = true,
+    steps = {},
+    status_text = '',
+    current_step = 0,
+    sub_completed = 0,
+    sub_total = 0,
+    frame_title = 'Progress',
+}
+
+function ProgressBarScreen:init()
+    local h = math.max(8, #self.steps * 2 + 6)
+    self:addviews{
+        widgets.Window{
+            view_id='progress_win',
+            frame={w=48, h=h},
+            frame_title=self.frame_title,
+            resizable=false,
+            subviews={
+                widgets.Label{
+                    view_id='progress_content',
+                    frame={l=1, t=1, r=1, b=1},
+                    auto_height=false,
+                },
+            }
+        }
+    }
+    self._last_step = 0
+    self:renderContent()
+end
+
+function ProgressBarScreen:setCurrent(step_index, status_text)
+    self.current_step = step_index
+    if status_text then self.status_text = status_text end
+    if step_index ~= self._last_step then
+        self.sub_total = 0
+        self.sub_completed = 0
+        self._last_step = step_index
+    end
+    self:renderContent()
+end
+
+function ProgressBarScreen:setSubProgress(scanned, total, matched)
+    self.sub_completed = scanned
+    self.sub_total = total
+    self.status_text = string.format("Scanning events... %d/%d (%d matched)", scanned, total, matched or 0)
+    self:renderContent()
+end
+
+function ProgressBarScreen:renderContent()
+    local text = {}
+    local total = #self.steps
+
+    for i, label in ipairs(self.steps) do
+        local enabled = i <= self.current_step
+        local label_pen = STEP_COLORS.pending
+        if enabled then
+            label_pen = STEP_COLORS.done
+        elseif i == self.current_step + 1 then
+            label_pen = STEP_COLORS.current
+        end
+        local left = enabled and PROGRESS_ENABLED_LEFT or PROGRESS_DISABLED_LEFT
+        local mid = enabled and PROGRESS_ENABLED_MID or PROGRESS_DISABLED_MID
+        local right = enabled and PROGRESS_ENABLED_RIGHT or PROGRESS_DISABLED_RIGHT
+        table.insert(text, { tile = left })
+        table.insert(text, { tile = mid })
+        table.insert(text, { tile = right })
+        table.insert(text, ' ')
+        table.insert(text, { text = label, pen = label_pen })
+        table.insert(text, NEWLINE)
+    end
+
+    table.insert(text, NEWLINE)
+    table.insert(text, { text = PROGRESS_LEFT, pen = COLOR_LIGHTCYAN })
+    local bar_width = 20
+    local filled = total > 0 and math.floor(self.current_step / total * bar_width) or 0
+    for j = 1, bar_width do
+        local ch = j <= filled and PROGRESS_FULL or PROGRESS_PART
+        local pen = j <= filled and COLOR_LIGHTGREEN or COLOR_DARKGREY
+        table.insert(text, { text = ch, pen = pen })
+    end
+    table.insert(text, { text = PROGRESS_RIGHT, pen = COLOR_LIGHTCYAN })
+    table.insert(text, NEWLINE)
+
+    if self.sub_total > 0 and self.sub_completed < self.sub_total then
+        table.insert(text, { text = PROGRESS_LEFT, pen = COLOR_LIGHTCYAN })
+        local sub_filled = math.floor(self.sub_completed / math.max(self.sub_total, 1) * bar_width)
+        for j = 1, bar_width do
+            local ch = j <= sub_filled and PROGRESS_FULL or PROGRESS_PART
+            local pen = j <= sub_filled and COLOR_LIGHTGREEN or COLOR_DARKGREY
+            table.insert(text, { text = ch, pen = pen })
+        end
+        table.insert(text, { text = PROGRESS_RIGHT, pen = COLOR_LIGHTCYAN })
+        table.insert(text, NEWLINE)
+        table.insert(text, { text = self.status_text, pen = COLOR_LIGHTCYAN })
+    elseif self.status_text and self.status_text ~= '' then
+        table.insert(text, { text = self.status_text, pen = COLOR_LIGHTCYAN })
+    end
+
+    self.subviews.progress_win.subviews.progress_content:setText(text)
+end
+
+function ProgressBarScreen:onDismiss()
+end
+
+--------------------------------------------------------------------------------
 --- TableOfContents
 local df_major_version = tonumber(dfhack.getCompiledDFVersion():match('%d+'))
 

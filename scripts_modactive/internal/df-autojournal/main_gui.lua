@@ -3,6 +3,7 @@ local gui = require('gui')
 local dialogs = require('gui.dialogs')
 local widgets = require('gui.widgets')
 local json = require('json')
+local gui_script = require('gui.script')
 
 local logger = reqscript('internal/df-autojournal/logger')
 local wiki_widgets = reqscript('internal/df-autojournal/wiki_widgets')
@@ -470,17 +471,46 @@ function WikiScreen:performInitialization()
     end
     self.initializing = true
 
+    local progress = wiki_widgets.ProgressBarScreen{
+        frame_title = 'Initializing Wiki',
+        steps = {
+            'Tracking civilizations & forts',
+            'Rendering index pages',
+            'World page',
+            'Citizens',
+            'Artifacts',
+            'Saving dynamic pages',
+            'Historical catch-up',
+            'Finalizing',
+        },
+    }
+    progress:show()
+
     local initializer = wiki_initializer.WikiInitializer{
         context = self.context,
         on_complete = function()
+            progress:dismiss()
             self:refreshPageList()
             self:updateLinkPages()
             self:onPageChange(self.current_page_id, true)
-        end
+            self.initializing = false
+        end,
     }
 
-    initializer:perform(self)
-    self.initializing = false
+    initializer.on_step = function(idx, total, name)
+        progress:setCurrent(idx, 'Working on ' .. name .. '...')
+    end
+    initializer.on_batch = function(scanned, total, matched)
+        progress:setSubProgress(scanned, total, matched)
+    end
+
+    gui_script.start(function()
+        local ok = initializer:perform_async()
+        if not ok then
+            progress:dismiss()
+            self.initializing = false
+        end
+    end)
 end
 
 function WikiScreen:onPageChange(page_id, no_save)

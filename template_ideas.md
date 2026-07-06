@@ -29,7 +29,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 * Add the continent and the general area's name to the fort template. 
     * Maybe put the fort's position on the world map in terms of compass directions as well:
     * Fort XXX is located in the west of the world (maybe give world name). Or Central
-    * Maybe describe the general temperature? Does it snow or not?
+    * If it's on a river or in a forest, or next to a mountain range or a beach etc (next to an ocean).
 * Existing Headings should work
     * Economic links (maybe it's working and my current test fort just doesn't have it)
     * Infrastructure & Districts
@@ -50,12 +50,16 @@ This is just a list of ideas of things that might be of interest to users, and m
 ## Bugs
 
 * Fort 'founding' is linked to when it gets journaled/initialized and not the actual founding date. - check might be resolved
-* I suspect the "climate" calc is wrong
+* I suspect the "climate" calc is wrong, Fridgid when the fort is closer to the non-pole edge of the map than the polar edge
+* The location doesn't do the 'north/south' axis first:
+    * the eastern south region of The Oracular Plane.
 
 # Citizen Root page
 
 * Maybe should be called Citizens and Visitors?
 * Currently says Total Citizens, but I assume those are 'alive' and not dead ones.
+* Game says 152 Citizens, and Total Citizens is 148 (maybe there are bards etc.)
+    * There were 4 human bards in the fort, but a total of 9 humans
 
 
 # Citizen Template
@@ -86,8 +90,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 # Code issues and other possible irritations and issues
 
 
-
-* We want a progressbar for the initialization process, and maybe during save (we must still determine the impact of the listener to the performance of the game, if it's heavy we should 'sync' changes when the wiki is opened or when the game is saved) - on a big fort we will want that progressbar anyway, because it can probably take 1 minute or so, as well as the HTML export (though maybe it can be 'asynchronous' - saving while you are continuing with the game)
 * We need support for pages that go down multiple levels - Because Citizens, Artifacts, Events, Enemies, Visitors are all actually sub sections of the Fort. The way it should be implemented:
     * At the moment every 'root' level page has left space for the [+]/[-] part (this should remain)
     * The [+]/[-] parts should always be in the same place to make programming the mouse code easier (we should probably code keyboard shortcuts for navigating that part)
