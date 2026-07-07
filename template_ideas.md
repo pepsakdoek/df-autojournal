@@ -89,7 +89,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
-* Wiki Wide search... (should be in the main ToC page)
 * Inititializing needs an option to include dead dwarfs (should be off by default)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal

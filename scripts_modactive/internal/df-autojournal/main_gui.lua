@@ -15,6 +15,86 @@ local utils = reqscript('internal/df-autojournal/wiki_utils')
 local wiki_functions = reqscript('internal/df-autojournal/wiki_functions')
 local HyperTextArea = reqscript('internal/df-autojournal/wiki_widgets/hyper_text_area').HyperTextArea
 
+local function extract_plain_text(content)
+    local parts = {}
+    for _, item in ipairs(content or {}) do
+        if type(item) == 'string' then
+            table.insert(parts, item)
+        elseif type(item) == 'table' then
+            if item.text then
+                table.insert(parts, tostring(item.text))
+            elseif item.type == 'table' then
+                if item.columns then
+                    for _, col in ipairs(item.columns) do
+                        if col.header then
+                            table.insert(parts, tostring(col.header) .. ' ')
+                        end
+                    end
+                end
+                if item.rows then
+                    for _, row in ipairs(item.rows) do
+                        for _, cell in ipairs(row) do
+                            if type(cell) == 'table' and cell.text then
+                                table.insert(parts, tostring(cell.text) .. ' ')
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return table.concat(parts)
+end
+
+local function analyze_search_tree(nodes, query, context)
+    local any_match = false
+    for _, node in ipairs(nodes) do
+        local data = context:load_content(node.id)
+        local plain_text = extract_plain_text(data.content)
+        node._direct_match = plain_text:lower():find(query, 1, true) ~= nil
+
+        node._descendant_match = false
+        if node.children and #node.children > 0 then
+            if analyze_search_tree(node.children, query, context) then
+                node._descendant_match = true
+            end
+        end
+
+        node._visible = node._direct_match or node._descendant_match
+        if node._visible then
+            any_match = true
+        end
+    end
+    return any_match
+end
+
+local function flatten_search_tree(tree, depth)
+    depth = depth or 0
+    local result = {}
+    for _, node in ipairs(tree) do
+        if node._visible then
+            local pad = string.rep(' ', depth + 1)
+            local text_color = node._direct_match and COLOR_LIGHTCYAN or COLOR_DARKGREY
+
+            table.insert(result, {
+                text = {
+                    { text = pad, pen = text_color },
+                    { text = node.text, pen = text_color },
+                },
+                id = node.id,
+            })
+
+            if node.children and #node.children > 0 then
+                local kids = flatten_search_tree(node.children, depth + 1)
+                for _, child in ipairs(kids) do
+                    table.insert(result, child)
+                end
+            end
+        end
+    end
+    return result
+end
+
 --------------------------------------------------------------------------------
 --- Wiki Pages Logic
 
@@ -35,6 +115,7 @@ WikiWindow.ATTRS {
     on_page_tree_toggle=DEFAULT_NIL,
     on_text_change=DEFAULT_NIL,
     on_link_click=DEFAULT_NIL,
+    on_search_change=DEFAULT_NIL,
 }
 
 function WikiWindow:init()
@@ -50,9 +131,24 @@ function WikiWindow:init()
                     text='Wiki Pages',
                     text_pen=COLOR_LIGHTCYAN,
                 },
+                widgets.Label{
+                    frame={t=2, l=0},
+                    text='SEARCH:',
+                    text_pen=COLOR_WHITE,
+                },
+                widgets.EditField{
+                    view_id='wiki_search',
+                    frame={t=2, l=8, r=0},
+                    text='',
+                    on_change=function(new_text, old_text)
+                        if self.on_search_change then
+                            self.on_search_change(new_text)
+                        end
+                    end,
+                },
                 widgets.List{
                     view_id='wiki_page_list',
-                    frame={t=2, l=0, r=0, b=12},
+                    frame={t=4, l=0, r=0, b=12},
                     choices=PAGES,
                     on_submit=self:callback('onWikiPageSubmit'),
                 },
@@ -379,6 +475,8 @@ function WikiScreen:init()
     self.context = WikiContext{}
     self.current_page_id = 'fort:' .. tostring(utils.get_site_id() or '')
     self.expanded = {}
+    self.search_mode = false
+    self.search_query = ''
 
     -- Start background chronicle if not already running
     -- chronicle.start_background_task(self.context)
@@ -394,6 +492,7 @@ function WikiScreen:init()
             on_page_tree_toggle=self:callback('onPageTreeToggle'),
             on_text_change=self:callback('onTextChange'),
             on_link_click=function(link_data) self:onPageChange(link_data) end,
+            on_search_change=function(query) self:onSearch(query) end,
         }
     }
 
@@ -402,7 +501,41 @@ function WikiScreen:init()
     self:onPageChange(self.current_page_id, true)
 end
 
+function WikiScreen:onSearch(query)
+    self.search_query = query or ''
+    if #self.search_query == 0 then
+        self.search_mode = false
+        self:refreshPageList()
+        return
+    end
+
+    self.search_mode = true
+    self:displaySearchResults(self.search_query)
+end
+
+function WikiScreen:displaySearchResults(query)
+    local dynamic = self.context:get_dynamic_pages()
+
+    local membership = {}
+    pcall(function()
+        local data = dfhack.persistent.getSiteData('mfw_fort_members')
+        if data and data.members then membership = data.members end
+    end)
+
+    local page_tree = wiki_widgets.build_page_tree(PAGES, dynamic, membership)
+    analyze_search_tree(page_tree, query:lower(), self.context)
+    local flat = flatten_search_tree(page_tree)
+
+    local list = self.subviews.wiki_window.subviews.wiki_page_list
+    list:setChoices(flat)
+
+    if #flat > 0 then
+        list:setSelected(1)
+    end
+end
+
 function WikiScreen:refreshPageList()
+    if self.search_mode then return end
     local dynamic = self.context:get_dynamic_pages()
 
     local membership = {}
