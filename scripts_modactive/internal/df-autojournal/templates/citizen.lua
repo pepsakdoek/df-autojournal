@@ -23,9 +23,10 @@ local function add_relation(content, hf, label)
     table.insert(content, "\n")
 end
 
-function render(unit)
+function render(unit, template_opts)
+    template_opts = template_opts or {}
     local cfg = mfw_settings.get_settings().citizen
-    local settings = cfg.init
+    local settings = template_opts.settings_override or cfg.init
     local name = utils.sanitize(dfhack.units.getReadableName(unit))
     local prof = utils.sanitize(dfhack.units.getProfessionName(unit))
     local sex = "Unknown"
@@ -43,6 +44,12 @@ function render(unit)
 
     table.insert(content, { text = "Gender: ", pen = COLOR_LIGHTCYAN })
     table.insert(content, { text = sex, pen = COLOR_WHITE })
+    table.insert(content, "\n")
+
+    -- Age (replaces raw birth year)
+    local age = df.global.cur_year - unit.birth_year
+    table.insert(content, { text = "Age: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { text = tostring(age), pen = COLOR_WHITE })
     table.insert(content, "\n")
 
     -- Family & Relationships section
@@ -85,12 +92,38 @@ function render(unit)
         end
     end
 
+    -- Skills (master-level shown)
+    if settings.skills and unit.status.current_soul then
+        local soul = unit.status.current_soul
+        if soul.skills and #soul.skills > 0 then
+            local master_skills = {}
+            for _, skill in ipairs(soul.skills) do
+                local rate = skill.rating
+                if rate >= 10 then
+                    local sk_name = tostring(df.job_skill[skill.id]):gsub("_", " "):lower()
+                    table.insert(master_skills, { name = sk_name, rate = rate })
+                end
+            end
+            if #master_skills > 0 then
+                table.insert(content, "\n")
+                table.insert(content, { text = "## Skills", pen = COLOR_YELLOW })
+                table.insert(content, "\n")
+                for _, ms in ipairs(master_skills) do
+                    table.insert(content, "* " .. ms.name)
+                    table.insert(content, "\n")
+                end
+            end
+        end
+    end
+
     -- Personal Journal
-    table.insert(content, "\n")
-    table.insert(content, { text = "## Personal Journal", pen = COLOR_YELLOW })
-    table.insert(content, "\n")
-    table.insert(content, { text = "Log your thoughts here...", pen = COLOR_DARKGREY })
-    table.insert(content, "\n\n")
+    if not template_opts.no_personal_journal then
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Personal Journal", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        table.insert(content, { text = "Log your thoughts here...", pen = COLOR_DARKGREY })
+        table.insert(content, "\n\n")
+    end
 
     -- Attributes & Personality
     if settings.values and unit.status.current_soul then

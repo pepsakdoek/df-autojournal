@@ -18,6 +18,7 @@ local visitors_template = reqscript('internal/df-autojournal/templates/visitors'
 local world_template = reqscript('internal/df-autojournal/templates/world')
 local civilizations_template = reqscript('internal/df-autojournal/templates/civilizations')
 local forts_index_template = reqscript('internal/df-autojournal/templates/forts')
+local entity_template = reqscript('internal/df-autojournal/templates/entity')
 
 local KNOWN_CIVS_KEY = 'mfw_known_civs'
 local KNOWN_FORTS_KEY = 'mfw_known_forts'
@@ -362,34 +363,34 @@ end
 
 function WikiInitializer:_step_citizens()
     local citizens = {}
+    local dead_citizen_rows = {}
     logger.log("Fetching units...")
 
-    local units = {}
-    pcall(function() units = df.global.world.units.active or {} end)
-    if #units == 0 then
-        logger.log("No active units found, skipping citizens")
-        return
-    end
+    local all_units = {}
+    pcall(function() all_units = df.global.world.units.all or {} end)
 
     local fort_section = 'fort:' .. self._site_id .. '/citizens'
 
-    logger.log("Found " .. #units .. " total active units.")
+    logger.log("Found " .. #all_units .. " total units in world.")
     local citizen_rows = {}
-    for i = 0, #units - 1 do
-        local unit = units[i]
+    for i = 0, #all_units - 1 do
+        local unit = all_units[i]
         if dfhack.units.isCitizen(unit) then
             local raw_name = dfhack.units.getReadableName(unit)
             local name = utils.sanitize(raw_name)
             local id = 'citizen:' .. tostring(unit.id)
             self._membership_map[id] = fort_section
 
-            table.insert(citizens, {name=name, id=id})
-            table.insert(self._dynamic_pages, {text=name, id=id})
+            local age = df.global.cur_year - unit.birth_year
 
-            local content = citizen_template.render(unit)
-            safe_save(self.context, id, utils.sanitize_content(content), 1)
+            if not dfhack.units.isDead(unit) then
+                table.insert(citizens, {name=name, id=id})
+                table.insert(self._dynamic_pages, {text=name, id=id})
 
-            local birth_year = tostring(unit.birth_year)
+                local content = citizen_template.render(unit)
+                safe_save(self.context, id, utils.sanitize_content(content), 1)
+            end
+
             local happiness = "Unknown"
             if unit and unit.status.current_soul and unit.status.current_soul.personality then
                 local stress = unit.status.current_soul.personality.stress
@@ -406,32 +407,64 @@ function WikiInitializer:_step_citizens()
             local dead = dfhack.units.isDead(unit)
             local death_status = dead and "Deceased" or "Alive"
 
-            table.insert(citizen_rows, {
-                { text = name, pen = COLOR_LIGHTBLUE, link = id },
-                { text = birth_year, pen = COLOR_WHITE },
-                { text = happiness },
-                { text = death_status, pen = dead and COLOR_LIGHTRED or COLOR_LIGHTGREEN },
-            })
+            local age_str = tostring(age) .. (dead and " (at death)" or "")
+            local age_pen = dead and COLOR_DARKGREY or COLOR_WHITE
+
+            if dead then
+                table.insert(dead_citizen_rows, {
+                    { text = name, pen = COLOR_LIGHTBLUE, link = id },
+                    { text = age_str, pen = age_pen },
+                    { text = death_status, pen = COLOR_LIGHTRED },
+                })
+            else
+                table.insert(citizen_rows, {
+                    { text = name, pen = COLOR_LIGHTBLUE, link = id },
+                    { text = age_str, pen = age_pen },
+                    { text = happiness },
+                    { text = death_status, pen = dead and COLOR_LIGHTRED or COLOR_LIGHTGREEN },
+                })
+            end
         end
     end
-    logger.log("Processed " .. #citizens .. " citizens.")
+    logger.log("Processed " .. #citizen_rows .. " living citizens + " .. #dead_citizen_rows .. " fallen.")
 
     local citizen_root = {}
     table.insert(citizen_root, { text = "# Citizens", pen = COLOR_YELLOW })
     table.insert(citizen_root, "\n\n")
     table.insert(citizen_root, { text = "Total Citizens: ", pen = COLOR_LIGHTCYAN })
-    table.insert(citizen_root, { text = tostring(#citizens), pen = COLOR_WHITE })
+    table.insert(citizen_root, { text = tostring(#citizen_rows), pen = COLOR_WHITE })
+    if #dead_citizen_rows > 0 then
+        table.insert(citizen_root, { text = " (Fallen: ", pen = COLOR_LIGHTCYAN })
+        table.insert(citizen_root, { text = tostring(#dead_citizen_rows), pen = COLOR_LIGHTRED })
+        table.insert(citizen_root, { text = ")", pen = COLOR_LIGHTCYAN })
+    end
     table.insert(citizen_root, "\n\n")
-    table.insert(citizen_root, {
-        type = 'table',
-        columns = {
-            { header = 'Name', align = 'left', min_width = 15, max_width = 50, stretch = true },
-            { header = 'Birth Year', align = 'right', min_width = 6, stretch = false },
-            { header = 'Happiness', align = 'left', min_width = 10, stretch = false },
-            { header = 'Death Status', align = 'left', min_width = 8, stretch = false },
-        },
-        rows = citizen_rows
-    })
+    if #citizen_rows > 0 then
+        table.insert(citizen_root, {
+            type = 'table',
+            columns = {
+                { header = 'Name', align = 'left', min_width = 15, max_width = 50, stretch = true },
+                { header = 'Age', align = 'right', min_width = 6, stretch = false },
+                { header = 'Happiness', align = 'left', min_width = 10, stretch = false },
+                { header = 'Status', align = 'left', min_width = 8, stretch = false },
+            },
+            rows = citizen_rows
+        })
+    end
+    if #dead_citizen_rows > 0 then
+        table.insert(citizen_root, "\n\n")
+        table.insert(citizen_root, { text = "## Fallen Citizens", pen = COLOR_YELLOW })
+        table.insert(citizen_root, "\n\n")
+        table.insert(citizen_root, {
+            type = 'table',
+            columns = {
+                { header = 'Name', align = 'left', min_width = 15, max_width = 50, stretch = true },
+                { header = 'Age at Death', align = 'right', min_width = 6, stretch = false },
+                { header = 'Status', align = 'left', min_width = 8, stretch = false },
+            },
+            rows = dead_citizen_rows
+        })
+    end
     safe_save(self.context, 'citizens', utils.sanitize_content(citizen_root), 1)
     safe_save(self.context, 'fort:' .. self._site_id .. '/citizens', utils.sanitize_content(citizen_root), 1)
 end
@@ -851,6 +884,7 @@ function WikiInitializer:renderEnemiesPage()
     local kills = event_listener.load_enemy_kills and event_listener.load_enemy_kills() or {}
     local content = enemies_template.render(enemies, settings, kills)
     safe_save(self.context, 'enemies', utils.sanitize_content(content), 1)
+    safe_save(self.context, 'fort:' .. self._site_id .. '/enemies', utils.sanitize_content(content), 1)
     logger.log("Enemies page rendered with " .. #enemies .. " entries")
 end
 
@@ -957,15 +991,11 @@ function WikiInitializer:renderVisitorsPage()
                         if dp.id == page_id then already = true; break end
                     end
                     if not already then
-                        local page_content = {
-                            { text = "# " .. safe_name, pen = COLOR_YELLOW },
-                            "\n\n",
-                            { text = "Type: ", pen = COLOR_LIGHTCYAN },
-                            { text = (v.visitor_type or "unknown"), pen = COLOR_WHITE },
-                            "\n\n",
-                            { text = "## Visits", pen = COLOR_YELLOW },
-                            "\n",
-                        }
+                        local page_content = entity_template.render(nil, {
+                            entity_type = 'visitor',
+                            name = safe_name,
+                            subtitle = "Type: " .. (v.visitor_type or "unknown"),
+                        })
                         safe_save(self.context, page_id, utils.sanitize_content(page_content), 1)
                         table.insert(dynamic_pages, { text = safe_name, id = page_id })
                         had_new_pages = true
@@ -987,6 +1017,7 @@ function WikiInitializer:renderVisitorsPage()
     local content = visitors_template.render(visitors, settings)
     logger.log("renderVisitorsPage: template rendered, " .. #content .. " spans")
     safe_save(self.context, 'visitors', utils.sanitize_content(content), 1)
+    safe_save(self.context, 'fort:' .. self._site_id .. '/visitors', utils.sanitize_content(content), 1)
     logger.log("renderVisitorsPage: saved visitors root page")
     logger.log("Visitors page rendered with " .. #visitors .. " entries")
 end

@@ -14,9 +14,10 @@ local LABEL_WIDTH = 20
 
 local CYCLE_OPTIONS = {
     tracking = {
-        { label = 'Player Only', value = 'player' },
-        { label = '+ Diplomatic', value = 'diplomatic' },
+        { label = 'All', value = 'all' },
         { label = 'All Major', value = 'all_major' },
+        { label = 'Diplomatic', value = 'diplomatic' },
+        { label = 'Player Only', value = 'player' },
     },
     landmass_detail = {
         { label = 'Contact Only', value = 'contact' },
@@ -83,6 +84,12 @@ local SETTING_DESCRIPTIONS = {
             pet_adopted = "Auto-record when a citizen adopts a pet",
             died = "Auto-record citizen deaths and causes",
             renamed = "Auto-record name changes",
+            arrivals = "Auto-record when citizens arrive at or emigrate from the fort",
+            new_relationships = "Auto-record new marriages, births, and family connections",
+            master_skills = "Auto-record when a citizen reaches master (Legendary) skill level",
+            medical_history = "Auto-record injuries, syndromes, and medical treatments",
+            military_history = "Auto-record notable kills and combat achievements",
+            timeline_events = "Auto-record personal timeline entries from daily events",
         },
     },
     artifact = {
@@ -176,7 +183,7 @@ local function make_cycle(tab_id, category, key, initial_val, row)
     return CycleHotkeyLabel{
         view_id='cycle_' .. tab_id .. '_' .. category .. '_' .. key,
         frame={t=row, l=0, r=0},
-        label=display_name .. padding .. ' ',
+        label=display_name .. padding,
         options=options,
         initial_option=initial_val,
         on_change=function(val)

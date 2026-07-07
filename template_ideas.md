@@ -13,12 +13,17 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 * Add a total Population 
 
+## Bugs
+* Civ type name should be Capitalized. Elf vs elf etc.
+
 # Civilization Template 
 
 * Diplomatic Relations
 * Ethics and Values
 * Major History (we should probably remove this - though it could be cool?)
-* Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
+    * When we get here, we should probably brainstorm on what it would mean
+* Ruler
+* Most Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
 * Elf Civs don't show all of their Retreats. (They seem to all be called Forest Retreats)
 
 
@@ -56,40 +61,86 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Citizen Root page
 
-* Maybe should be called Citizens and Visitors?
+* Cut off the table at 20 I'd say, people should use the search
+* Happiness in the table should be sorted correctly (by happiness and not as text)
+    * Might be tricky, and might need function change, or we can just 'cheat' it by adding 
+    1,2,3,4,5,6,7 to the happiness states (not worth the effort to build a hidden sort field into the table structure)
 * Currently says Total Citizens, but I assume those are 'alive' and not dead ones.
+* Inititializing needs an option to include dead dwarfs (should be off by default)
+* Needs an aggregate table (doesn't need to be an 'wiki table' - probably doesn't need to be) of Alive/Dead/Missing (stolen or body not found) citizens  
+* Dead citizens might need their own little table with memorialized / non memorialized, and maybe a death cause too, combat / Age
 * Game says 152 Citizens, and Total Citizens is 148 (maybe there are bards etc.)
     * There were 4 human bards in the fort, but a total of 9 humans
 
 
 # Citizen Template
 
-* Now that we have functions, change the birth year to age
-* Get the actual arrival date per citizen (especially on initialization)
-* Auto-journaling settings should include timeline and arrivals, new relationships, new skills (upon reaching master level), new medical requirements and history
-* Military history (notable kills)
-
-
-## Citizen Root page
-
-* Age here (in the table) should just be a year, so that sorting on it works fine
-
+* Get the actual arrival date per citizen (especially on initialization) -- it currently uses the logged on date, it should never optionally use the 'logged on' date, and should use find the date the entity arrived at the fort (find it, else put unknown)
+* Should include timeline and arrivals, new relationships, new skills (upon reaching master level), new medical requirements and history
+* Military history (notable kills) - if it's in it's not working / showing
     
 # Artifacts
 
-* The create date should also be a column
+* The create date should also be a column (could maybe call this age too?)
 * All the fields from initialization should be pushed to Auto-journaling too (though I guess if we run the initialization code when the artifact is first created it's not much of a problem)
 * Would need a field for if the location is known or not - It may have been traded in peace negotiations (or seige negotiations etc.) or just flat out stolen
     * Don't need/want the exact location, we want to know the 'status' (not sure if this is available in a vague 'lore' term in the engine) - I asked on the discord
 
-# Enemies
+# Enemies root page
 
-* Settings tab and settings for enemies should be implemented
-* They should have their notable kills
+# Enemies Template
+
+# Visitors root Page
+
+# Visitors Template
 
 # Code issues and other possible irritations and issues
 
-* Inititializing needs an option to include dead dwarfs (should be off by default)
+* Logged on typically says '* Arrived / Logged on 68-402600' And when it's not in a table it should rather be Arrived 28th Obsidian in the year 68. (LONG date format.)
+    * would need our own date utils I don't think there are built in ones
+```
+local month_names = {
+    "Granite", "Slate", "Felsite",
+    "Hematite", "Malachite", "Galena",
+    "Limestone", "Sandstone", "Timber",
+    "Moonstone", "Opal", "Obsidian"
+}
+
+-- To get the name from a 1-based index (e.g., 12 for Obsidian):
+local month_name = month_names[month_index]
+
+function get_nice_date()
+    local year = df.global.cur_year
+    -- DF months are 0-indexed in some internal structures, so add 1 if needed
+    local month_idx = df.global.cur_year_time_month + 1
+    local day = df.global.cur_year_time_day + 1
+    
+    local month_name = month_names[month_idx] or "Unknown"
+    
+    -- Format: "28th of Obsidian, 68"
+    return string.format("%d%s of %s, %d", day, get_ordinal(day), month_name, year)
+end
+
+-- Helper to add "st", "nd", "rd", "th" to days
+function get_ordinal(n)
+    if n % 10 == 1 and n ~= 11 then return "st"
+    elseif n % 10 == 2 and n ~= 12 then return "nd"
+    elseif n % 10 == 3 and n ~= 13 then return "rd"
+    else return "th" end
+end
+
+function get_short_date()
+    -- WE NEED TO LEFT PAD WITH Spaces or 0s so that sorting will work if we are trying to sort dates.
+    local year = df.global.cur_year
+    -- DF months and days are 0-indexed, so add 1 to get standard 1-12 and 1-28 ranges
+    local month = df.global.cur_year_time_month + 1
+    local day = df.global.cur_year_time_day + 1
+    
+    -- Format: "YYYY-MM-DD" (e.g., "68-12-28" or "250-01-05")
+    -- %d outputs the year as-is, %02d ensures month and day are exactly 2 digits
+    return string.format("%d-%02d-%02d", year, month, day)
+end
+```
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export
