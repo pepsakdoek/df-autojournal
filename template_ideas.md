@@ -4,9 +4,14 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # World
 
-## Bugs 
-* List of inhabited landmasses doesn't show
-* Era doesn't show
+* Maybe major rivers & mountains? 
+* Gods / Religions? Should maybe live in Civ
+* Divine secrets? (I don't know this is a bit late game spoilery)
+* Meta info:
+    * Maybe show the last 'save' human date?
+    * World seed + map seed (critical for sharing/recreating)
+    * World generation parameters: size, history length, beast count, savagery, mineral scarcity, etc.
+    * World gen preset name (e.g. "Pocket World", "Large Island") - If it was used
 
 
 # Civilization Root Template
@@ -43,6 +48,7 @@ This is just a list of ideas of things that might be of interest to users, and m
         * A guildhalls table
         * Defense status could be added (like count of traps, and a list of military squads)
         * History & Timeline should be combined with Fort Timeline (they are the same, and should come last in the template)
+* Fort page should have links to it's children pages (citizens, artifacts etc.) - Should be near the top of the template.
 * Fort should maybe be the default 'homepage' for the player, meaning all important-ish things gets logged here.
     * Artifacts that get generated here
     * Immigrations
@@ -95,52 +101,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 # Visitors Template
 
 # Code issues and other possible irritations and issues
-
-* Logged on typically says '* Arrived / Logged on 68-402600' And when it's not in a table it should rather be Arrived 28th Obsidian in the year 68. (LONG date format.)
-    * would need our own date utils I don't think there are built in ones
-```
-local month_names = {
-    "Granite", "Slate", "Felsite",
-    "Hematite", "Malachite", "Galena",
-    "Limestone", "Sandstone", "Timber",
-    "Moonstone", "Opal", "Obsidian"
-}
-
--- To get the name from a 1-based index (e.g., 12 for Obsidian):
-local month_name = month_names[month_index]
-
-function get_nice_date()
-    local year = df.global.cur_year
-    -- DF months are 0-indexed in some internal structures, so add 1 if needed
-    local month_idx = df.global.cur_year_time_month + 1
-    local day = df.global.cur_year_time_day + 1
-    
-    local month_name = month_names[month_idx] or "Unknown"
-    
-    -- Format: "28th of Obsidian, 68"
-    return string.format("%d%s of %s, %d", day, get_ordinal(day), month_name, year)
-end
-
--- Helper to add "st", "nd", "rd", "th" to days
-function get_ordinal(n)
-    if n % 10 == 1 and n ~= 11 then return "st"
-    elseif n % 10 == 2 and n ~= 12 then return "nd"
-    elseif n % 10 == 3 and n ~= 13 then return "rd"
-    else return "th" end
-end
-
-function get_short_date()
-    -- WE NEED TO LEFT PAD WITH Spaces or 0s so that sorting will work if we are trying to sort dates.
-    local year = df.global.cur_year
-    -- DF months and days are 0-indexed, so add 1 to get standard 1-12 and 1-28 ranges
-    local month = df.global.cur_year_time_month + 1
-    local day = df.global.cur_year_time_day + 1
-    
-    -- Format: "YYYY-MM-DD" (e.g., "68-12-28" or "250-01-05")
-    -- %d outputs the year as-is, %02d ensures month and day are exactly 2 digits
-    return string.format("%d-%02d-%02d", year, month, day)
-end
-```
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export

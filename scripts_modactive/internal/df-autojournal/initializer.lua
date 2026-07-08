@@ -273,86 +273,85 @@ function WikiInitializer:_step_world()
 
     pcall(function()
         local wd = df.global.world.world_data
-        if not wd then return end
+        if not wd then
+            logger.log("WORLD: world_data is nil")
+            return
+        end
 
         local ok_n, name_n = pcall(utils.get_readable_name, wd.name)
         if ok_n and name_n and name_n ~= "" then world_name = name_n end
 
-        if wd.eras then
-            for _, era_elem in ipairs(wd.eras) do
-                local ok_en, era_name = pcall(utils.get_readable_name, era_elem.name)
-                if ok_en and era_name then
-                    table.insert(world_eras, { year = era_elem.first_year, name = era_name, is_current = false })
+        logger.log("WORLD: world_data found, landmasses=" .. tostring(wd.landmasses and #wd.landmasses))
+
+        -- Eras live in df.global.world.history.eras, NOT world_data.eras
+        local hist_eras = df.global.world.history.eras
+        if hist_eras then
+            logger.log("WORLD: scanning " .. #hist_eras .. " era(s) from history")
+            for i = 0, #hist_eras - 1 do
+                local era = hist_eras[i]
+                local year = era.year
+                local name = era.title and era.title.name or nil
+                if name and name ~= "" then
+                    table.insert(world_eras, { year = year, name = name, is_current = false })
+                    logger.log("WORLD: era: year=" .. tostring(year) .. " name=" .. name)
                 end
             end
             table.sort(world_eras, function(a, b) return (a.year or 0) < (b.year or 0) end)
             if #world_eras > 0 then
                 local cur = df.global.cur_year
-                local cur_name = world_eras[1].name
+                local current_era = world_eras[1]
                 for _, e in ipairs(world_eras) do
-                    if e.year <= cur then cur_name = e.name end
+                    if e.year <= cur then current_era = e end
                 end
-                for _, e in ipairs(world_eras) do
-                    if e.name == cur_name then e.is_current = true; break end
-                end
+                current_era.is_current = true
             end
+        else
+            logger.log("WORLD: no history eras found")
         end
 
         if wd.landmasses then
             for _, lm in ipairs(wd.landmasses) do
                 local ok_ln, lm_name = pcall(utils.get_readable_name, lm.name)
                 if not ok_ln or not lm_name then lm_name = "Unknown" end
-                local known = {}
-                local unknown_count = 0
+                local total_population = 0
 
                 for _, site in ipairs(wd.sites) do
                     if site.pos and site.pos.x >= lm.min_x and site.pos.x <= lm.max_x
                         and site.pos.y >= lm.min_y and site.pos.y <= lm.max_y then
-                        if site.entity_links then
-                            for _, link in ipairs(site.entity_links) do
-                                local entity = df.historical_entity.find(link.entity_id)
-                                if entity and entity.type == df.historical_entity_type.Civilization then
-                                    local eid = entity.id
-                                    if self._known_map[eid] then
-                                        local already = false
-                                        for _, kc in ipairs(known) do
-                                            if kc.civ_id == eid then already = true; kc.site_count = (kc.site_count or 0) + 1; break end
-                                        end
-                                        if not already then
-                                            local ename = utils.get_readable_name(entity.name)
-                                            table.insert(known, {civ_id=eid, name=ename, site_count=1, link="civ:" .. tostring(eid)})
-                                        end
-                                    else
-                                        unknown_count = unknown_count + 1
-                                    end
-                                    break
-                                end
-                            end
-                        end
+                        total_population = total_population + (site.infrastructure_pop_level or 0)
                     end
                 end
 
-                if #known > 0 or unknown_count > 0 then
-                    table.insert(world_landmasses, { name = lm_name, known_civs = known, unknown_count = unknown_count, site_count = #known + unknown_count })
+                if total_population > 0 then
+                    table.insert(world_landmasses, { name = lm_name, total_population = total_population })
                 end
             end
-            table.sort(world_landmasses, function(a, b) return #b.known_civs < #a.known_civs end)
+            table.sort(world_landmasses, function(a, b) return (a.total_population or 0) > (b.total_population or 0) end)
+            logger.log("WORLD: " .. #world_landmasses .. " landmass(es) populated")
+        else
+            logger.log("WORLD: no landmasses or no wd.landmasses field")
         end
     end)
 
     local world_content = world_template.render({
         world_name = world_name,
         current_year = df.global.cur_year,
+        current_month = math.floor(df.global.cur_year_tick / 33600) + 1,
+        current_day = math.floor((df.global.cur_year_tick % 33600) / 1200) + 1,
         current_season = world_season or "",
         eras = world_eras,
         landmasses = world_landmasses,
     })
 
+    logger.log("WORLD: eras built=" .. #world_eras .. ", landmasses built=" .. #world_landmasses)
+
     if not world_content or #world_content == 0 then
         world_content = { { text = "# " .. world_name, pen = COLOR_YELLOW }, "\n\n", { text = "Current Date: ", pen = COLOR_LIGHTCYAN }, { text = "Year " .. tostring(df.global.cur_year or 0), pen = COLOR_WHITE }, "\n" }
+        logger.log("WORLD: using fallback content (empty render)")
     end
 
     logger.log("Saving World page (" .. #world_content .. " spans)")
+    world_content = utils.sanitize_content(world_content)
     local w_ok, w_err = pcall(dfhack.persistent.saveSiteData, 'mfw_p_world', {content=world_content, cursor={1}})
     if not w_ok then
         logger.log_error("Direct world save failed: " .. tostring(w_err))
@@ -998,6 +997,7 @@ function WikiInitializer:renderVisitorsPage()
                         })
                         safe_save(self.context, page_id, utils.sanitize_content(page_content), 1)
                         table.insert(dynamic_pages, { text = safe_name, id = page_id })
+                        self._membership_map[page_id] = 'fort:' .. self._site_id .. '/visitors'
                         had_new_pages = true
                         logger.log("create_pages: created page " .. page_id)
                     end
@@ -1005,7 +1005,8 @@ function WikiInitializer:renderVisitorsPage()
             end
             if had_new_pages then
                 self.context:save_dynamic_pages(dynamic_pages)
-                logger.log("create_pages: saved " .. #dynamic_pages .. " dynamic pages")
+                save_fort_members(self._membership_map)
+                logger.log("create_pages: saved " .. #dynamic_pages .. " dynamic pages + membership map")
             end
         end)
         if not ok_pages then

@@ -114,6 +114,9 @@ function render(civ_id, known_fort_set)
                     local raw = df.creature_raw.find(civ.race)
                     if raw and raw.name then
                         race_name = utils.sanitize(raw.name[0]) or ""
+                        if race_name ~= "" then
+                            race_name = race_name:sub(1, 1):upper() .. race_name:sub(2)
+                        end
                     end
                 end
             end)

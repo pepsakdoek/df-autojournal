@@ -124,6 +124,79 @@ function from_ui(str)
     return str
 end
 
+local MONTH_NAMES = {
+    "Granite", "Slate", "Felsite",
+    "Hematite", "Malachite", "Galena",
+    "Limestone", "Sandstone", "Timber",
+    "Moonstone", "Opal", "Obsidian"
+}
+
+local function get_ordinal(n)
+    if n % 10 == 1 and n ~= 11 then return "st"
+    elseif n % 10 == 2 and n ~= 12 then return "nd"
+    elseif n % 10 == 3 and n ~= 13 then return "rd"
+    else return "th" end
+end
+
+--- Current game date components.
+--- Returns { year, month (1-12), day (1-28) }
+--- Derives month/day from cur_year_tick (403200 ticks/year, 33600/month, 1200/day)
+function get_current_date()
+    local year = df.global.cur_year
+    local tick = df.global.cur_year_tick
+    local month = math.floor(tick / 33600) + 1
+    local day = math.floor((tick % 33600) / 1200) + 1
+    return year, month, day
+end
+
+--- Long date: "28th of Obsidian, 68"
+--- Defaults to the current in-game date if not specified.
+function get_nice_date(year, month, day)
+    if not year then year, month, day = get_current_date() end
+    month = month or 1
+    day = day or 1
+    local month_name = MONTH_NAMES[month] or "Unknown"
+    return string.format("%d%s of %s, %d", day, get_ordinal(day), month_name, year)
+end
+
+--- Short (unsorted) date: "68-12-28"
+--- Defaults to current in-game date. Good for simple display.
+function get_short_date(year, month, day)
+    if not year then year, month, day = get_current_date() end
+    month = month or 1
+    day = day or 1
+    return string.format("%d-%02d-%02d", year, month, day)
+end
+
+--- Sort-safe date string with zero-padded year: "0068-12-28"
+--- `width` controls the year pad (default 4).
+--- Use for columns that must sort chronologically as strings.
+function format_sortable_date(year, month, day, width)
+    width = width or 4
+    if not month then _, month, day = get_current_date() end
+    month = month or 1
+    day = day or 1
+    return string.format("%0" .. width .. "d-%02d-%02d", year, month, day)
+end
+
+--- Batch version of format_sortable_date.
+--- entries: array of {year, month?, day?}
+--- Returns array of zero-padded date strings, all with the same year width.
+function format_sortable_dates(entries)
+    local max_width = 4
+    for _, e in ipairs(entries) do
+        local y = e[1] or 0
+        local w = #tostring(math.abs(y))
+        if w > max_width then max_width = w end
+    end
+    local result = {}
+    for _, e in ipairs(entries) do
+        table.insert(result, format_sortable_date(e[1], e[2], e[3], max_width))
+    end
+    return result
+end
+
+-- Legacy: year-tick format, kept for backward compatibility
 function get_date_str()
     return tostring(df.global.cur_year) .. "-" .. tostring(df.global.cur_year_tick)
 end
@@ -222,6 +295,37 @@ local function get_landmasses_for_sites(site_positions, world_data)
     end
 
     return #result > 0 and result or nil
+end
+
+--- Return a compass direction name for a 5x5 world grid cell.
+--- bx: 0 (far west) to 4 (far east), by: 0 (far north) to 4 (far south)
+local function grid_direction_name(bx, by)
+    local Y_WORDS = { [0]="north", [1]="north", [3]="south", [4]="south" }
+    local X_WORDS = { [0]="west", [1]="west", [3]="east", [4]="east" }
+    local y_far, x_far = (by == 0 or by == 4), (bx == 0 or bx == 4)
+    local function cap(s) return s:sub(1,1):upper() .. s:sub(2) end
+
+    if bx == 2 and by == 2 then return "Central region" end
+    if by == 2 then
+        if x_far then return "Far " .. cap(X_WORDS[bx]) .. "ern" end
+        return cap(X_WORDS[bx]) .. "ern"
+    end
+    if bx == 2 then
+        if y_far then return "Far " .. cap(Y_WORDS[by]) .. "ern" end
+        return cap(Y_WORDS[by]) .. "ern"
+    end
+
+    local yw, xw = Y_WORDS[by], X_WORDS[bx]
+    if y_far and x_far then
+        return "Far " .. cap(yw) .. "-" .. xw .. "ern"
+    elseif y_far then
+        return cap(yw) .. "-" .. yw .. " " .. xw .. "ern"
+    elseif x_far then
+        return cap(yw) .. "-" .. xw .. "-" .. xw
+    else
+        local x_part = (xw == "east") and "eastern" or xw
+        return cap(yw) .. "-" .. x_part
+    end
 end
 
 function describe_world_position(civ)
@@ -336,13 +440,7 @@ function describe_world_position(civ)
         local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
         description = "the " .. x_label .. " across the world"
     elseif x_only and y_only then
-        if X_NAMES[xi[1] + 1] == "central" and Y_NAMES[yi[1] + 1] == "central" then
-            description = "the central region of the world"
-        elseif X_NAMES[xi[1] + 1] == "central" then
-            description = "the central " .. Y_NAMES[yi[1] + 1] .. " region"
-        else
-            description = "the " .. X_NAMES[xi[1] + 1] .. " " .. Y_NAMES[yi[1] + 1] .. " region"
-        end
+        description = "the " .. grid_direction_name(xi[1], yi[1]) .. " region"
     elseif x_only then
         local x_part = x_adj(X_NAMES[xi[1] + 1])
         local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
@@ -384,27 +482,10 @@ function describe_site_position(site)
 
     local world_name = get_readable_name(world_data.name) or "the world"
 
-    -- Compass direction using same grid system as civ position
+    -- Compass direction using 5x5 world grid
     local bx = math.max(0, math.min(4, math.floor(site.pos.x / world_width * 5)))
     local by = math.max(0, math.min(4, math.floor(site.pos.y / world_height * 5)))
-    local dir_x = X_NAMES[bx + 1]
-    local dir_y = Y_NAMES[by + 1]
-
-    local function x_adj(name)
-        if name == "central" then return "central" end
-        return name .. "ern"
-    end
-
-    local dir_desc
-    if dir_x == "central" and dir_y == "central" then
-        dir_desc = "the central region of the world"
-    elseif dir_x == "central" then
-        dir_desc = "the central " .. dir_y .. " region"
-    elseif dir_y == "central" then
-        dir_desc = "the " .. x_adj(dir_x) .. " central region"
-    else
-        dir_desc = "the " .. x_adj(dir_x) .. " " .. dir_y .. " region"
-    end
+    local dir_desc = "the " .. grid_direction_name(bx, by) .. " region"
 
     -- Region map data for biome, continent, temperature
     local region_ent = dfhack.maps.getRegionBiome(site.pos.x, site.pos.y)

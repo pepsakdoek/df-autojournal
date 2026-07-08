@@ -442,6 +442,16 @@ Templates:
       event.lua, timeline.lua, enemies.lua
 
 
+## DFHack-run for variable exploration
+
+When the game is running with a save loaded, use `dfhack-run` to probe DF data structures live:
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "print(...)"
+```
+Usage: `dfhack-run lua "lua code here"` — the argument after `lua` is the script string.
+Useful for: finding field names, checking vector sizes, testing `pcall` expressions, verifying data is reachable.
+NOTE: All DFHack struct field accesses that might fail should be wrapped in `pcall()` to avoid silent errors inside `xpcall`.
+
 # Agent instructions
 
 * Settings and features should always be synced. 

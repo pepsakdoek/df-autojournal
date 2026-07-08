@@ -155,9 +155,10 @@ function render(unit, template_opts)
         table.insert(content, "\n")
         table.insert(content, { text = "## History & Timeline", pen = COLOR_YELLOW })
         table.insert(content, "\n")
-        table.insert(content, "* Arrived / Logged on ")
-        table.insert(content, { text = utils.get_date_str(), pen = COLOR_WHITE })
-        table.insert(content, "\n")
+        local ny, nm, nd = utils.get_current_date()
+        table.insert(content, "* Arrived ")
+        table.insert(content, { text = utils.get_nice_date(ny, nm, nd), pen = COLOR_WHITE })
+        table.insert(content, " (logged on)\n")
     end
 
     return utils.sanitize_content(content)
