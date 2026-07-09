@@ -507,45 +507,80 @@ function describe_site_position(site)
     end
 
     -- Temperature description
+    -- region_ent.temperature is a 0-100 biome index, NOT an absolute value.
+    -- 0=glacial, 100=tropical, with latitude/elevation modifiers.
+    -- Use the DF biome temperature thresholds.
     local temp_desc = nil
     if region_ent then
         local temp = region_ent.temperature
         local snowfall = region_ent.snowfall or 0
 
-        if temp < 10000 then
-            if snowfall > 500 then
-                temp_desc = "frigid, with heavy snow"
+        if temp < 15 then
+            if snowfall > 0 then
+                temp_desc = "frigid, with permanent snow"
             else
                 temp_desc = "frigid"
             end
-        elseif temp < 10100 then
-            if snowfall > 500 then
-                temp_desc = "very cold, with snow"
-            elseif snowfall > 0 then
-                temp_desc = "cold, with occasional snow"
-            else
-                temp_desc = "very cold"
-            end
-        elseif temp < 10300 then
-            if snowfall > 300 then
-                temp_desc = "cold, with snowfall"
-            elseif snowfall > 0 then
-                temp_desc = "cold, with light snow"
+        elseif temp < 30 then
+            temp_desc = "very cold"
+        elseif temp < 45 then
+            if snowfall > 0 then
+                temp_desc = "cold, with snow"
             else
                 temp_desc = "cold"
             end
-        elseif temp < 10500 then
+        elseif temp < 55 then
             temp_desc = "cool"
-        elseif temp < 10800 then
+        elseif temp < 70 then
             temp_desc = "temperate"
-        elseif temp < 11200 then
+        elseif temp < 82 then
             temp_desc = "warm"
-        elseif temp < 11600 then
+        elseif temp < 92 then
             temp_desc = "hot"
         else
             temp_desc = "scorching"
         end
     end
+
+    -- Volcano check: is the site on or near a volcano?
+    local nearby_volcano = nil
+    pcall(function()
+        local peaks = world_data.mountain_peaks
+        if peaks then
+            for _, mp in ipairs(peaks) do
+                if mp.flags[0] then
+                    local dist = math.sqrt((mp.pos.x - site.pos.x)^2 + (mp.pos.y - site.pos.y)^2)
+                    if dist <= 5 then
+                        nearby_volcano = get_readable_name(mp.name) or "a volcano"
+                        break
+                    end
+                end
+            end
+        end
+    end)
+
+    -- River check: collect all rivers at the site
+    local nearby_rivers = {}
+    pcall(function()
+        local rivers = world_data.rivers
+        if rivers then
+            for _, r in ipairs(rivers) do
+                local path = r.path
+                if path then
+                    for j = 0, #path - 1 do
+                        local tp = path[j]
+                        if tp and math.abs(tp.x - site.pos.x) <= 1 and math.abs(tp.y - site.pos.y) <= 1 then
+                            local rname = get_readable_name(r.name)
+                            if rname and rname ~= "" then
+                                table.insert(nearby_rivers, rname)
+                            end
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end)
 
     return {
         description = dir_desc,
@@ -554,5 +589,8 @@ function describe_site_position(site)
         temperature = temp_desc,
         region_name = region_name,
         region_type = region_type_str,
+        vegetation = region_ent and region_ent.vegetation,
+        nearby_volcano = nearby_volcano,
+        nearby_rivers = nearby_rivers,
     }
 end

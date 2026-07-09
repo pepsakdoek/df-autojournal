@@ -9,6 +9,8 @@ This is just a list of ideas of things that might be of interest to users, and m
     * Maybe show the last 'save' human date?
 * Geography:
     * Lakes and Oceans?
+    * Named peaks should say in which mountain range they are
+    * Rivers should not say 'major' if they are not major (but we can still list the top 5 or so)
 
 
 
@@ -33,9 +35,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Fort Template
 
-* Geography
-    * If it's on a river or in a forest, or next to a mountain range or a beach etc (next to an ocean).
-    * Specifically also Volcano (because on the world map you can't see the volcano name anymore)
 * Existing Headings should work
     * Economic links (maybe it's working and my current test fort just doesn't have it)
     * Infrastructure & Districts
@@ -54,7 +53,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 ## Bugs
 
-* I suspect the "climate" calc is wrong, Fridgid when the fort is closer to the non-pole edge of the map than the polar edge
 
 # Citizen Root page
 

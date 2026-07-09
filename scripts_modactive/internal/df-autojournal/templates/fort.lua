@@ -56,63 +56,85 @@ function render(site_id)
             table.insert(content, { text = "## Location", pen = COLOR_YELLOW })
             table.insert(content, "\n")
 
-            table.insert(content, { text = site_name, pen = COLOR_LIGHTBLUE })
-            table.insert(content, " is located in ")
-            table.insert(content, { text = pos_info.continent or pos_info.region_name or "an uncharted area", pen = COLOR_LIGHTCYAN })
-            table.insert(content, ", ")
-            table.insert(content, { text = pos_info.description, pen = COLOR_WHITE })
+            local function cap(s)
+                return s and s:sub(1,1):upper() .. s:sub(2) or ""
+            end
 
+            table.insert(content, { text = site_name, pen = COLOR_LIGHTBLUE })
+            table.insert(content, " is situated in ")
+            if pos_info.region_name then
+                table.insert(content, { text = pos_info.region_name, pen = COLOR_LIGHTCYAN })
+                table.insert(content, ", ")
+            end
+            table.insert(content, { text = pos_info.description, pen = COLOR_WHITE })
             if pos_info.world_name and not pos_info.description:match("world$") then
                 table.insert(content, " of ")
                 table.insert(content, { text = pos_info.world_name, pen = COLOR_LIGHTCYAN })
             end
             table.insert(content, ".\n")
 
-            if pos_info.continent and pos_info.region_name then
-                table.insert(content, { text = "Region: ", pen = COLOR_LIGHTCYAN })
-                table.insert(content, { text = pos_info.region_name, pen = COLOR_WHITE })
-                table.insert(content, "\n")
+            -- Build a descriptive paragraph about the area
+            local desc_parts = {}
+            if pos_info.continent then
+                table.insert(desc_parts, "The surrounding region is part of " .. pos_info.continent)
             end
-
+            local rt = pos_info.region_type or ""
+            if rt ~= "" then
+                local biome_adj = rt:lower()
+                if biome_adj == "swamp" or biome_adj == "marsh" then
+                    if pos_info.vegetation and pos_info.vegetation > 70 then
+                        biome_adj = "densely forested swampland"
+                    else
+                        biome_adj = "swampland"
+                    end
+                elseif biome_adj == "mountains" then biome_adj = "mountainous area"
+                elseif biome_adj == "glacier" then biome_adj = "glacial expanse"
+                elseif biome_adj == "tundra" then biome_adj = "tundra"
+                elseif biome_adj == "grassland" then biome_adj = "grassland"
+                elseif biome_adj == "hills" then biome_adj = "hills"
+                elseif biome_adj == "lake" then biome_adj = "lakeside area"
+                elseif biome_adj == "ocean" then biome_adj = "coastal area"
+                elseif biome_adj == "forest" then biome_adj = "forested area"
+                end
+                table.insert(desc_parts, "a " .. biome_adj)
+            end
             if pos_info.temperature then
-                table.insert(content, { text = "Climate: ", pen = COLOR_LIGHTCYAN })
-                if pos_info.temperature:match("cold") or pos_info.temperature:match("frigid") then
-                    table.insert(content, { text = pos_info.temperature, pen = COLOR_LIGHTCYAN })
-                elseif pos_info.temperature:match("hot") or pos_info.temperature:match("scorch") then
-                    table.insert(content, { text = pos_info.temperature, pen = COLOR_LIGHTRED })
+                local t = pos_info.temperature:lower()
+                local temp_word = t:match("^[^,]+") or t
+                table.insert(desc_parts, "with a " .. temp_word .. " climate")
+            end
+            if pos_info.nearby_volcano then
+                table.insert(desc_parts, "built atop the volcano " .. pos_info.nearby_volcano)
+            end
+            local rivers = pos_info.nearby_rivers or {}
+            if #rivers > 0 then
+                local river_text
+                if #rivers == 1 then
+                    river_text = "along the banks of " .. rivers[1]
+                elseif #rivers == 2 then
+                    river_text = "at the confluence of " .. rivers[1] .. " and " .. rivers[2]
                 else
-                    table.insert(content, { text = pos_info.temperature, pen = COLOR_GREEN })
+                    local parts = {}
+                    for i = 1, #rivers - 1 do
+                        table.insert(parts, rivers[i])
+                    end
+                    river_text = "at the confluence of " .. table.concat(parts, ", ") .. ", and " .. rivers[#rivers]
                 end
-                table.insert(content, "\n")
+                table.insert(desc_parts, river_text)
             end
 
-            if pos_info.region_type then
-                table.insert(content, { text = "Biome: ", pen = COLOR_LIGHTCYAN })
-                local biome_pen = COLOR_WHITE
-                local rt = pos_info.region_type:lower()
-                if rt == "mountains" then
-                    biome_pen = COLOR_LIGHTCYAN
-                elseif rt == "swamp" or rt == "marsh" then
-                    biome_pen = COLOR_GREEN
-                elseif rt == "desert" then
-                    biome_pen = COLOR_YELLOW
-                elseif rt == "ocean" or rt == "lake" then
-                    biome_pen = COLOR_LIGHTBLUE
-                elseif rt == "glacier" or rt == "tundra" then
-                    biome_pen = COLOR_LIGHTCYAN
-                elseif rt == "forest" then
-                    biome_pen = COLOR_GREEN
-                elseif rt == "grassland" then
-                    biome_pen = COLOR_LIGHTGREEN
-                elseif rt == "hills" then
-                    biome_pen = COLOR_LIGHTMAGENTA
+            if #desc_parts > 0 then
+                table.insert(content, "\n")
+                local line = cap(desc_parts[1])
+                for i = 2, #desc_parts do
+                    if i == #desc_parts then
+                        line = line .. ", and " .. desc_parts[i]
+                    else
+                        line = line .. ", " .. desc_parts[i]
+                    end
                 end
-                table.insert(content, { text = pos_info.region_type, pen = biome_pen })
-                if pos_info.region_name then
-                    table.insert(content, " (")
-                    table.insert(content, { text = pos_info.region_name, pen = COLOR_LIGHTCYAN })
-                    table.insert(content, ")")
-                end
+                line = line .. "."
+                table.insert(content, { text = line, pen = COLOR_WHITE })
                 table.insert(content, "\n")
             end
         end
