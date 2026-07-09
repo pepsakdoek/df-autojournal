@@ -263,6 +263,9 @@ function WikiInitializer:_step_world()
     local world_eras = {}
     local world_landmasses = {}
     local world_season = ""
+    local world_gen_params = nil
+    local world_mountain_peaks = {}
+    local world_rivers_count = 0
     pcall(function()
         local names = {"Early Spring", "Late Spring", "Early Summer", "Late Summer", "Early Autumn", "Late Autumn", "Early Winter", "Late Winter"}
         if df.global.cur_year_tick then
@@ -333,6 +336,91 @@ function WikiInitializer:_step_world()
         end
     end)
 
+    -- World gen parameters
+    pcall(function()
+        local wg = df.global.world.worldgen
+        if wg and wg.worldgen_parms then
+            local wp = wg.worldgen_parms
+            world_gen_params = {
+                title = wp.title or "",
+                seed = wp.seed or "",
+                history_seed = wp.history_seed or "",
+                name_seed = wp.name_seed or "",
+                creature_seed = wp.creature_seed or "",
+                dim_x = wp.dim_x or 0,
+                dim_y = wp.dim_y or 0,
+                end_year = wp.end_year or 0,
+                beast_end_year = wp.beast_end_year or 0,
+                mineral_scarcity = wp.mineral_scarcity or 0,
+                total_civ_number = wp.total_civ_number or 0,
+                total_civ_population = wp.total_civ_population or 0,
+                site_cap = wp.site_cap or 0,
+                megabeast_cap = wp.megabeast_cap or 0,
+                semimegabeast_cap = wp.semimegabeast_cap or 0,
+                titan_number = wp.titan_number or 0,
+                demon_number = wp.demon_number or 0,
+                embark_points = wp.embark_points or 0,
+            }
+            logger.log("WORLD: gen params loaded, preset=" .. tostring(wp.title))
+        end
+    end)
+
+    -- Mountain peaks
+    pcall(function()
+        local wd = df.global.world.world_data
+        if wd and wd.mountain_peaks then
+            for _, mp in ipairs(wd.mountain_peaks) do
+                local name = utils.get_readable_name(mp.name)
+                if name and name ~= "" then
+                    local is_volcano = false
+                    pcall(function() is_volcano = mp.flags[0] end)
+                    table.insert(world_mountain_peaks, { name = name, is_volcano = is_volcano })
+                end
+            end
+            logger.log("WORLD: " .. #world_mountain_peaks .. " mountain peak(s) found")
+        end
+    end)
+
+    -- Mountain ranges (regions with type=3)
+    local world_mountain_ranges = {}
+    pcall(function()
+        local wd = df.global.world.world_data
+        if wd and wd.regions then
+            for _, r in ipairs(wd.regions) do
+                if r.type == 3 then
+                    local eng = dfhack.translation.translateName(r.name, true)
+                    if eng and eng ~= "" then
+                        table.insert(world_mountain_ranges, { name = eng, size = r.size })
+                    end
+                end
+            end
+            table.sort(world_mountain_ranges, function(a, b) return (a.size or 0) > (b.size or 0) end)
+            logger.log("WORLD: " .. #world_mountain_ranges .. " mountain range(s) found")
+        end
+    end)
+
+    -- Rivers: count + major rivers (flow >= 100)
+    local world_major_rivers = {}
+    local world_all_rivers = {}
+    pcall(function()
+        local wd = df.global.world.world_data
+        if wd and wd.rivers then
+            world_rivers_count = #wd.rivers
+            for i = 0, #wd.rivers - 1 do
+                local r = wd.rivers[i]
+                local name = utils.get_readable_name(r.name)
+                if name and name ~= "" then
+                    table.insert(world_all_rivers, { name = name, flow = r.flow[0] or 0 })
+                    if r.flow and r.flow[0] and r.flow[0] >= 100 then
+                        table.insert(world_major_rivers, { name = name, flow = r.flow[0] })
+                    end
+                end
+            end
+            table.sort(world_all_rivers, function(a, b) return (a.flow or 0) > (b.flow or 0) end)
+            logger.log("WORLD: " .. world_rivers_count .. " rivers, " .. #world_major_rivers .. " major (flow>=100)")
+        end
+    end)
+
     local world_content = world_template.render({
         world_name = world_name,
         current_year = df.global.cur_year,
@@ -341,6 +429,13 @@ function WikiInitializer:_step_world()
         current_season = world_season or "",
         eras = world_eras,
         landmasses = world_landmasses,
+        gen_params = world_gen_params,
+        mountain_peaks = world_mountain_peaks,
+        mountain_ranges = world_mountain_ranges,
+        rivers_count = world_rivers_count,
+        major_rivers_count = #world_major_rivers,
+        major_rivers = world_major_rivers,
+        rivers = world_all_rivers,
     })
 
     logger.log("WORLD: eras built=" .. #world_eras .. ", landmasses built=" .. #world_landmasses)

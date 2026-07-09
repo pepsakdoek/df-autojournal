@@ -388,71 +388,58 @@ function describe_world_position(civ)
         }
     end
 
-    local function range_label(indices, names, half_left, half_right)
-        local first, last = indices[1], indices[#indices]
-        if first == last then
-            return names[first + 1]
-        end
-        if first == 0 and last == 1 then return "the far " .. names[2] end
-        if first == 0 and last == 2 then return "the " .. half_left end
-        if first == 2 and last == 4 then return "the " .. half_right end
-        if first == 3 and last == 4 then return "the far " .. names[last] end
-        if first == 0 and last == 4 then return "the entire world" end
-        return "from " .. names[first + 1] .. " to " .. names[last + 1]
-    end
-
-    -- Convert an X band name to its adjective form for use in "the <x> <y> region"
-    local function x_adj(name)
-        if name == "central" then return "central" end
-        return name .. "ern"
-    end
-
-    -- Strip leading "the " for use in compound descriptions
-    local function strip_the(s)
-        return s:gsub("^the ", "")
-    end
-
-    -- Build description
-    local x_only = #xi == 1
-    local y_only = #yi == 1
-    local x_all = xi[1] == 0 and xi[#xi] == 4
-    local y_all = yi[1] == 0 and yi[#yi] == 4
-
-    -- Produce range name without leading "the"
-    local function range_name(indices, names, half_left, half_right)
+    local function range_str(indices, names)
+        if #indices == 0 then return nil end
         local first, last = indices[1], indices[#indices]
         if first == last then return names[first + 1] end
+        if first == 0 and last == 4 then return nil end
+        if first == 0 and last == 2 then return "western half" end
+        if first == 2 and last == 4 then return "eastern half" end
         if first == 0 and last == 1 then return "far " .. names[2] end
-        if first == 0 and last == 2 then return half_left end
-        if first == 2 and last == 4 then return half_right end
-        if first == 3 and last == 4 then return "far " .. names[last] end
-        if first == 0 and last == 4 then return "the world" end
-        return "from " .. names[first + 1] .. " to " .. names[last + 1]
+        if first == 1 and last == 2 then return "west to central" end
+        if first == 2 and last == 3 then return "central to east" end
+        if first == 3 and last == 4 then return "far " .. names[4] end
+        if first == 1 and last == 3 then return "west to east" end
+        return names[first + 1] .. " to " .. names[last + 1]
     end
 
+    local function y_range_str(indices, names)
+        if #indices == 0 then return nil end
+        local first, last = indices[1], indices[#indices]
+        if first == last then return names[first + 1] end
+        if first == 0 and last == 4 then return nil end
+        if first == 0 and last == 2 then return "northern half" end
+        if first == 2 and last == 4 then return "southern half" end
+        if first == 0 and last == 1 then return "far " .. names[2] end
+        if first == 1 and last == 2 then return "north to central" end
+        if first == 2 and last == 3 then return "central to south" end
+        if first == 3 and last == 4 then return "far " .. names[4] end
+        if first == 1 and last == 3 then return "north to south" end
+        return names[first + 1] .. " to " .. names[last + 1]
+    end
+
+    local x_label = range_str(xi, X_NAMES)
+    local y_label = y_range_str(yi, Y_NAMES)
+    local x_only = xi and #xi == 1
+    local y_only = yi and #yi == 1
+
     local description
-    if x_all and y_all then
+    if x_label == nil and y_label == nil then
         description = "the entire world"
-    elseif x_all then
-        local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
+    elseif y_label == nil then
+        description = "the " .. x_label .. " of the world"
+    elseif x_label == nil then
         description = "the " .. y_label .. " of the world"
-    elseif y_all then
-        local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
-        description = "the " .. x_label .. " across the world"
     elseif x_only and y_only then
         description = "the " .. grid_direction_name(xi[1], yi[1]) .. " region"
     elseif x_only then
-        local x_part = x_adj(X_NAMES[xi[1] + 1])
-        local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
-        description = "the " .. x_part .. " " .. y_label .. " region"
+        local x_name = X_NAMES[xi[1] + 1]
+        local x_part = (x_name == "central") and "central" or x_name .. "ern"
+        description = "the " .. x_part .. " " .. y_label
     elseif y_only then
-        local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
-        local y_name = Y_NAMES[yi[1] + 1]
-        description = "the " .. x_label .. " " .. y_name .. " region"
+        description = "the " .. x_label .. " " .. Y_NAMES[yi[1] + 1]
     else
-        local x_label = range_name(xi, X_NAMES, "western half", "eastern half")
-        local y_label = range_name(yi, Y_NAMES, "northern half", "southern half")
-        description = "the " .. x_label .. ", reaching " .. y_label
+        description = "the " .. x_label .. ", " .. y_label
     end
 
     -- Determine landmass(es)

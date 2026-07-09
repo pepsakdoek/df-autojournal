@@ -23,6 +23,12 @@ local CYCLE_OPTIONS = {
         { label = 'Contact Only', value = 'contact' },
         { label = 'Show All', value = 'all' },
     },
+    geography_detail = {
+        { label = 'None', value = 'none' },
+        { label = 'Count Only', value = 'count' },
+        { label = 'Major', value = 'major' },
+        { label = 'All', value = 'all' },
+    },
 }
 
 local function capitalize(str)
@@ -35,6 +41,9 @@ local SETTING_DESCRIPTIONS = {
             era_timeline = "Show the world's age timeline from history",
             landmass_list = "Show inhabited landmasses and their civilizations",
             landmass_detail = "How to list civilizations on landmasses: name known, count or name all",
+            world_gen = "Show world generation parameters (history length, civ count, mineral scarcity, beast counts, etc.)",
+            seeds = "Show world seeds (seed, history seed, name seed, creature seed)",
+            geography_detail = "How to show geography: none hides, count shows totals, major lists named peaks + major rivers (flow>=100), all lists every named river",
         },
     },
     civ = {

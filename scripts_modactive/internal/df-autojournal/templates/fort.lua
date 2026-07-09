@@ -31,6 +31,24 @@ function render(site_id)
     table.insert(content, { text = tostring(citizens) .. " Citizens", pen = COLOR_WHITE })
     table.insert(content, "\n")
 
+    -- Links to section pages
+    table.insert(content, "\n")
+    table.insert(content, { text = "## Pages", pen = COLOR_YELLOW })
+    table.insert(content, "\n")
+    local section_links = {
+        { id = 'fort:' .. tostring(site_id) .. '/citizens', label = 'Citizens' },
+        { id = 'fort:' .. tostring(site_id) .. '/artifacts', label = 'Artifacts' },
+        { id = 'fort:' .. tostring(site_id) .. '/events', label = 'Events' },
+        { id = 'fort:' .. tostring(site_id) .. '/visitors', label = 'Visitors' },
+        { id = 'fort:' .. tostring(site_id) .. '/enemies', label = 'Enemies' },
+    }
+    for _, sl in ipairs(section_links) do
+        table.insert(content, "* ")
+        table.insert(content, { text = sl.label, pen = COLOR_LIGHTBLUE, link = sl.id })
+        table.insert(content, "\n")
+    end
+    table.insert(content, "\n")
+
     if settings.location and site and site.pos then
         local pos_info = utils.describe_site_position(site)
         if pos_info then
@@ -108,9 +126,10 @@ function render(site_id)
         table.insert(content, "\n\n")
     end
 
-    if settings.timeline then
+    if settings.timeline or settings.defense then
+        -- Combined fort timeline section
         table.insert(content, "\n")
-        table.insert(content, { text = "## History & Timeline", pen = COLOR_YELLOW })
+        table.insert(content, { text = "## Fort Timeline", pen = COLOR_YELLOW })
         table.insert(content, "\n")
         local founding_year = site and site.created_year and site.created_year > 0 and site.created_year or df.global.cur_year
         table.insert(content, "* Founding of ")
@@ -118,22 +137,14 @@ function render(site_id)
         table.insert(content, " in year ")
         table.insert(content, { text = tostring(founding_year), pen = COLOR_WHITE })
         table.insert(content, "\n")
+        if settings.defense then
+            table.insert(content, "\n")
+            table.insert(content, { text = "### Notable Visitors & Sieges", pen = COLOR_YELLOW })
+            table.insert(content, "\n")
+            table.insert(content, { text = "Record sieges, military campaigns, and notable visitors here.", pen = COLOR_DARKGREY })
+            table.insert(content, "\n")
+        end
     end
-
-    if settings.defense then
-        table.insert(content, "\n")
-        table.insert(content, { text = "## Defense Status", pen = COLOR_YELLOW })
-        table.insert(content, "\n")
-        table.insert(content, { text = "Describe your military and traps here.", pen = COLOR_DARKGREY })
-        table.insert(content, "\n")
-    end
-
-    -- Fort Timeline — populated by event listener / catch-up
-    table.insert(content, "\n")
-    table.insert(content, { text = "## Fort Timeline", pen = COLOR_YELLOW })
-    table.insert(content, "\n")
-    local founding_year = site and site.created_year and site.created_year > 0 and site.created_year or df.global.cur_year
-    table.insert(content, "* " .. site_name .. " founded in year " .. tostring(founding_year) .. ".\n")
 
     return content
 end

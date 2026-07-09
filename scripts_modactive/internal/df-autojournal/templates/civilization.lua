@@ -91,6 +91,23 @@ local function get_forts_table(civ, known_fort_set)
     return result
 end
 
+local function get_civ_population(civ_id)
+    local total = 0
+    pcall(function()
+        local pops = df.global.world.entity_populations
+        if not pops then return end
+        for i = 0, #pops - 1 do
+            local pop = pops[i]
+            if pop.civ_id == civ_id then
+                for j = 0, #pop.counts - 1 do
+                    total = total + pop.counts[j]
+                end
+            end
+        end
+    end)
+    return total
+end
+
 function render(civ_id, known_fort_set)
     local ok, result = xpcall(function()
         local cfg = mfw_settings.get_settings().civ
@@ -129,6 +146,14 @@ function render(civ_id, known_fort_set)
                 table.insert(content, { text = type_str, pen = COLOR_WHITE })
             end
             table.insert(content, "\n")
+
+            -- Total population
+            local pop = get_civ_population(civ_id)
+            if pop > 0 then
+                table.insert(content, { text = "Total Population: ", pen = COLOR_LIGHTCYAN })
+                table.insert(content, { text = tostring(pop), pen = COLOR_WHITE })
+                table.insert(content, "\n")
+            end
 
             -- Ruler
             pcall(function()
@@ -176,11 +201,21 @@ function render(civ_id, known_fort_set)
                 table.insert(content, "\n")
                 if pos then
                     table.insert(content, { text = civ_name, pen = COLOR_LIGHTBLUE })
-                    table.insert(content, " is located in ")
-                    table.insert(content, { text = pos.description, pen = COLOR_WHITE })
-                    if not pos.description:match("world$") then
+                    if pos.description:match("^scattered") then
+                        table.insert(content, " is ")
+                        table.insert(content, { text = pos.description, pen = COLOR_WHITE })
                         table.insert(content, " of ")
                         table.insert(content, { text = pos.world_name, pen = COLOR_LIGHTCYAN })
+                    elseif pos.description:match("^the entire") then
+                        table.insert(content, " spans ")
+                        table.insert(content, { text = pos.description, pen = COLOR_WHITE })
+                    else
+                        table.insert(content, " is located in ")
+                        table.insert(content, { text = pos.description, pen = COLOR_WHITE })
+                        if not pos.description:match("world$") then
+                            table.insert(content, " of ")
+                            table.insert(content, { text = pos.world_name, pen = COLOR_LIGHTCYAN })
+                        end
                     end
                     if pos.continent and #pos.continent > 0 then
                         table.insert(content, #pos.continent > 1 and ", on the continents of " or ", on the continent of ")

@@ -4,26 +4,23 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # World
 
-* Maybe major rivers & mountains? 
+* After init the World page should be the first page selected.
 * Gods / Religions? Should maybe live in Civ
-* Divine secrets? (I don't know this is a bit late game spoilery)
 * Meta info:
     * Maybe show the last 'save' human date?
-    * World seed + map seed (critical for sharing/recreating)
-    * World generation parameters: size, history length, beast count, savagery, mineral scarcity, etc.
-    * World gen preset name (e.g. "Pocket World", "Large Island") - If it was used
+
 
 
 # Civilization Root Template
 
-* Add a total Population 
+* Add a total Population per Civ (into the table)
 
 ## Bugs
-* Civ type name should be Capitalized. Elf vs elf etc.
 
 # Civilization Template 
 
 * Diplomatic Relations
+    * Add links to the other Civs
 * Ethics and Values
 * Major History (we should probably remove this - though it could be cool?)
     * When we get here, we should probably brainstorm on what it would mean
@@ -36,10 +33,9 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Fort Template
 
-* Add the continent and the general area's name to the fort template. 
-    * Maybe put the fort's position on the world map in terms of compass directions as well:
-    * Fort XXX is located in the west of the world (maybe give world name). Or Central
+* Geography
     * If it's on a river or in a forest, or next to a mountain range or a beach etc (next to an ocean).
+    * Specifically also Volcano (because on the world map you can't see the volcano name anymore)
 * Existing Headings should work
     * Economic links (maybe it's working and my current test fort just doesn't have it)
     * Infrastructure & Districts
@@ -47,9 +43,7 @@ This is just a list of ideas of things that might be of interest to users, and m
         * A function for unallocated bedrooms
         * A guildhalls table
         * Defense status could be added (like count of traps, and a list of military squads)
-        * History & Timeline should be combined with Fort Timeline (they are the same, and should come last in the template)
-* Fort page should have links to it's children pages (citizens, artifacts etc.) - Should be near the top of the template.
-* Fort should maybe be the default 'homepage' for the player, meaning all important-ish things gets logged here.
+* Fort should maybe be the 'homepage' for the player, meaning all important-ish things gets logged here.
     * Artifacts that get generated here
     * Immigrations
     * Emmigrations (when a dwarf gets 'expelled')
@@ -60,10 +54,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 ## Bugs
 
-* Fort 'founding' is linked to when it gets journaled/initialized and not the actual founding date. - check might be resolved
 * I suspect the "climate" calc is wrong, Fridgid when the fort is closer to the non-pole edge of the map than the polar edge
-* The location doesn't do the 'north/south' axis first:
-    * the eastern south region of The Oracular Plane.
 
 # Citizen Root page
 

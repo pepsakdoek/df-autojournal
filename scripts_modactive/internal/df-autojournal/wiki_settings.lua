@@ -122,6 +122,9 @@ local DEFAULT_SETTINGS = {
             era_timeline = true,
             landmass_list = true,
             landmass_detail = 'all',
+            world_gen = true,
+            seeds = true,
+            geography_detail = 'major',
         },
         journal = {},
     }

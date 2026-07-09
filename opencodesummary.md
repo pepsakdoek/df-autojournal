@@ -449,8 +449,51 @@ When the game is running with a save loaded, use `dfhack-run` to probe DF data s
 & "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "print(...)"
 ```
 Usage: `dfhack-run lua "lua code here"` — the argument after `lua` is the script string.
-Useful for: finding field names, checking vector sizes, testing `pcall` expressions, verifying data is reachable.
-NOTE: All DFHack struct field accesses that might fail should be wrapped in `pcall()` to avoid silent errors inside `xpcall`.
+
+### Examples
+
+**Print a single value:**
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "print(df.global.cur_year, df.global.plotinfo.site_id)"
+```
+
+**Print all fields of a struct (safe way — pairs() on the object works):**
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "local wd = df.global.world.world_data; for k, v in pairs(wd.rivers[0]) do print(k, type(v), '=', tostring(v)) end"
+```
+
+**Check vector/array sizes:**
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "local wd = df.global.world.world_data; print('rivers:', #wd.rivers, 'peaks:', #wd.mountain_peaks, 'landmasses:', #wd.landmasses)"
+```
+
+**List struct field names (via the type's `_fields` table):**
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "if df.world_region then for k, v in pairs(df.world_region._fields) do print(k, 'offset=', v.offset, 'type=', v.type) end end"
+```
+
+**List enum values:**
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "for i = 0, 10 do local ok, v = pcall(function() return df.world_region_type[i] end); if ok then print(i, '=', v) end end"
+```
+
+**Translate DF language names to English:**
+```
+& "D:\Steam\steamapps\common\DFHack\hack\dfhack-run" lua "local r = df.global.world.world_data.regions[0]; print(dfhack.translation.translateName(r.name, false), '->', dfhack.translation.translateName(r.name, true))"
+```
+
+### Gotchas & tips
+
+- **`pairs()` on a DF struct instance lists its fields and values** — this is the primary way to discover what's available. `df.Type._fields` lists field metadata.
+- **Accessing a non-existent field throws an error** — always wrap in `pcall()` if unsure: `pcall(function() return obj.field end)`.
+- **Vector access uses 0-based indices** — `vec[0]` for the first element, `#vec` for count.
+- **BitArray flags** are accessed by numeric index: `obj.flags[0]`, check enum via `df.enum_name._first_item` / `_last_item`.
+- **`io.write()` output is invisible in dfhack-run** — always use `print()` or `table.concat`.
+- ****`dfhack.translation.translateName(name, true)`** gives the English/game-readable name (e.g. "The Ardent Spine"). Without it you get the raw language string (e.g. "Rotecartha").
+- ****`dfhack.df2utf()` / `dfhack.utf2df()`** convert between DF's internal CP437 and UTF-8. Needed when storing/displaying text.
+- **The `--@ module = true` script pattern**: `reqscript()` returns the script's `_ENV` table, not its return value. Always assign exports to `_ENV` and `return _ENV`.
+- **Struct types are in the `df` namespace** by their DF name: `df.world_region`, `df.historical_entity`, `df.unit`, etc. Check `df.<type_name>` to see if a type exists.
+- **Nested fields like `obj.field.subfield` can fail at any level** — wrap entire access chains in `pcall`.
 
 # Agent instructions
 
