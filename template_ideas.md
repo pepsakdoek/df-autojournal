@@ -4,16 +4,16 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # World
 
-* After init the World page should be the first page selected.
 * Gods / Religions? Should maybe live in Civ
 * Meta info:
     * Maybe show the last 'save' human date?
+* Geography:
+    * Lakes and Oceans?
 
 
 
 # Civilization Root Template
 
-* Add a total Population per Civ (into the table)
 
 ## Bugs
 
@@ -21,7 +21,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 * Diplomatic Relations
     * Add links to the other Civs
-* Ethics and Values
+    * Eg: The Ferocious Fountains are at war with:
 * Major History (we should probably remove this - though it could be cool?)
     * When we get here, we should probably brainstorm on what it would mean
 * Ruler
@@ -58,7 +58,6 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Citizen Root page
 
-* Cut off the table at 20 I'd say, people should use the search
 * Happiness in the table should be sorted correctly (by happiness and not as text)
     * Might be tricky, and might need function change, or we can just 'cheat' it by adding 
     1,2,3,4,5,6,7 to the happiness states (not worth the effort to build a hidden sort field into the table structure)
@@ -92,6 +91,8 @@ This is just a list of ideas of things that might be of interest to users, and m
 # Visitors Template
 
 # Code issues and other possible irritations and issues
+
+Searching the cursor doesn't 'move on' when typing a search. (minor)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export

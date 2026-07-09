@@ -491,12 +491,17 @@ function describe_site_position(site)
 
     -- Region/area name from world_region
     local region_name = nil
+    local region_type_str = nil
     if region_ent and region_ent.region_id >= 0 then
         local wr = df.world_region.find(region_ent.region_id)
         if wr then
             local rname = get_readable_name(wr.name)
             if rname and rname ~= "" then
                 region_name = rname
+            end
+            local ok_type, rtype = pcall(function() return df.world_region_type[wr.type] end)
+            if ok_type and rtype then
+                region_type_str = rtype
             end
         end
     end
@@ -548,5 +553,6 @@ function describe_site_position(site)
         continent = continent,
         temperature = temp_desc,
         region_name = region_name,
+        region_type = region_type_str,
     }
 end

@@ -414,15 +414,13 @@ function HyperTable:render(avail_width)
         table.insert(line_spans, ds)
     end
 
-    if #query > 0 and #data_rows == 0 then
+    local remaining = #data_rows - target
+    if #query > 0 and remaining == 0 and #data_rows == 0 then
         local msg = "(no matches)"
         table.insert(lines, msg)
         table.insert(line_spans, {{ text = msg, pen = COLOR_GREY }})
-    end
-
-    if self.max_rows and #self.rows > self.max_rows then
-        local rem = #self.rows - self.max_rows
-        local msg = string.format("... and %d more", rem)
+    elseif remaining > 0 then
+        local msg = string.format("... and %d more", remaining)
         table.insert(lines, msg)
         table.insert(line_spans, {{ text = msg, pen = COLOR_GREY }})
     end

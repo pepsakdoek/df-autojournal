@@ -473,7 +473,7 @@ WikiScreen.ATTRS {
 
 function WikiScreen:init()
     self.context = WikiContext{}
-    self.current_page_id = 'fort:' .. tostring(utils.get_site_id() or '')
+    self.current_page_id = 'world'
     self.expanded = {}
     self.search_mode = false
     self.search_query = ''

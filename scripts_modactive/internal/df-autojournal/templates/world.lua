@@ -87,7 +87,9 @@ function render(data)
         -- Mountain ranges (sorted by size descending)
         local ranges = data.mountain_ranges or {}
         if #ranges > 0 then
-            table.insert(content, { text = "Mountain Ranges: ", pen = COLOR_LIGHTCYAN })
+            table.insert(content, { text = "### Mountain Ranges", pen = COLOR_YELLOW })
+            table.insert(content, "\n")
+            table.insert(content, { text = "Total: ", pen = COLOR_LIGHTCYAN })
             table.insert(content, { text = tostring(#ranges), pen = COLOR_WHITE })
             table.insert(content, "\n")
 
@@ -111,7 +113,9 @@ function render(data)
         -- Mountain peaks (highest points within ranges)
         local peaks = data.mountain_peaks or {}
         if #peaks > 0 then
-            table.insert(content, { text = "Named Peaks: ", pen = COLOR_LIGHTCYAN })
+            table.insert(content, { text = "### Named Peaks", pen = COLOR_YELLOW })
+            table.insert(content, "\n")
+            table.insert(content, { text = "Total: ", pen = COLOR_LIGHTCYAN })
             table.insert(content, { text = tostring(#peaks), pen = COLOR_WHITE })
             table.insert(content, "\n")
 
@@ -131,7 +135,9 @@ function render(data)
 
         -- Rivers
         if data.rivers_count and data.rivers_count > 0 then
-            table.insert(content, { text = "Rivers & Waterways: ", pen = COLOR_LIGHTCYAN })
+            table.insert(content, { text = "### Rivers & Waterways", pen = COLOR_YELLOW })
+            table.insert(content, "\n")
+            table.insert(content, { text = "Total: ", pen = COLOR_LIGHTCYAN })
             table.insert(content, { text = tostring(data.rivers_count) .. " named", pen = COLOR_WHITE })
             if data.major_rivers_count and data.major_rivers_count > 0 then
                 table.insert(content, " (")

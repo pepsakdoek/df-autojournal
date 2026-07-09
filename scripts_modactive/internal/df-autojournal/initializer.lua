@@ -251,7 +251,21 @@ function WikiInitializer:_step_render_subpages()
         safe_save(self.context, page_id, utils.sanitize_content(content), 1)
     end
 
-    local civ_index_content = civilizations_template.render(self._known_civs, self._civ_id)
+    local civ_pops = {}
+    pcall(function()
+        local pops = df.global.world.entity_populations
+        if not pops then return end
+        for i = 0, #pops - 1 do
+            local pop = pops[i]
+            local cid = pop.civ_id
+            local total = 0
+            for j = 0, #pop.counts - 1 do
+                total = total + pop.counts[j]
+            end
+            civ_pops[cid] = (civ_pops[cid] or 0) + total
+        end
+    end)
+    local civ_index_content = civilizations_template.render(self._known_civs, self._civ_id, civ_pops)
     safe_save(self.context, 'civilizations', utils.sanitize_content(civ_index_content), 1)
 
     local forts_index_content = forts_index_template.render(self._known_forts, self._site_id)
@@ -542,7 +556,8 @@ function WikiInitializer:_step_citizens()
                 { header = 'Happiness', align = 'left', min_width = 10, stretch = false },
                 { header = 'Status', align = 'left', min_width = 8, stretch = false },
             },
-            rows = citizen_rows
+            rows = citizen_rows,
+            max_rows = 20,
         })
     end
     if #dead_citizen_rows > 0 then

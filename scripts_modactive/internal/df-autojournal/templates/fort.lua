@@ -85,6 +85,36 @@ function render(site_id)
                 end
                 table.insert(content, "\n")
             end
+
+            if pos_info.region_type then
+                table.insert(content, { text = "Biome: ", pen = COLOR_LIGHTCYAN })
+                local biome_pen = COLOR_WHITE
+                local rt = pos_info.region_type:lower()
+                if rt == "mountains" then
+                    biome_pen = COLOR_LIGHTCYAN
+                elseif rt == "swamp" or rt == "marsh" then
+                    biome_pen = COLOR_GREEN
+                elseif rt == "desert" then
+                    biome_pen = COLOR_YELLOW
+                elseif rt == "ocean" or rt == "lake" then
+                    biome_pen = COLOR_LIGHTBLUE
+                elseif rt == "glacier" or rt == "tundra" then
+                    biome_pen = COLOR_LIGHTCYAN
+                elseif rt == "forest" then
+                    biome_pen = COLOR_GREEN
+                elseif rt == "grassland" then
+                    biome_pen = COLOR_LIGHTGREEN
+                elseif rt == "hills" then
+                    biome_pen = COLOR_LIGHTMAGENTA
+                end
+                table.insert(content, { text = pos_info.region_type, pen = biome_pen })
+                if pos_info.region_name then
+                    table.insert(content, " (")
+                    table.insert(content, { text = pos_info.region_name, pen = COLOR_LIGHTCYAN })
+                    table.insert(content, ")")
+                end
+                table.insert(content, "\n")
+            end
         end
     end
 

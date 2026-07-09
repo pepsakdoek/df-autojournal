@@ -283,22 +283,20 @@ function render(civ_id, known_fort_set)
                     local other_civ = df.historical_entity.find(rel.entity_id)
                     if other_civ and other_civ.type == df.historical_entity_type.Civilization then
                         local other_name = utils.get_readable_name(other_civ.name)
-                        local rel_type = "Neutral"
-                        if rel.relation == df.entity_relation_type.War then
-                            rel_type = "WAR"
-                        elseif rel.relation == df.entity_relation_type.Peace then
-                            rel_type = "Peace"
-                        end
+                        local is_war = rel.relation == df.entity_relation_type.War
+                        local is_peace = rel.relation == df.entity_relation_type.Peace
 
-                        if (settings.wars and rel_type == "WAR") or settings.relations then
+                        if (settings.wars and is_war) or settings.relations then
                             table.insert(content, "* ")
-                            table.insert(content, { text = other_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(other_civ.id) })
-                            table.insert(content, ": ")
-                            if rel_type == "WAR" then
-                                table.insert(content, { text = rel_type, pen = COLOR_LIGHTRED })
+                            table.insert(content, { text = civ_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(civ.id) })
+                            if is_war then
+                                table.insert(content, " are at war with ")
+                            elseif is_peace then
+                                table.insert(content, " are at peace with ")
                             else
-                                table.insert(content, { text = rel_type, pen = COLOR_LIGHTGREEN })
+                                table.insert(content, " are neutral with ")
                             end
+                            table.insert(content, { text = other_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(other_civ.id) })
                             table.insert(content, "\n")
                             found = true
                         end
@@ -314,8 +312,93 @@ function render(civ_id, known_fort_set)
                 table.insert(content, "\n")
                 table.insert(content, { text = "## Ethics & Values", pen = COLOR_YELLOW })
                 table.insert(content, "\n")
-                table.insert(content, { text = "Describe the core beliefs of your civilization here.", pen = COLOR_DARKGREY })
-                table.insert(content, "\n")
+
+                -- Core Values from entity_raw
+                local strong_values = {}
+                local despised_values = {}
+                pcall(function()
+                    local er = civ.entity_raw
+                    if er and er.values then
+                        for i = 0, #er.values - 1 do
+                            local v = er.values[i]
+                            if math.abs(v) >= 15 then
+                                local ok, vname = pcall(function() return df.value_type[i] end)
+                                if ok and vname then
+                                    local label = vname:gsub("_", " "):lower():gsub("^%l", string.upper)
+                                    if v > 0 then
+                                        table.insert(strong_values, label)
+                                    else
+                                        table.insert(despised_values, label)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+
+                if #strong_values > 0 then
+                    table.insert(content, { text = "### Core Values", pen = COLOR_YELLOW })
+                    table.insert(content, "\n")
+                    for _, val in ipairs(strong_values) do
+                        table.insert(content, "* " .. val .. "\n")
+                    end
+                    table.insert(content, "\n")
+                end
+
+                if #despised_values > 0 then
+                    table.insert(content, { text = "### Despised", pen = COLOR_YELLOW })
+                    table.insert(content, "\n")
+                    for _, val in ipairs(despised_values) do
+                        table.insert(content, "* " .. val .. "\n")
+                    end
+                    table.insert(content, "\n")
+                end
+
+                -- Ethics from entity_raw
+                local ethic_rows = {}
+                pcall(function()
+                    local er = civ.entity_raw
+                    if er and er.ethic then
+                        for i = 0, #er.ethic - 1 do
+                            local resp = er.ethic[i]
+                            if resp ~= 0 then
+                                local ok, ename = pcall(function() return df.ethic_type[i] end)
+                                local ok2, rname = pcall(function() return df.ethic_response[resp] end)
+                                if ok and ok2 and ename and rname then
+                                    local label = ename:gsub("_", " "):lower():gsub("^%l", string.upper)
+                                    local resp_label = rname:gsub("_", " "):lower():gsub("^%l", string.upper)
+                                    local resp_pen = COLOR_WHITE
+                                    if rname == "UNTHINKABLE" or rname == "APPALLING" then
+                                        resp_pen = COLOR_LIGHTRED
+                                    elseif rname == "ACCEPTABLE" then
+                                        resp_pen = COLOR_LIGHTGREEN
+                                    elseif rname:match("PUNISH") then
+                                        resp_pen = COLOR_YELLOW
+                                    end
+                                    table.insert(ethic_rows, {
+                                        { text = label, pen = COLOR_WHITE },
+                                        { text = resp_label, pen = resp_pen },
+                                    })
+                                end
+                            end
+                        end
+                    end
+                end)
+
+                if #ethic_rows > 0 then
+                    table.insert(content, { text = "### Ethics", pen = COLOR_YELLOW })
+                    table.insert(content, "\n")
+                    table.insert(content, {
+                        type = 'table',
+                        columns = {
+                            { header = 'Topic', align = 'left', min_width = 25, stretch = true },
+                            { header = 'Stance', align = 'left', min_width = 30, stretch = true },
+                        },
+                        rows = ethic_rows,
+                        max_rows = 30,
+                    })
+                    table.insert(content, "\n")
+                end
             end
         end
 
