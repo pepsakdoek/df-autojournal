@@ -24,11 +24,14 @@ This is just a list of ideas of things that might be of interest to users, and m
 * Diplomatic Relations
     * Add links to the other Civs
     * Eg: The Ferocious Fountains are at war with:
-* Major History (we should probably remove this - though it could be cool?)
-    * When we get here, we should probably brainstorm on what it would mean
 * Ruler
 * Most Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
 * Elf Civs don't show all of their Retreats. (They seem to all be called Forest Retreats)
+
+## Lower priority
+
+* Major History (we should probably remove this - though it could be cool?)
+    * When we get here, we should probably brainstorm on what it would mean
 
 
 # Forts Root Page
@@ -49,10 +52,8 @@ This is just a list of ideas of things that might be of interest to users, and m
     * Deaths
     * 'Visitors' like monster slayers / entertainers etc.
     * Sieges
-    * Maybe even the whole events / enemies should maybe be 'sub-sections' of Fort - thinking about a 'multi-fort' save game. Events at Fort 1 should not be part of Fort 2's events.
 
 ## Bugs
-
 
 # Citizen Root page
 
@@ -72,13 +73,10 @@ This is just a list of ideas of things that might be of interest to users, and m
 * Get the actual arrival date per citizen (especially on initialization) -- it currently uses the logged on date, it should never optionally use the 'logged on' date, and should use find the date the entity arrived at the fort (find it, else put unknown)
 * Should include timeline and arrivals, new relationships, new skills (upon reaching master level), new medical requirements and history
 * Military history (notable kills) - if it's in it's not working / showing
-    
-# Artifacts
 
-* The create date should also be a column (could maybe call this age too?)
-* All the fields from initialization should be pushed to Auto-journaling too (though I guess if we run the initialization code when the artifact is first created it's not much of a problem)
-* Would need a field for if the location is known or not - It may have been traded in peace negotiations (or seige negotiations etc.) or just flat out stolen
-    * Don't need/want the exact location, we want to know the 'status' (not sure if this is available in a vague 'lore' term in the engine) - I asked on the discord
+# Artifacts root page
+
+# Artifacts template
 
 # Enemies root page
 
@@ -90,7 +88,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
-Searching the cursor doesn't 'move on' when typing a search. (minor)
+* Searching the cursor doesn't 'move on' when typing a search. (minor)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export

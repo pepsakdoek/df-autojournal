@@ -67,6 +67,7 @@ local DEFAULT_SETTINGS = {
         },
         journal = {
             created = true,
+            decorations = true,
         }
     },
     event = {
@@ -134,7 +135,7 @@ local DEFAULT_JOURNAL = {
     civ = { diplomacy = true, wars = true, leadership = true },
     fort = { population = true, construction = true, defense = true },
     citizen = { pet_adopted = true, died = true, renamed = true, arrivals = true, new_relationships = true, master_skills = true, medical_history = true, military_history = true, timeline_events = true },
-    artifact = { created = true },
+    artifact = { created = true, decorations = true },
     event = {
         threat_events = true,
         achievement_events = true,

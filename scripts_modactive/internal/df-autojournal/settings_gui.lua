@@ -110,6 +110,7 @@ local SETTING_DESCRIPTIONS = {
         },
         journal = {
             created = "Auto-record when new artifacts are created",
+            decorations = "Show artifact decorations and improvements (gem settings, metal inlays, images)",
         },
     },
     event = {

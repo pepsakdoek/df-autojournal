@@ -601,43 +601,59 @@ function WikiInitializer:_step_artifacts()
         if not ok_item or not item then
             goto continue_artifact
         end
-        local pos = dfhack.items.getPosition(item)
-        if pos then
-            local name = utils.sanitize(dfhack.items.getReadableDescription(item))
+        local pos = item.pos
+        if pos and pos.x ~= -30000 then
+            local art_name = art_record.name and utils.get_readable_name(art_record.name) or ""
+            local short_desc = utils.sanitize(dfhack.items.getDescription(item, 1))
+            local display_name = art_name ~= "" and art_name or short_desc
             local id = 'artifact:' .. tostring(art_record.id)
             self._membership_map[id] = 'fort:' .. self._site_id .. '/artifacts'
-            logger.log("Found artifact on site: " .. name .. " (ID: " .. art_record.id .. ")")
-            table.insert(artifacts, {name=name, id=id})
-            self._dynamic_pages[#self._dynamic_pages + 1] = {text=name, id=id}
+            logger.log("Found artifact on site: " .. display_name .. " (ID: " .. art_record.id .. ")")
+            table.insert(artifacts, {name=display_name, id=id})
+            self._dynamic_pages[#self._dynamic_pages + 1] = {text=display_name, id=id}
 
-            local content = artifact_template.render(item)
+            local content = artifact_template.render(item, art_record)
             safe_save(self.context, id, utils.sanitize_content(content), 1)
 
             local itype = item:getType()
             local type_name = tostring(df.item_type[itype]):gsub("_", " "):lower():gsub("^%l", string.upper)
             local value = dfhack.items.getValue(item)
+            local material_name = "?"
+            pcall(function()
+                local m = dfhack.matinfo.decode(item.mat_type, item.mat_index)
+                if m then material_name = m:toString() end
+            end)
+            local year_str = "?"
+            if art_record and art_record.year and art_record.year > 0 then
+                year_str = tostring(art_record.year)
+            end
 
             local creator_cell = { text = "Unknown", pen = COLOR_DARKGREY }
-            local art_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.ARTIFACT)
-            local artifact_record = nil
-            if art_ref then
-                artifact_record = df.artifact_record.find(art_ref.artifact_id)
-            end
-            if artifact_record then
-                local creator_ref = dfhack.items.getGeneralRef(item, df.general_ref_type.UNIT_CREATOR)
-                if creator_ref then
-                    local unit = df.unit.find(creator_ref.unit_id)
-                    if unit then
-                        local unit_name = utils.sanitize(dfhack.units.getReadableName(unit))
-                        creator_cell = { text = unit_name, pen = COLOR_LIGHTBLUE, link = "citizen:" .. tostring(unit.id) }
+            local ok_maker, maker_id = pcall(function() return item.maker end)
+            if ok_maker and maker_id and maker_id > 0 then
+                local hf = df.historical_figure.find(maker_id)
+                if hf then
+                    local hf_name = utils.get_readable_name(hf.name)
+                    if hf.unit_id and hf.unit_id > 0 then
+                        local unit = df.unit.find(hf.unit_id)
+                        if unit and dfhack.units.isCitizen(unit) then
+                            creator_cell = { text = hf_name, pen = COLOR_LIGHTBLUE, link = "citizen:" .. tostring(hf.unit_id) }
+                        end
+                    end
+                    if not creator_cell.link then
+                        creator_cell = { text = hf_name, pen = COLOR_WHITE }
                     end
                 end
             end
 
+            local material_cell = { text = material_name, pen = dfhack.matinfo.decode(item.mat_type, item.mat_index) and COLOR_WHITE or COLOR_GREY }
+
             table.insert(artifact_rows, {
-                { text = name, pen = COLOR_LIGHTBLUE, link = id },
-                creator_cell,
+                { text = display_name, pen = COLOR_LIGHTBLUE, link = id },
                 { text = type_name },
+                material_cell,
+                { text = year_str, pen = COLOR_LIGHTCYAN },
+                creator_cell,
                 { text = tostring(value), pen = COLOR_LIGHTGREEN },
             })
         end
@@ -654,13 +670,15 @@ function WikiInitializer:_step_artifacts()
     table.insert(artifact_root, {
         type = 'table',
         columns = {
-            { header = 'Name', align = 'left', min_width = 20 },
+            { header = 'Name', align = 'left', min_width = 20, stretch = true },
+            { header = 'Type', align = 'left', min_width = 12 },
+            { header = 'Material', align = 'left', min_width = 12 },
+            { header = 'Year', align = 'right', min_width = 5 },
             { header = 'Creator', align = 'left', min_width = 15 },
-            { header = 'Type', align = 'left', min_width = 10 },
             { header = 'Value', align = 'right', min_width = 8 },
         },
         rows = artifact_rows,
-        max_rows = 50,
+        max_rows = 100,
     })
     safe_save(self.context, 'artifacts', utils.sanitize_content(artifact_root), 1)
     safe_save(self.context, 'fort:' .. self._site_id .. '/artifacts', utils.sanitize_content(artifact_root), 1)
