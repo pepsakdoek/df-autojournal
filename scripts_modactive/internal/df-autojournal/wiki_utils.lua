@@ -559,28 +559,55 @@ function describe_site_position(site)
         end
     end)
 
-    -- River check: collect all rivers at the site
+    -- River check: collect rivers near the site by end_pos
     local nearby_rivers = {}
     pcall(function()
         local rivers = world_data.rivers
         if rivers then
+            local sx, sy = site.pos.x, site.pos.y
             for _, r in ipairs(rivers) do
-                local path = r.path
-                if path then
-                    for j = 0, #path - 1 do
-                        local tp = path[j]
-                        if tp and math.abs(tp.x - site.pos.x) <= 1 and math.abs(tp.y - site.pos.y) <= 1 then
-                            local rname = get_readable_name(r.name)
-                            if rname and rname ~= "" then
-                                table.insert(nearby_rivers, rname)
-                            end
-                            break
-                        end
-                    end
+                local d = math.sqrt((r.end_pos.x - sx)^2 + (r.end_pos.y - sy)^2)
+                if d <= 2 then
+                    local rname = get_readable_name(r.name)
+                    if rname and rname ~= "" then table.insert(nearby_rivers, rname) end
                 end
             end
         end
+        -- Deduplicate
+        local seen = {}
+        local unique = {}
+        for _, name in ipairs(nearby_rivers) do
+            if not seen[name] then seen[name] = true; table.insert(unique, name) end
+        end
+        nearby_rivers = unique
     end)
+
+    -- Vegetation description based on biome density
+    local vegetation_desc = nil
+    local veg = region_ent and region_ent.vegetation
+    if veg then
+        if veg < 10 then
+            if region_type_str == "Tundra" or region_type_str == "Glacier" then
+                vegetation_desc = "with sparse vegetation"
+            else
+                vegetation_desc = "sparsely vegetated"
+            end
+        elseif veg < 30 then
+            vegetation_desc = "lightly vegetated"
+        elseif veg < 50 then
+            vegetation_desc = "with scattered vegetation"
+        elseif veg < 70 then
+            vegetation_desc = "moderately vegetated"
+        elseif veg < 85 then
+            vegetation_desc = "densely vegetated"
+        else
+            if region_type_str == "Swamp" or region_type_str == "Marsh" or vegetation_desc == nil then
+                vegetation_desc = "with thick vegetation"
+            else
+                vegetation_desc = "lushly vegetated"
+            end
+        end
+    end
 
     return {
         description = dir_desc,
@@ -589,7 +616,8 @@ function describe_site_position(site)
         temperature = temp_desc,
         region_name = region_name,
         region_type = region_type_str,
-        vegetation = region_ent and region_ent.vegetation,
+        vegetation = veg,
+        vegetation_desc = vegetation_desc,
         nearby_volcano = nearby_volcano,
         nearby_rivers = nearby_rivers,
     }

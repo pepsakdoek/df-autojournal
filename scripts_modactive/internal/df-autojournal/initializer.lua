@@ -92,6 +92,7 @@ function WikiInitializer:perform(screen)
         self:_step_create_sections()
         self:_step_save_dynamic()
         self:_step_events_and_catchup()
+        self:_step_start_listener()
         self:_step_finalize()
 
         return true
@@ -722,6 +723,12 @@ function WikiInitializer:_step_events_and_catchup()
     pcall(function() self:renderVisitorsPage() end)
 end
 
+function WikiInitializer:_step_start_listener()
+    logger.log("Starting real-time event listener...")
+    event_listener.start()
+    logger.log("Event listener started.")
+end
+
 function WikiInitializer:_step_finalize()
     logger.log("Setting mfw_initialized flag")
     dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
@@ -753,6 +760,7 @@ function WikiInitializer:perform_async()
             {name='Creating section pages',         fn=function() self:_step_create_sections() end},
             {name='Saving dynamic pages',           fn=function() self:_step_save_dynamic() end},
             {name='Historical catch-up',            fn=function() self:_step_events_and_catchup() end},
+            {name='Starting event listener',        fn=function() self:_step_start_listener() end},
             {name='Finalizing',                     fn=function() self:_step_finalize() end},
         }
 

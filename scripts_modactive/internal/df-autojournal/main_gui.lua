@@ -474,6 +474,12 @@ WikiScreen.ATTRS {
 function WikiScreen:init()
     self.context = WikiContext{}
     self.current_page_id = 'world'
+    pcall(function()
+        local data = dfhack.persistent.getSiteData(self.context.save_prefix .. 'last_page')
+        if data and data.val and type(data.val) == 'table' and #data.val > 0 then
+            self.current_page_id = data.val[1]
+        end
+    end)
     self.expanded = {}
     self.search_mode = false
     self.search_query = ''
@@ -616,6 +622,7 @@ function WikiScreen:performInitialization()
             'Creating section pages',
             'Saving dynamic pages',
             'Historical catch-up',
+            'Starting event listener',
             'Finalizing',
         },
     }
@@ -713,6 +720,12 @@ function WikiScreen:updateLinkPages()
     self.subviews.wiki_window.subviews.editor.link_pages = all_pages
 end
 
+function WikiScreen:save_last_page(page_id)
+    if dfhack.isWorldLoaded() then
+        dfhack.persistent.saveSiteData(self.context.save_prefix .. 'last_page', {val={page_id}})
+    end
+end
+
 function WikiScreen:onDismiss()
     local win = self.subviews.wiki_window
     if win then
@@ -727,6 +740,7 @@ function WikiScreen:onDismiss()
             })
         end
     end
+    self:save_last_page(self.current_page_id)
     view = nil
 end
 

@@ -103,6 +103,9 @@ function render(site_id)
                 local temp_word = t:match("^[^,]+") or t
                 table.insert(desc_parts, "with a " .. temp_word .. " climate")
             end
+            if pos_info.vegetation_desc then
+                table.insert(desc_parts, pos_info.vegetation_desc)
+            end
             if pos_info.nearby_volcano then
                 table.insert(desc_parts, "built atop the volcano " .. pos_info.nearby_volcano)
             end

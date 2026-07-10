@@ -63,12 +63,21 @@ local REPORT_MAP = {
     -- Ambush (53–66)
     [53] = { category = "military", type = "ambush", importance = 3, is_major = true },
 
+    -- Migration
+    [49] = { category = "population", type = "migrant_wave_named", importance = 2 },
+    [50] = { category = "population", type = "migrant_wave", importance = 2 },
+    [69] = { category = "population", type = "migrant_details", importance = 1 },
+
+    -- Births
+    [83] = { category = "population", type = "birth", importance = 2 },
+
     -- Caravan / Trade
     [67] = { category = "trade", type = "caravan_arrival", importance = 2 },
     [68] = { category = "trade", type = "noble_arrival", importance = 1 },
     [242] = { category = "trade", type = "merchants_unloading", importance = 1 },
     [245] = { category = "trade", type = "merchants_leaving_soon", importance = 1 },
     [246] = { category = "trade", type = "merchants_embarked", importance = 1 },
+    [248] = { category = "social", type = "pet_adopted", importance = 1 },
     [343] = { category = "trade", type = "first_caravan_arrival", importance = 3, is_major = true },
 
     -- Diplomats
@@ -92,6 +101,7 @@ local REPORT_MAP = {
     [91] = { category = "achievement", type = "mood_building_claimed", importance = 2 },
     [92] = { category = "achievement", type = "artifact_begun", importance = 2 },
     [99] = { category = "achievement", type = "masterpiece_construction", importance = 2 },
+    [85] = { category = "achievement", type = "strange_mood", importance = 1 },
     [238] = { category = "achievement", type = "soldier_becomes_master", importance = 2 },
     [256] = { category = "achievement", type = "masterpiece_crafted", importance = 2 },
     [258] = { category = "achievement", type = "power_learned", importance = 2 },
@@ -105,8 +115,10 @@ local REPORT_MAP = {
     -- Threats
     [93] = { category = "threat", type = "megabeast_arrival", importance = 4, is_major = true },
     [94] = { category = "threat", type = "werebeast_arrival", importance = 4, is_major = true },
+    [95] = { category = "threat", type = "beast_ambush", importance = 3, is_major = true },
     [136] = { category = "threat", type = "night_attack_start", importance = 3, is_major = true },
     [137] = { category = "threat", type = "night_attack_end", importance = 3 },
+    [139] = { category = "crisis", type = "ghost_attack", importance = 2 },
     [145] = { category = "threat", type = "creature_steals_object", importance = 3 },
     [147] = { category = "threat", type = "body_transformation", importance = 2 },
     [150] = { category = "threat", type = "undead_attack", importance = 4, is_major = true },
@@ -125,6 +137,9 @@ local REPORT_MAP = {
     [313] = { category = "crisis", type = "building_destroyed", importance = 3 },
     [314] = { category = "crisis", type = "deity_curse", importance = 4, is_major = true },
     [348] = { category = "crisis", type = "food_warning", importance = 2 },
+
+    -- Death (pets, animals)
+    [107] = { category = "death", type = "pet_died", importance = 1 },
 
     -- Social
     [153] = { category = "social", type = "embrace", importance = 1 },
@@ -401,6 +416,30 @@ function EventParser._format_combat_entry(report_text, report_obj)
     return nil
 end
 
+function EventParser._format_population_entry(report_text, report_obj, event_type)
+    local date = formatted_date(df.global.cur_year, df.global.cur_year_tick)
+    local text = sanitize_report_text(report_text) or event_type
+    local entry = entry_line(date .. ": " .. text)
+    -- Extract mother unit for birth citizen routing
+    local speaker_id = nil
+    if report_obj and report_obj.speaker_id and report_obj.speaker_id ~= -1 then
+        speaker_id = report_obj.speaker_id
+    end
+    return entry, speaker_id
+end
+
+function EventParser._format_pet_entry(report_text, report_obj, event_type)
+    local date = formatted_date(df.global.cur_year, df.global.cur_year_tick)
+    local text = sanitize_report_text(report_text) or event_type
+    local entry = entry_line(date .. ": " .. text)
+    -- Extract owner unit for citizen routing
+    local speaker_id = nil
+    if report_obj and report_obj.speaker_id and report_obj.speaker_id ~= -1 then
+        speaker_id = report_obj.speaker_id
+    end
+    return entry, speaker_id
+end
+
 ---------------------------------------------------------------------------
 --- Build a parsed result structure from category info + entry text
 ---------------------------------------------------------------------------
@@ -438,6 +477,10 @@ local function make_result(info, entry, extra_targets, enemy_name, enemy_type, e
         table.insert(targets, { page_id = "events", section = "World Events", entry = entry })
     elseif info.category == "combat" then
         table.insert(targets, { page_id = "events", section = "Combat Log", entry = entry })
+    elseif info.category == "population" then
+        table.insert(targets, { page_id = "events", section = "Population", entry = entry })
+    elseif info.category == "death" then
+        table.insert(targets, { page_id = "events", section = "Deaths", entry = entry })
     else
         table.insert(targets, { page_id = "events", section = default_section, entry = entry })
     end
@@ -507,13 +550,24 @@ function EventParser.parse_report(report_type, report_text, report_obj)
     local enemy_type = nil
     local visitor_name = nil
     local visitor_type = nil
+    local extra_targets = nil
+    local citizen_id = nil
     if info.category == "threat" then
         entry, enemy_name, enemy_type = EventParser._format_threat_entry(report_text, report_obj, info.type)
     elseif info.category == "achievement" then
         entry = EventParser._format_achievement_entry(report_text, report_obj, info.type)
     elseif info.category == "social" then
-        entry, visitor_name = EventParser._format_social_entry(report_text, report_obj, info.type)
-        if visitor_name then visitor_type = "entertainer" end
+        if info.type == "pet_adopted" then
+            entry, citizen_id = EventParser._format_pet_entry(report_text, report_obj, info.type)
+            if citizen_id then
+                extra_targets = {
+                    { page_id = "citizen:" .. tostring(citizen_id), section = "History & Timeline", entry = entry },
+                }
+            end
+        else
+            entry, visitor_name = EventParser._format_social_entry(report_text, report_obj, info.type)
+            if visitor_name then visitor_type = "entertainer" end
+        end
     elseif info.category == "trade" then
         entry, visitor_name, visitor_type = EventParser._format_trade_entry(report_text, report_obj, info.type)
     elseif info.category == "crisis" then
@@ -524,13 +578,37 @@ function EventParser.parse_report(report_type, report_text, report_obj)
         entry = EventParser._format_environment_entry(report_text, report_obj, info.type)
     elseif info.category == "world" then
         entry = EventParser._format_world_entry(report_text, report_obj, info.type)
+    elseif info.category == "population" then
+        entry, citizen_id = EventParser._format_population_entry(report_text, report_obj, info.type)
+        if citizen_id and info.type == "birth" then
+            extra_targets = {
+                { page_id = "citizen:" .. tostring(citizen_id), section = "History & Timeline", entry = entry },
+            }
+        end
+    elseif info.category == "death" then
+        entry, citizen_id = EventParser._format_pet_entry(report_text, report_obj, info.type)
+        if citizen_id then
+            extra_targets = {
+                { page_id = "citizen:" .. tostring(citizen_id), section = "History & Timeline", entry = entry },
+            }
+        end
     else
         entry = EventParser._format_world_entry(report_text, report_obj, info.type)
     end
 
     if not entry then return nil end
 
-    local result = make_result(info, entry, nil, enemy_name, enemy_type)
+    -- Soldier becomes master: route to citizen page
+    if info.type == "soldier_becomes_master" and report_obj and report_obj.speaker_id and report_obj.speaker_id ~= -1 then
+        local unit = df.unit.find(report_obj.speaker_id)
+        if unit and is_our_unit(unit) then
+            local citizen_target = { page_id = "citizen:" .. tostring(unit.id), section = "History & Timeline", entry = entry }
+            if not extra_targets then extra_targets = {} end
+            table.insert(extra_targets, citizen_target)
+        end
+    end
+
+    local result = make_result(info, entry, extra_targets, enemy_name, enemy_type)
     if visitor_name then
         result.visitor_name = visitor_name
         result.visitor_type = visitor_type or "unknown"
@@ -1197,9 +1275,185 @@ function EventParser.parse(event)
             importance = 1,
         }
 
+    -- + WAR_ATTACKED_SITE (site attacked by a civilization)
+    elseif etype == df.history_event_type.WAR_ATTACKED_SITE then
+        local site_id = -1
+        pcall(function() site_id = event.site_id end)
+        if site_id == df.global.plotinfo.site_id then
+            local attacker = "unknown"
+            pcall(function()
+                if event.attacker_civ_id and event.attacker_civ_id ~= -1 then
+                    local civ = df.historical_entity.find(event.attacker_civ_id)
+                    if civ then attacker = utils.get_readable_name(civ.name) end
+                end
+            end)
+            return {
+                page_id = "events",
+                section = "Sieges & Invasions",
+                text = "Attacked by " .. attacker .. " in year " .. year,
+                importance = 3,
+            }
+        end
+        return nil
+
+    -- + CREATED_SITE (site founded)
+    elseif etype == df.history_event_type.CREATED_SITE then
+        local site_id = -1
+        pcall(function() site_id = event.site_id end)
+        if site_id == df.global.plotinfo.site_id then
+            local site_name = ""
+            pcall(function()
+                local site = df.world_site.find(site_id)
+                if site and site.name and site.name.has_name then
+                    site_name = ": " .. utils.get_readable_name(site.name)
+                end
+            end)
+            return {
+                page_id = "events",
+                section = "Fort Timeline",
+                text = "Site founded in year " .. year .. site_name,
+                importance = 3,
+            }
+        end
+        return nil
+
+    -- + ADD_HF_ENTITY_LINK (historical figure joined/left an entity)
+    elseif etype == df.history_event_type.ADD_HF_ENTITY_LINK then
+        local entity_id = -1
+        pcall(function() entity_id = event.entity_id end)
+        if entity_id == df.global.plotinfo.civ_id and EventParser.is_our_hf(event.hfid) then
+            local link_type = "joined"
+            pcall(function() link_type = tostring(event.link_type):lower() end)
+            link_type = link_type:gsub("^%l", string.upper)
+            local page = citizen_page(event.hfid)
+            local result = {
+                section = "History & Timeline",
+                text = link_type .. " the civilization in year " .. year,
+                importance = 1,
+            }
+            if page then
+                result.page_id = page
+            else
+                result.page_id = "events"
+                result.section = "Population"
+            end
+            return result
+        end
+        return nil
+
+    -- + ADD_HF_SITE_LINK (historical figure linked to a site)
+    elseif etype == df.history_event_type.ADD_HF_SITE_LINK then
+        local site_id = -1
+        pcall(function() site_id = event.site_id end)
+        if site_id == df.global.plotinfo.site_id then
+            if EventParser.is_our_hf(event.hfid) then
+                local page = citizen_page(event.hfid)
+                if page then
+                    local link_type = "visited"
+                    pcall(function() link_type = tostring(event.link_type):lower() end)
+                    link_type = link_type:gsub("^%l", string.upper)
+                    return {
+                        page_id = page,
+                        section = "History & Timeline",
+                        text = link_type .. " the fortress in year " .. year,
+                        importance = 1,
+                    }
+                end
+            end
+        end
+        return nil
+
+    -- + WAR_FIELD_BATTLE (battle at a site between civilizations)
+    elseif etype == df.history_event_type.WAR_FIELD_BATTLE then
+        local site_id = -1
+        pcall(function() site_id = event.site_id end)
+        if site_id == df.global.plotinfo.site_id then
+            return {
+                page_id = "events",
+                section = "Sieges & Invasions",
+                text = "Battle fought at the fortress in year " .. year,
+                importance = 2,
+            }
+        end
+        return nil
+
+    -- + HIST_FIGURE_WOUNDED (historical figure was wounded)
+    elseif etype == df.history_event_type.HIST_FIGURE_WOUNDED then
+        if EventParser.is_our_hf(event.hf) then
+            local page = citizen_page(event.hf)
+            local wound_type = ""
+            pcall(function() wound_type = " (" .. tostring(event.wound_type):lower() .. ")" end)
+            local result = {
+                section = "History & Timeline",
+                text = "Wounded in year " .. year .. wound_type,
+                importance = 1,
+            }
+            if page then
+                result.page_id = page
+            else
+                result.page_id = "events"
+                result.section = "Combat & Conflicts"
+            end
+            return result
+        end
+        return nil
+
+    -- + ITEM_STOLEN (item stolen, track only if artifact)
+    elseif etype == df.history_event_type.ITEM_STOLEN then
+        local is_artifact = false
+        pcall(function()
+            local item_id = event.item
+            if item_id and item_id ~= -1 then
+                for _, art in ipairs(df.global.world.artifacts.all) do
+                    if art.item and art.item.id == item_id then
+                        is_artifact = true
+                        break
+                    end
+                end
+            end
+        end)
+        if is_artifact then
+            local art_name = ""
+            pcall(function()
+                local item = df.item.find(event.item)
+                if item then
+                    art_name = " " .. dfhack.items.getDescription(item, 0, true)
+                end
+            end)
+            return {
+                page_id = "events",
+                section = "Incidents & Crises",
+                text = "Artifact stolen in year " .. year .. ":" .. art_name,
+                importance = 3,
+            }
+        end
+        return nil
+
+    -- + CEREMONY (ceremony held at a site)
+    elseif etype == df.history_event_type.CEREMONY then
+        local site_id = -1
+        pcall(function() site_id = event.site_id end)
+        if site_id == df.global.plotinfo.site_id then
+            local ceremony_type = "ceremony"
+            pcall(function() ceremony_type = tostring(event.ceremony_type):lower() end)
+            ceremony_type = ceremony_type:gsub("^%l", string.upper)
+            return {
+                page_id = "events",
+                section = "Social Events",
+                text = ceremony_type .. " held at the fortress in year " .. year,
+                importance = 1,
+            }
+        end
+        return nil
+
     end
 
     return nil
 end
 
-return EventParser
+-- Export EventParser functions to the module environment so reqscript callers
+-- find them.  DFHack returns _ENV for --@ module = true scripts.
+for k, v in pairs(EventParser) do
+    _ENV[k] = v
+end
+return _ENV
