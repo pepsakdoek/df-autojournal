@@ -181,6 +181,227 @@ function render(site_id)
         table.insert(content, "\n\n")
     end
 
+    if settings.religion then
+        pcall(function()
+            local site_id_actual = site_id or (site and site.id)
+            if not site_id_actual then return end
+            local civ_id = df.global.plotinfo and df.global.plotinfo.civ_id
+            if not civ_id then return end
+            local civ = df.historical_entity.find(civ_id)
+            if not civ or not civ.relations then return end
+            local rels = civ.relations
+
+            local deity_counts = {}
+            local rel_members = {}
+            local all_units = df.global.world.units.all
+            if all_units then
+                for i = 0, #all_units - 1 do
+                    local u = all_units[i]
+                    if u and u.civ_id == civ_id then
+                        local hf = df.historical_figure.find(u.hist_figure_id)
+                        if hf then
+                            if hf.histfig_links then
+                                for _, link in ipairs(hf.histfig_links) do
+                                    if df.histfig_hf_link_deityst and df.histfig_hf_link_deityst:is_instance(link) then
+                                        deity_counts[link.target_hf] = (deity_counts[link.target_hf] or 0) + 1
+                                    end
+                                end
+                            end
+                            if hf.entity_links then
+                                for _, l in ipairs(hf.entity_links) do
+                                    local e = df.historical_entity.find(l.entity_id)
+                                    if e and e.type == df.historical_entity_type.Religion then
+                                        rel_members[l.entity_id] = (rel_members[l.entity_id] or 0) + 1
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Build deity name lookup
+            local deity_name_map = {}
+            for i = 0, #rels.deities - 1 do
+                local hf = df.historical_figure.find(rels.deities[i])
+                if hf and hf.name then
+                    local name = utils.get_readable_name(hf.name)
+                    local lower = name:lower()
+                    local first_word = lower:match('%S+')
+                    deity_name_map[lower] = rels.deities[i]
+                    if first_word then
+                        deity_name_map[first_word] = rels.deities[i]
+                    end
+                end
+            end
+
+            -- Find temples among LOCATION_ASSIGNED buildings
+            local temple_rows = {}
+            local locs = df.global.world.buildings.other.LOCATION_ASSIGNED
+            if locs then
+                for i = 0, #locs - 1 do
+                    local bld = locs[i]
+                    if bld and bld.name and bld.name ~= '' then
+                        local bname = bld.name
+                        local lower = bname:lower()
+                        local deity_id = nil
+                        for dlower, did in pairs(deity_name_map) do
+                            if lower:match(dlower) then
+                                deity_id = did
+                                break
+                            end
+                        end
+                        local hf_name = ''
+                        if deity_id then
+                            local dhf = df.historical_figure.find(deity_id)
+                            if dhf then
+                                hf_name = utils.get_readable_name(dhf.name)
+                            end
+                        end
+                        if hf_name ~= '' or lower:match('temple') or lower:match('chapel') or lower:match('shrine') then
+                            table.insert(temple_rows, {
+                                { text = bname, pen = COLOR_WHITE },
+                                { text = hf_name ~= '' and hf_name or 'General worship', pen = hf_name ~= '' and COLOR_LIGHTBLUE or COLOR_GREY },
+                            })
+                        end
+                    end
+                end
+            end
+
+            table.insert(content, "\n")
+            table.insert(content, { text = "## Religion", pen = COLOR_YELLOW })
+            table.insert(content, "\n")
+
+            if temple_rows and #temple_rows > 0 then
+                table.insert(content, { text = "### Temples & Shrines", pen = COLOR_YELLOW })
+                table.insert(content, "\n")
+                table.insert(content, {
+                    type = 'table',
+                    columns = {
+                        { header = 'Building', align = 'left', min_width = 20, stretch = true },
+                        { header = 'Dedicated To', align = 'left', min_width = 20, stretch = true },
+                    },
+                    rows = temple_rows,
+                    max_rows = 20,
+                })
+                table.insert(content, "\n")
+            end
+
+            -- Deities followed by fort citizens
+            local deities = rels.deities
+            if deities and #deities > 0 then
+                local deity_rows = {}
+                for i = 0, #deities - 1 do
+                    local hf = df.historical_figure.find(deities[i])
+                    if hf and hf.name then
+                        local dname = utils.get_readable_name(hf.name)
+                        local spheres_list = {}
+                        pcall(function()
+                            local meta = hf.info and hf.info.metaphysical
+                            if meta and meta.spheres then
+                                for j = 0, #meta.spheres - 1 do
+                                    local sn = df.sphere_type[meta.spheres[j]]
+                                    if sn then
+                                        table.insert(spheres_list, sn:sub(1, 1) .. sn:sub(2):lower())
+                                    end
+                                end
+                            end
+                        end)
+                        local spheres_text = #spheres_list > 0 and table.concat(spheres_list, ', ') or ''
+                        local favor_val = (i < #rels.worship) and rels.worship[i] or 0
+                        local favor_text = tostring(favor_val)
+                        local favor_pen = COLOR_GREY
+                        if favor_val > 0 then
+                            favor_pen = COLOR_LIGHTGREEN
+                        elseif favor_val < 0 then
+                            favor_pen = COLOR_LIGHTRED
+                        end
+                        local follower_count = deity_counts[deities[i]] or 0
+                        table.insert(deity_rows, {
+                            { text = dname, pen = COLOR_LIGHTBLUE },
+                            { text = spheres_text, pen = COLOR_WHITE },
+                            { text = favor_text, pen = favor_pen },
+                            { text = tostring(follower_count), pen = COLOR_WHITE },
+                        })
+                    end
+                end
+                if #deity_rows > 0 then
+                    table.insert(content, { text = "### Deities", pen = COLOR_YELLOW })
+                    table.insert(content, "\n")
+                    table.insert(content, {
+                        type = 'table',
+                        columns = {
+                            { header = 'Deity', align = 'left', min_width = 20, stretch = true },
+                            { header = 'Spheres', align = 'left', min_width = 20, stretch = true },
+                            { header = 'Favor', align = 'left', min_width = 8, stretch = false },
+                            { header = 'Followers', align = 'left', min_width = 10, stretch = false },
+                        },
+                        rows = deity_rows,
+                        max_rows = 20,
+                    })
+                    table.insert(content, "\n")
+                end
+            end
+
+            -- Religious organizations present at the fort
+            local world_data = df.global.world.world_data
+            local org_rows = {}
+            if world_data and world_data.sites then
+                for _, site in ipairs(world_data.sites) do
+                    if site and site.entity_links then
+                        for _, link in ipairs(site.entity_links) do
+                            if link.entity_id == civ_id then
+                                for _, slink in ipairs(site.entity_links) do
+                                    local ee = df.historical_entity.find(slink.entity_id)
+                                    if ee and ee.type == df.historical_entity_type.Religion then
+                                        local d_names = {}
+                                        if ee.relations and ee.relations.deities then
+                                            for j = 0, #ee.relations.deities - 1 do
+                                                local ef = df.historical_figure.find(ee.relations.deities[j])
+                                                if ef and ef.name then
+                                                    table.insert(d_names, utils.get_readable_name(ef.name))
+                                                end
+                                            end
+                                        end
+                                        local found = false
+                                        for _, o in ipairs(org_rows) do
+                                            if o[1].text == utils.get_readable_name(ee.name) then
+                                                found = true; break
+                                            end
+                                        end
+                                        if not found then
+                                            table.insert(org_rows, {
+                                                { text = utils.get_readable_name(ee.name), pen = COLOR_LIGHTBLUE, link = "religion:" .. tostring(ee.id) },
+                                                { text = tostring(rel_members[ee.id] or 0) .. " followers", pen = COLOR_WHITE },
+                                                { text = #d_names > 0 and table.concat(d_names, ', ') or 'None', pen = COLOR_WHITE },
+                                            })
+                                        end
+                                    end
+                                end
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            if #org_rows > 0 then
+                table.insert(content, { text = "### Religious Organizations", pen = COLOR_YELLOW })
+                table.insert(content, "\n")
+                table.insert(content, {
+                    type = 'table',
+                    columns = {
+                        { header = 'Organization', align = 'left', min_width = 20, stretch = true },
+                        { header = 'Followers', align = 'left', min_width = 12, stretch = false },
+                        { header = 'Deities', align = 'left', min_width = 25, stretch = true },
+                    },
+                    rows = org_rows,
+                    max_rows = 10,
+                })
+                table.insert(content, "\n")
+            end
+        end)
+    end
+
     if settings.timeline or settings.defense then
         -- Combined fort timeline section
         table.insert(content, "\n")

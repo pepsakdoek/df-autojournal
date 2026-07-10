@@ -73,6 +73,7 @@ local SETTING_DESCRIPTIONS = {
             links = "Show economic and political links to other sites",
             timeline = "Show founding and historical timeline",
             location = "Show world map position, continent, region, and climate description",
+            religion = "Show fort religion: temples, worship statistics, and religious organizations",
         },
         journal = {
             population = "Auto-record population changes and migration waves",

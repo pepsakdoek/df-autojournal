@@ -30,6 +30,7 @@ local DEFAULT_SETTINGS = {
             links = true,
             timeline = true,
             location = true,
+            religion = true,
         },
         journal = {
             population = true,
