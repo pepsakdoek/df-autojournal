@@ -480,98 +480,97 @@ function WikiInitializer:_step_citizens()
     local fort_section = 'fort:' .. self._site_id .. '/citizens'
 
     logger.log("Found " .. #all_units .. " total units in world.")
-    local citizen_rows = {}
+    local resident_rows = {}
+    local dead_resident_rows = {}
+    local HAPPY_KEYS = { Euphoric = 1, ["Very Happy"] = 2, Happy = 3, Content = 4, Unhappy = 5, ["Very Unhappy"] = 6, Miserable = 7 }
+    local civ_id = df.global.plotinfo.civ_id
+
     for i = 0, #all_units - 1 do
         local unit = all_units[i]
-        if dfhack.units.isCitizen(unit) then
+        if not dfhack.units.isAnimal(unit) and unit.civ_id == civ_id and not dfhack.units.isDead(unit) then
             local raw_name = dfhack.units.getReadableName(unit)
             local name = utils.sanitize(raw_name)
             local id = 'citizen:' .. tostring(unit.id)
             self._membership_map[id] = fort_section
 
             local age = df.global.cur_year - unit.birth_year
+            local is_citizen = dfhack.units.isCitizen(unit)
 
-            if not dfhack.units.isDead(unit) then
-                table.insert(citizens, {name=name, id=id})
-                table.insert(self._dynamic_pages, {text=name, id=id})
+            table.insert(citizens, {name=name, id=id})
+            table.insert(self._dynamic_pages, {text=name, id=id})
 
-                local content = citizen_template.render(unit)
-                safe_save(self.context, id, utils.sanitize_content(content), 1)
-            end
+            local content = citizen_template.render(unit)
+            safe_save(self.context, id, utils.sanitize_content(content), 1)
 
             local happiness = "Unknown"
+            local happy_key = 99
             if unit and unit.status.current_soul and unit.status.current_soul.personality then
                 local stress = unit.status.current_soul.personality.stress
-                if stress < -50000 then happiness = "Euphoric"
-                elseif stress < -25000 then happiness = "Very Happy"
-                elseif stress < -10000 then happiness = "Happy"
-                elseif stress < 10000 then happiness = "Content"
-                elseif stress < 25000 then happiness = "Unhappy"
-                elseif stress < 50000 then happiness = "Very Unhappy"
-                else happiness = "Miserable"
+                if stress < -50000 then happiness = "Euphoric"; happy_key = 1
+                elseif stress < -25000 then happiness = "Very Happy"; happy_key = 2
+                elseif stress < -10000 then happiness = "Happy"; happy_key = 3
+                elseif stress < 10000 then happiness = "Content"; happy_key = 4
+                elseif stress < 25000 then happiness = "Unhappy"; happy_key = 5
+                elseif stress < 50000 then happiness = "Very Unhappy"; happy_key = 6
+                else happiness = "Miserable"; happy_key = 7
                 end
             end
 
-            local dead = dfhack.units.isDead(unit)
-            local death_status = dead and "Deceased" or "Alive"
+            local race_name = "?"
+            pcall(function()
+                local cr = df.creature_raw.find(unit.race)
+                if cr and cr.name then race_name = cr.name[0] end
+            end)
 
-            local age_str = tostring(age) .. (dead and " (at death)" or "")
-            local age_pen = dead and COLOR_DARKGREY or COLOR_WHITE
+            local age_str = tostring(age)
+            local age_pen = COLOR_WHITE
 
-            if dead then
-                table.insert(dead_citizen_rows, {
-                    { text = name, pen = COLOR_LIGHTBLUE, link = id },
-                    { text = age_str, pen = age_pen },
-                    { text = death_status, pen = COLOR_LIGHTRED },
-                })
-            else
-                table.insert(citizen_rows, {
-                    { text = name, pen = COLOR_LIGHTBLUE, link = id },
-                    { text = age_str, pen = age_pen },
-                    { text = happiness },
-                    { text = death_status, pen = dead and COLOR_LIGHTRED or COLOR_LIGHTGREEN },
-                })
-            end
+            table.insert(resident_rows, {
+                { text = name, pen = COLOR_LIGHTBLUE, link = is_citizen and id or nil },
+                { text = age_str, pen = age_pen },
+                { text = string.char(64 + happy_key) .. happiness },
+                { text = race_name, pen = COLOR_LIGHTCYAN },
+                { text = is_citizen and "Citizen" or "Resident", pen = is_citizen and COLOR_LIGHTGREEN or COLOR_GREY },
+            })
         end
     end
-    logger.log("Processed " .. #citizen_rows .. " living citizens + " .. #dead_citizen_rows .. " fallen.")
+    logger.log("Processed " .. #resident_rows .. " residents counted.")
+
+    local total_all = #resident_rows
 
     local citizen_root = {}
     table.insert(citizen_root, { text = "# Citizens", pen = COLOR_YELLOW })
     table.insert(citizen_root, "\n\n")
-    table.insert(citizen_root, { text = "Total Citizens: ", pen = COLOR_LIGHTCYAN })
-    table.insert(citizen_root, { text = tostring(#citizen_rows), pen = COLOR_WHITE })
-    if #dead_citizen_rows > 0 then
-        table.insert(citizen_root, { text = " (Fallen: ", pen = COLOR_LIGHTCYAN })
-        table.insert(citizen_root, { text = tostring(#dead_citizen_rows), pen = COLOR_LIGHTRED })
-        table.insert(citizen_root, { text = ")", pen = COLOR_LIGHTCYAN })
-    end
+    table.insert(citizen_root, { text = "Total Residents: ", pen = COLOR_LIGHTCYAN })
+    table.insert(citizen_root, { text = tostring(total_all), pen = COLOR_WHITE })
     table.insert(citizen_root, "\n\n")
-    if #citizen_rows > 0 then
+
+    local citizen_root = {}
+    table.insert(citizen_root, { text = "# Citizens", pen = COLOR_YELLOW })
+    table.insert(citizen_root, "\n\n")
+    table.insert(citizen_root, { text = "Alive: ", pen = COLOR_LIGHTCYAN })
+    table.insert(citizen_root, { text = tostring(total_alive), pen = COLOR_LIGHTGREEN })
+    if total_fallen > 0 then
+        table.insert(citizen_root, "  |  ")
+        table.insert(citizen_root, { text = "Fallen: ", pen = COLOR_LIGHTCYAN })
+        table.insert(citizen_root, { text = tostring(total_fallen), pen = COLOR_LIGHTRED })
+    end
+    table.insert(citizen_root, "  |  ")
+    table.insert(citizen_root, { text = "Total: ", pen = COLOR_LIGHTCYAN })
+    table.insert(citizen_root, { text = tostring(total_all), pen = COLOR_WHITE })
+    table.insert(citizen_root, "\n\n")
+    if #resident_rows > 0 then
         table.insert(citizen_root, {
             type = 'table',
             columns = {
                 { header = 'Name', align = 'left', min_width = 15, max_width = 50, stretch = true },
                 { header = 'Age', align = 'right', min_width = 6, stretch = false },
                 { header = 'Happiness', align = 'left', min_width = 10, stretch = false },
+                { header = 'Race', align = 'left', min_width = 8, stretch = false },
                 { header = 'Status', align = 'left', min_width = 8, stretch = false },
             },
-            rows = citizen_rows,
+            rows = resident_rows,
             max_rows = 20,
-        })
-    end
-    if #dead_citizen_rows > 0 then
-        table.insert(citizen_root, "\n\n")
-        table.insert(citizen_root, { text = "## Fallen Citizens", pen = COLOR_YELLOW })
-        table.insert(citizen_root, "\n\n")
-        table.insert(citizen_root, {
-            type = 'table',
-            columns = {
-                { header = 'Name', align = 'left', min_width = 15, max_width = 50, stretch = true },
-                { header = 'Age at Death', align = 'right', min_width = 6, stretch = false },
-                { header = 'Status', align = 'left', min_width = 8, stretch = false },
-            },
-            rows = dead_citizen_rows
         })
     end
     safe_save(self.context, 'citizens', utils.sanitize_content(citizen_root), 1)

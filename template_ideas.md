@@ -57,22 +57,19 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Citizen Root page
 
-* Happiness in the table should be sorted correctly (by happiness and not as text)
-    * Might be tricky, and might need function change, or we can just 'cheat' it by adding 
-    1,2,3,4,5,6,7 to the happiness states (not worth the effort to build a hidden sort field into the table structure)
-* Currently says Total Citizens, but I assume those are 'alive' and not dead ones.
+* ~~Happiness in the table should be sorted correctly (by happiness and not as text)~~
+* ~~Currently says Total Citizens, but I assume those are 'alive' and not dead ones.~~
 * Inititializing needs an option to include dead dwarfs (should be off by default)
-* Needs an aggregate table (doesn't need to be an 'wiki table' - probably doesn't need to be) of Alive/Dead/Missing (stolen or body not found) citizens  
+* ~~Needs an aggregate table (doesn't need to be an 'wiki table' - probably doesn't need to be) of Alive/Dead/Missing (stolen or body not found) citizens~~
 * Dead citizens might need their own little table with memorialized / non memorialized, and maybe a death cause too, combat / Age
-* Game says 152 Citizens, and Total Citizens is 148 (maybe there are bards etc.)
-    * There were 4 human bards in the fort, but a total of 9 humans
+* ~~Game says 152 Citizens, and Total Citizens is 148 (maybe there are bards etc.)~~
 
 
 # Citizen Template
 
-* Get the actual arrival date per citizen (especially on initialization) -- it currently uses the logged on date, it should never optionally use the 'logged on' date, and should use find the date the entity arrived at the fort (find it, else put unknown)
+* ~~Get the actual arrival date per citizen (especially on initialization) -- it currently uses the logged on date, it should never optionally use the 'logged on' date, and should use find the date the entity arrived at the fort (find it, else put unknown)~~
 * Should include timeline and arrivals, new relationships, new skills (upon reaching master level), new medical requirements and history
-* Military history (notable kills) - if it's in it's not working / showing
+* ~~Military history (notable kills) - if it's in it's not working / showing~~
 
 # Artifacts root page
 
@@ -88,6 +85,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 # Code issues and other possible irritations and issues
 
+* The UI should remember where you were last time you opened the wiki and reopen on that page
 * Searching the cursor doesn't 'move on' when typing a search. (minor)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal

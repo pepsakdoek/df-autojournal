@@ -26,7 +26,9 @@ end
 function render(unit, template_opts)
     template_opts = template_opts or {}
     local cfg = mfw_settings.get_settings().citizen
-    local settings = template_opts.settings_override or cfg.init
+    local init_settings = template_opts.settings_override or cfg.init
+    local journal_settings = cfg.journal
+    local settings = init_settings
     local name = utils.sanitize(dfhack.units.getReadableName(unit))
     local prof = utils.sanitize(dfhack.units.getProfessionName(unit))
     local sex = "Unknown"
@@ -155,10 +157,59 @@ function render(unit, template_opts)
         table.insert(content, "\n")
         table.insert(content, { text = "## History & Timeline", pen = COLOR_YELLOW })
         table.insert(content, "\n")
-        local ny, nm, nd = utils.get_current_date()
-        table.insert(content, "* Arrived ")
-        table.insert(content, { text = utils.get_nice_date(ny, nm, nd), pen = COLOR_WHITE })
-        table.insert(content, " (logged on)\n")
+        local arrived_year = nil
+        if unit.hist_figure_id >= 0 then
+            local hf = df.historical_figure.find(unit.hist_figure_id)
+            if hf then
+                if hf.appeared_year and hf.appeared_year > 0 then
+                    arrived_year = hf.appeared_year
+                end
+            end
+        end
+        if arrived_year then
+            table.insert(content, "* Born in year ")
+            table.insert(content, { text = tostring(unit.birth_year), pen = COLOR_WHITE })
+            table.insert(content, ", first appears in history in year ")
+            table.insert(content, { text = tostring(arrived_year), pen = COLOR_WHITE })
+            table.insert(content, "\n")
+        else
+            table.insert(content, "* Born in year ")
+            table.insert(content, { text = tostring(unit.birth_year), pen = COLOR_WHITE })
+            table.insert(content, "\n")
+        end
+    end
+
+    -- Military History
+    if journal_settings and journal_settings.military_history and unit.hist_figure_id >= 0 then
+        local hf = df.historical_figure.find(unit.hist_figure_id)
+        if hf and hf.info and hf.info.kills and hf.info.kills.killed_count then
+            local total_kills = 0
+            for j = 0, #hf.info.kills.killed_count - 1 do
+                total_kills = total_kills + hf.info.kills.killed_count[j]
+            end
+            if total_kills > 0 then
+                table.insert(content, "\n")
+                table.insert(content, { text = "## Military History", pen = COLOR_YELLOW })
+                table.insert(content, "\n")
+                table.insert(content, { text = "Notable kills: ", pen = COLOR_LIGHTCYAN })
+                table.insert(content, { text = tostring(total_kills), pen = COLOR_WHITE })
+                table.insert(content, "\n")
+                for j = 0, #hf.info.kills.killed_count - 1 do
+                    local count = hf.info.kills.killed_count[j]
+                    if count > 0 then
+                        local race_id = hf.info.kills.killed_race[j]
+                        local race_name = "?"
+                        pcall(function()
+                            local cr = df.creature_raw.find(race_id)
+                            if cr and cr.name then race_name = cr.name[0] end
+                        end)
+                        table.insert(content, "* " .. tostring(count) .. "x ")
+                        table.insert(content, { text = race_name, pen = COLOR_LIGHTRED })
+                        table.insert(content, "\n")
+                    end
+                end
+            end
+        end
     end
 
     return utils.sanitize_content(content)
