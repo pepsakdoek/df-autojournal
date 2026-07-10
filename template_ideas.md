@@ -8,29 +8,28 @@ Fully tested and implemented ideas are fully removed.
 # World
 
 * BUG: Opening a new fort in an exising world didn't seem to 'load' the existing wiki (test in more depth)
+* Peaks should say in which ranges they are
 
 # Civilization Root Template
 
 * BUG: Population I think is all time 'records' and not population that is alive
+* Active Fort header should probably just be 'Status' and the Value should be "Active Fort" and any previously player 'played' forts should be "Player Fort"
+    * Or maybe more flavourful 'Armok Status' (are they god(player) blessed)
 
 # Civilization Template 
 
-* Diplomatic Relations
-    * Add links to the other Civs
-    * Eg: The Ferocious Fountains are at war with:
-* Ruler
-* Most Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
-* Elf Civs don't show all of their Retreats. (They seem to all be called Forest Retreats)
-* Major Gods & Religions?
+* BUG: Most Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
+* BUG: Elf Civs don't show all of their Retreats. (They seem to all be called Forest Retreats)
 * (Magic when that comes soon(tm))
+
 
 ## Lower priority
 
-* Major History (we should probably remove this - though it could be cool?)
+* Major History 
     * When we get here, we should probably brainstorm on what it would mean
-        * Wars that started
-        * Peace made
-        * Other civs 'destroyed' (I don't know if that is 'officially' a thing)
+        * Wars that started (with time stamp)
+        * Peace made (with time stamp)
+        * Other civs 'destroyed' (I don't know if that is 'officially' a thing) (with time stamp)
 
 # Forts Root Page
 
@@ -38,6 +37,7 @@ Fully tested and implemented ideas are fully removed.
 
 * The location string can have more colors (forested/biome type things could be green etc, rivers/lakes blue and volcano red)
 * BUG: Building on mutliple rivers throws in WAY too many rivers. (Building on 1 river might also be broken at the moment - requires testing) 
+* Use the religion for civ here too, just add if there is a temple and what 'level' the temple is
 * Existing ##Headings should be populated
     * Economic links (maybe it's working and my current test fort just doesn't have it)
     * Infrastructure & Districts
@@ -96,8 +96,6 @@ Fully tested and implemented ideas are fully removed.
 # Event Architecture (from 2026-07-10 planning session)
 
 Note the numbers in this area (like 49 MIGRANT_ARRIVAL_NAMED is the event_type_id)
-
-> **Restart required**: All changes below require DF restart due to `reqscript` module caching.
 
 ## Design Direction
 - **Major events** (sieges, megabeasts, migrant waves, weddings, artifact creations, ghost attacks, war attacks on site) get first-class event pages with aggregated detail
@@ -182,6 +180,9 @@ Current 12 event toggles might need:
 - ghost_events (new toggle for ghost attacks)
 
 # Code issues and other possible irritations and issues
+
+* Page history for quick navigation (breadcrumbs) - it should probably be 'above' the main wiki page, and we want to use a horizontal divider there.
+* We also want to compress the Options UI (Initialize wiki, Auto Journaling, Settings, Export to HTML and Show/Hide the TOC)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export

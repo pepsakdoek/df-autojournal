@@ -3,19 +3,8 @@ local utils = reqscript('internal/df-autojournal/wiki_utils')
 local mfw_settings = reqscript('internal/df-autojournal/wiki_settings')
 local logger = reqscript('internal/df-autojournal/logger')
 
-local function find_position_by_id(civ, position_id)
-    if not civ or not civ.positions or not civ.positions.own then return nil end
-    for _, pos in ipairs(civ.positions.own) do
-        if pos.id == position_id then
-            return pos
-        end
-    end
-    return nil
-end
-
-
-
---- Build a table of sites belonging to the civilization.
+--- Build a table of sites currently settled by the civilization.
+--- Checks entity_site_link type == 0 to confirm active ownership.
 --- known_fort_set: optional set of { [site_id] = true }
 local function get_forts_table(civ, known_fort_set)
     if not civ then return nil end
@@ -30,7 +19,7 @@ local function get_forts_table(civ, known_fort_set)
             local owns = false
             if site.entity_links then
                 for _, link in ipairs(site.entity_links) do
-                    if link.entity_id == civ_id then
+                    if link.entity_id == civ_id and link.type == 0 then
                         owns = true
                         break
                     end
@@ -47,9 +36,9 @@ local function get_forts_table(civ, known_fort_set)
                     type_pen = COLOR_LIGHTBLUE
                 elseif lower_type:match("mountain") or lower_type:match("hall") then
                     type_pen = COLOR_LIGHTCYAN
-                elseif lower_type:match("dark") then
+                elseif lower_type:match("dark") or lower_type:match("pit") then
                     type_pen = COLOR_LIGHTRED
-                elseif lower_type:match("forest") or lower_type:match("tree") then
+                elseif lower_type:match("forest") or lower_type:match("retreat") then
                     type_pen = COLOR_GREEN
                 elseif lower_type:match("town") or lower_type:match("city") then
                     type_pen = COLOR_LIGHTCYAN
@@ -155,43 +144,92 @@ function render(civ_id, known_fort_set)
                 table.insert(content, "\n")
             end
 
-            -- Ruler
-            pcall(function()
-                if civ.positions and civ.positions.assignments then
-                    for _, assign in ipairs(civ.positions.assignments) do
-                        if assign and assign.histfig_id ~= -1 then
-                            local hf = df.historical_figure.find(assign.histfig_id)
-                            if hf and hf.name then
-                                local ruler_name = utils.get_readable_name(hf.name)
-                                local pos_name = "Leader"
-                                if civ.positions.own then
-                                    for _, p in ipairs(civ.positions.own) do
-                                        if p.id == assign.position_id then
-                                            local _, pname = pcall(utils.sanitize, p.name[0])
-                                            if pname then pos_name = pname end
-                                            break
-                                        end
+            -- Ruler(s)
+            if settings.leadership then
+                pcall(function()
+                    if civ.positions and civ.positions.assignments then
+                        local function get_position_name(pos_id)
+                            if civ.positions.own then
+                                for _, p in ipairs(civ.positions.own) do
+                                    if p.id == pos_id then
+                                        local ok, pname = pcall(utils.sanitize, p.name and p.name[0] or '')
+                                        if ok and pname and pname ~= '' then return pname end
                                     end
                                 end
-                                local ruler_link = nil
-                                if hf.unit_id and hf.unit_id ~= -1 then
-                                    ruler_link = "citizen:" .. tostring(hf.unit_id)
-                                end
-                                table.insert(content, { text = "Ruler: ", pen = COLOR_LIGHTCYAN })
-                                if ruler_link then
-                                    table.insert(content, { text = ruler_name, pen = COLOR_LIGHTBLUE, link = ruler_link })
-                                else
-                                    table.insert(content, { text = ruler_name, pen = COLOR_WHITE })
-                                end
-                                table.insert(content, " (")
-                                table.insert(content, { text = pos_name, pen = COLOR_WHITE })
-                                table.insert(content, ")\n")
+                            end
+                            return nil
+                        end
+
+                        local function to_camel_case(s)
+                            if not s or s == '' then return nil end
+                            local words = {}
+                            for w in s:gmatch('%S+') do
+                                table.insert(words, w:sub(1, 1):upper() .. w:sub(2):lower())
+                            end
+                            return table.concat(words, ' ')
+                        end
+
+                        local function make_ruler_link(hf)
+                            if hf.unit_id and hf.unit_id ~= -1 then
+                                return "citizen:" .. tostring(hf.unit_id)
+                            end
+                            return nil
+                        end
+
+                        -- Find monarch (position ID 0) first
+                        local monarch = nil
+                        for _, assign in ipairs(civ.positions.assignments) do
+                            if assign.position_id == 0 and assign.histfig ~= -1 then
+                                monarch = df.historical_figure.find(assign.histfig)
+                                break
                             end
                         end
-                        break
+
+                        if monarch and monarch.name then
+                            local name = utils.get_readable_name(monarch.name)
+                            local link = make_ruler_link(monarch)
+                            table.insert(content, { text = "Ruler: ", pen = COLOR_LIGHTCYAN })
+                            if link then
+                                table.insert(content, { text = name, pen = COLOR_LIGHTBLUE, link = link })
+                            else
+                                table.insert(content, { text = name, pen = COLOR_WHITE })
+                            end
+                            table.insert(content, "\n")
+                        end
+
+                        -- Collect other royalty for table (max 10)
+                        local royal_rows = {}
+                        for _, assign in ipairs(civ.positions.assignments) do
+                            if assign.position_id ~= 0 and assign.histfig ~= -1 then
+                                local hf = df.historical_figure.find(assign.histfig)
+                                if hf and hf.name then
+                                    local name = utils.get_readable_name(hf.name)
+                                    local link = make_ruler_link(hf)
+                                    local title = to_camel_case(get_position_name(assign.position_id)) or "Leader"
+                                    table.insert(royal_rows, {
+                                        { text = title, pen = COLOR_WHITE },
+                                        { text = name, pen = link and COLOR_LIGHTBLUE or COLOR_WHITE, link = link },
+                                    })
+                                    if #royal_rows >= 10 then break end
+                                end
+                            end
+                        end
+                        if #royal_rows > 0 then
+                            table.insert(content, "\n")
+                            table.insert(content, {
+                                type = 'table',
+                                columns = {
+                                    { header = 'Title', align = 'left', min_width = 15, stretch = true },
+                                    { header = 'Name', align = 'left', min_width = 20, stretch = true },
+                                },
+                                rows = royal_rows,
+                                max_rows = 10,
+                            })
+                            table.insert(content, "\n")
+                        end
                     end
-                end
-            end)
+                end)
+            end
 
             -- World position
             if settings.position then
@@ -274,34 +312,243 @@ function render(civ_id, known_fort_set)
                 end
             end
 
+            if settings.religion then
+                pcall(function()
+                    local has_religion = false
+                    local rels = civ.relations
+                    if rels then
+                        -- Single pass: count deity followers + religion members for all civ units
+                        local deity_counts = {}
+                        local rel_members = {}
+                        local all_units = df.global.world.units.all
+                        if all_units then
+                            for i = 0, #all_units - 1 do
+                                local u = all_units[i]
+                                if u and u.civ_id == civ.id then
+                                    local hf = df.historical_figure.find(u.hist_figure_id)
+                                    if hf then
+                                        if hf.histfig_links then
+                                            for _, link in ipairs(hf.histfig_links) do
+                                                if df.histfig_hf_link_deityst and df.histfig_hf_link_deityst:is_instance(link) then
+                                                    deity_counts[link.target_hf] = (deity_counts[link.target_hf] or 0) + 1
+                                                end
+                                            end
+                                        end
+                                        if hf.entity_links then
+                                            for _, l in ipairs(hf.entity_links) do
+                                                local e = df.historical_entity.find(l.entity_id)
+                                                if e and e.type == df.historical_entity_type.Religion then
+                                                    rel_members[l.entity_id] = (rel_members[l.entity_id] or 0) + 1
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        -- Build deity_id -> religion info, and find religion entities linked through sites
+                        local deity_religions = {}
+                        local religion_entities = {}
+                        local world_data = df.global.world.world_data
+                        if world_data and world_data.sites then
+                            for _, site in ipairs(world_data.sites) do
+                                if site and site.entity_links then
+                                    for _, link in ipairs(site.entity_links) do
+                                        if link.entity_id == civ.id then
+                                            for _, slink in ipairs(site.entity_links) do
+                                                local ee = df.historical_entity.find(slink.entity_id)
+                                                if ee and ee.type == df.historical_entity_type.Religion
+                                                        and not religion_entities[ee.id] then
+                                                    local d_names = {}
+                                                    if ee.relations and ee.relations.deities then
+                                                        for j = 0, #ee.relations.deities - 1 do
+                                                            local hf = df.historical_figure.find(ee.relations.deities[j])
+                                                            if hf and hf.name then
+                                                                local dname = utils.get_readable_name(hf.name)
+                                                                table.insert(d_names, dname)
+                                                                deity_religions[ee.relations.deities[j]] =
+                                                                    deity_religions[ee.relations.deities[j]] or
+                                                                    {name = dname, followers = rel_members[ee.id] or 0}
+                                                            end
+                                                        end
+                                                    end
+                                                    religion_entities[ee.id] = {
+                                                        name = utils.get_readable_name(ee.name),
+                                                        deity_names = d_names,
+                                                        followers = rel_members[ee.id] or 0,
+                                                    }
+                                                end
+                                            end
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        -- Spheres from entity_raw
+                        local spheres = civ.entity_raw and civ.entity_raw.religion_sphere
+                        if spheres and #spheres > 0 then
+                            if not has_religion then
+                                table.insert(content, "\n")
+                                table.insert(content, { text = "## Major Gods & Religions", pen = COLOR_YELLOW })
+                                table.insert(content, "\n")
+                                has_religion = true
+                            end
+                            table.insert(content, { text = "Spheres: ", pen = COLOR_LIGHTCYAN })
+                            local sphere_names = {}
+                            for i = 0, #spheres - 1 do
+                                local sname = pcall(function() return df.sphere_type[spheres[i]] end) and df.sphere_type[spheres[i]] or tostring(spheres[i])
+                                if sname then
+                                    table.insert(sphere_names, { text = sname:gsub("_", " "):lower():gsub("^%l", string.upper), pen = COLOR_WHITE })
+                                end
+                            end
+                            for i, sn in ipairs(sphere_names) do
+                                if i > 1 then table.insert(content, ", ") end
+                                table.insert(content, sn)
+                            end
+                            table.insert(content, "\n\n")
+                        end
+
+                        -- Deities
+                        local deities = rels.deities
+                        if deities and #deities > 0 then
+                            if not has_religion then
+                                table.insert(content, "\n")
+                                table.insert(content, { text = "## Major Gods & Religions", pen = COLOR_YELLOW })
+                                table.insert(content, "\n")
+                                has_religion = true
+                            end
+                            table.insert(content, { text = "### Deities", pen = COLOR_YELLOW })
+                            table.insert(content, "\n")
+                            local deity_rows = {}
+                            for i = 0, #deities - 1 do
+                                local hf = df.historical_figure.find(deities[i])
+                                if hf and hf.name then
+                                    local dname = utils.get_readable_name(hf.name)
+                                    local spheres_list = {}
+                                    pcall(function()
+                                        local meta = hf.info and hf.info.metaphysical
+                                        if meta and meta.spheres then
+                                            for j = 0, #meta.spheres - 1 do
+                                                local sn = df.sphere_type[meta.spheres[j]]
+                                                if sn then
+                                                    table.insert(spheres_list, sn:sub(1, 1) .. sn:sub(2):lower())
+                                                end
+                                            end
+                                        end
+                                    end)
+                                    local spheres_text = #spheres_list > 0 and table.concat(spheres_list, ', ') or ''
+                                    local favor_val = (i < #rels.worship) and rels.worship[i] or 0
+                                    local favor_text = tostring(favor_val)
+                                    local favor_pen = COLOR_GREY
+                                    if favor_val > 0 then
+                                        favor_pen = COLOR_LIGHTGREEN
+                                    elseif favor_val < 0 then
+                                        favor_pen = COLOR_LIGHTRED
+                                    end
+                                    local follower_count = deity_counts[deities[i]] or 0
+                                    local follower_text = tostring(follower_count)
+                                    table.insert(deity_rows, {
+                                        { text = dname, pen = COLOR_LIGHTBLUE },
+                                        { text = spheres_text, pen = COLOR_WHITE },
+                                        { text = favor_text, pen = favor_pen },
+                                        { text = follower_text, pen = COLOR_WHITE },
+                                    })
+                                end
+                            end
+                            if #deity_rows > 0 then
+                                table.insert(content, {
+                                    type = 'table',
+                                    columns = {
+                                        { header = 'Deity', align = 'left', min_width = 20, stretch = true },
+                                        { header = 'Spheres', align = 'left', min_width = 20, stretch = true },
+                                        { header = 'Favor', align = 'left', min_width = 20, stretch = false },
+                                        { header = 'Followers', align = 'left', min_width = 10, stretch = false },
+                                    },
+                                    rows = deity_rows,
+                                    max_rows = 20,
+                                })
+                                table.insert(content, "\n")
+                            end
+                        end
+
+                        local rel_ids = {}
+                        for id, _ in pairs(religion_entities) do
+                            table.insert(rel_ids, id)
+                        end
+                        table.sort(rel_ids)
+                        if #rel_ids > 0 then
+                            if not has_religion then
+                                table.insert(content, "\n")
+                                table.insert(content, { text = "## Major Gods & Religions", pen = COLOR_YELLOW })
+                                table.insert(content, "\n")
+                                has_religion = true
+                            end
+                            table.insert(content, { text = "### Religious Organizations", pen = COLOR_YELLOW })
+                            table.insert(content, "\n")
+                            local org_rows = {}
+                            for _, id in ipairs(rel_ids) do
+                                local info = religion_entities[id]
+                                local deities_text = #info.deity_names > 0 and table.concat(info.deity_names, ', ') or 'None'
+                                table.insert(org_rows, {
+                                    { text = info.name, pen = COLOR_LIGHTBLUE, link = "religion:" .. tostring(id) },
+                                    { text = tostring(info.followers) .. " followers", pen = COLOR_WHITE },
+                                    { text = deities_text, pen = COLOR_WHITE },
+                                })
+                            end
+                            table.insert(content, {
+                                type = 'table',
+                                columns = {
+                                    { header = 'Organization', align = 'left', min_width = 20, stretch = true },
+                                    { header = 'Followers', align = 'left', min_width = 12, stretch = false },
+                                    { header = 'Deities', align = 'left', min_width = 25, stretch = true },
+                                },
+                                rows = org_rows,
+                                max_rows = 10,
+                            })
+                            table.insert(content, "\n")
+                        end
+                    end
+                end)
+            end
+
             if (settings.relations or settings.wars) and civ.relations then
                 table.insert(content, "\n")
                 table.insert(content, { text = "## Diplomatic Relations", pen = COLOR_YELLOW })
                 table.insert(content, "\n")
                 local found = false
-                for _, rel in ipairs(civ.relations) do
-                    local other_civ = df.historical_entity.find(rel.entity_id)
-                    if other_civ and other_civ.type == df.historical_entity_type.Civilization then
-                        local other_name = utils.get_readable_name(other_civ.name)
-                        local is_war = rel.relation == df.entity_relation_type.War
-                        local is_peace = rel.relation == df.entity_relation_type.Peace
+                pcall(function()
+                    local dip = civ.relations.diplomacy
+                    if dip and dip.state then
+                        for i = 0, #dip.state - 1 do
+                            local s = dip.state[i]
+                            local other_entity = df.historical_entity.find(s.group_id)
+                            if other_entity and other_entity.type == df.historical_entity_type.Civilization
+                                    and other_entity.id ~= civ.id then
+                                local other_name = utils.get_readable_name(other_entity.name)
+                                local is_war = (s.war_event_collection ~= -1)
+                                local is_peace = (s.war_event_collection == -1)
 
-                        if (settings.wars and is_war) or settings.relations then
-                            table.insert(content, "* ")
-                            table.insert(content, { text = civ_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(civ.id) })
-                            if is_war then
-                                table.insert(content, " are at war with ")
-                            elseif is_peace then
-                                table.insert(content, " are at peace with ")
-                            else
-                                table.insert(content, " are neutral with ")
+                                if (settings.wars and is_war) or (settings.relations and is_peace) then
+                                    table.insert(content, "* ")
+                                    if is_war then
+                                        table.insert(content, { text = civ_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(civ.id) })
+                                        table.insert(content, " are at war with ")
+                                        table.insert(content, { text = other_name, pen = COLOR_LIGHTRED, link = "civ:" .. tostring(other_entity.id) })
+                                    else
+                                        table.insert(content, { text = civ_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(civ.id) })
+                                        table.insert(content, " are at peace with ")
+                                        table.insert(content, { text = other_name, pen = COLOR_LIGHTGREEN, link = "civ:" .. tostring(other_entity.id) })
+                                    end
+                                    table.insert(content, "\n")
+                                    found = true
+                                end
                             end
-                            table.insert(content, { text = other_name, pen = COLOR_LIGHTBLUE, link = "civ:" .. tostring(other_civ.id) })
-                            table.insert(content, "\n")
-                            found = true
                         end
                     end
-                end
+                end)
                 if not found then
                     table.insert(content, { text = "No diplomatic relations recorded.", pen = COLOR_DARKGREY })
                     table.insert(content, "\n")

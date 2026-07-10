@@ -12,6 +12,7 @@ local DEFAULT_SETTINGS = {
             wars = true,
             position = true,
             forts = true,
+            religion = true,
             tracking = 'all_major',
         },
         journal = {

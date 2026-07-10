@@ -55,6 +55,7 @@ local SETTING_DESCRIPTIONS = {
             wars = "Show war and conflict records",
             position = "Show world map position of the civilization",
             forts = "Show a list of all civilization forts with player fort marked",
+            religion = "Show the pantheon, religious spheres, and religious organizations of the civilization",
             tracking = "Which civilizations get wiki pages: player only, add diplomatic, or all major races",
         },
         journal = {
