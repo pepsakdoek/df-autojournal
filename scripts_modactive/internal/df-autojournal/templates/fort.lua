@@ -220,69 +220,74 @@ function render(site_id)
                 end
             end
 
-            -- Build deity name lookup
-            local deity_name_map = {}
-            for i = 0, #rels.deities - 1 do
-                local hf = df.historical_figure.find(rels.deities[i])
-                if hf and hf.name then
-                    local name = utils.get_readable_name(hf.name)
-                    local lower = name:lower()
-                    local first_word = lower:match('%S+')
-                    deity_name_map[lower] = rels.deities[i]
-                    if first_word then
-                        deity_name_map[first_word] = rels.deities[i]
+            -- Gather locations from site abstract buildings (temples, shrines)
+            local location_rows = {}
+            pcall(function()
+                local site = site_id_actual and df.world_site.find(site_id_actual)
+                if site and site.buildings then
+                    local locs = site.buildings
+                    for i = 0, #locs - 1 do
+                        local ab = locs[i]
+                        if ab then
+                            local ab_type = -1
+                            pcall(function() ab_type = ab:getType() end)
+                            if ab_type ~= df.abstract_building_type.TEMPLE then goto continue end
+                            local name = ''
+                            pcall(function()
+                                name = dfhack.translation.translateName(ab.name, true)
+                            end)
+                            if name and name ~= '' then
+                                local tier = -1
+                                local val = 0
+                                pcall(function()
+                                    if ab.contents then
+                                        tier = ab.contents.location_tier
+                                        val = ab.contents.location_value
+                                    end
+                                end)
+                                local deity_id = -1
+                                pcall(function()
+                                    deity_id = ab.deity_data.Deity
+                                end)
+                                local dname = ''
+                                if deity_id >= 0 then
+                                    local dhf = df.historical_figure.find(deity_id)
+                                    if dhf then
+                                        dname = utils.get_readable_name(dhf.name)
+                                    end
+                                end
+                                local tier_name = tier == 0 and 'Shrine' or (tier == 1 and 'Temple' or (tier == 2 and 'Grand Temple' or ''))
+                                local tier_pen = tier == 0 and COLOR_GREY or (tier == 1 and COLOR_WHITE or (tier == 2 and COLOR_YELLOW or COLOR_WHITE))
+                                table.insert(location_rows, {
+                                    { text = name, pen = tier_pen },
+                                    { text = tier_name, pen = tier_pen },
+                                    { text = tostring(val), pen = COLOR_WHITE },
+                                    { text = dname ~= '' and dname or 'None', pen = dname ~= '' and COLOR_LIGHTBLUE or COLOR_GREY },
+                                })
+                            end
+                            ::continue::
+                        end
                     end
                 end
-            end
-
-            -- Find temples among LOCATION_ASSIGNED buildings
-            local temple_rows = {}
-            local locs = df.global.world.buildings.other.LOCATION_ASSIGNED
-            if locs then
-                for i = 0, #locs - 1 do
-                    local bld = locs[i]
-                    if bld and bld.name and bld.name ~= '' then
-                        local bname = bld.name
-                        local lower = bname:lower()
-                        local deity_id = nil
-                        for dlower, did in pairs(deity_name_map) do
-                            if lower:match(dlower) then
-                                deity_id = did
-                                break
-                            end
-                        end
-                        local hf_name = ''
-                        if deity_id then
-                            local dhf = df.historical_figure.find(deity_id)
-                            if dhf then
-                                hf_name = utils.get_readable_name(dhf.name)
-                            end
-                        end
-                        if hf_name ~= '' or lower:match('temple') or lower:match('chapel') or lower:match('shrine') then
-                            table.insert(temple_rows, {
-                                { text = bname, pen = COLOR_WHITE },
-                                { text = hf_name ~= '' and hf_name or 'General worship', pen = hf_name ~= '' and COLOR_LIGHTBLUE or COLOR_GREY },
-                            })
-                        end
-                    end
-                end
-            end
+            end)
 
             table.insert(content, "\n")
             table.insert(content, { text = "## Religion", pen = COLOR_YELLOW })
             table.insert(content, "\n")
 
-            if temple_rows and #temple_rows > 0 then
+            if location_rows and #location_rows > 0 then
                 table.insert(content, { text = "### Temples & Shrines", pen = COLOR_YELLOW })
                 table.insert(content, "\n")
                 table.insert(content, {
                     type = 'table',
                     columns = {
-                        { header = 'Building', align = 'left', min_width = 20, stretch = true },
-                        { header = 'Dedicated To', align = 'left', min_width = 20, stretch = true },
+                        { header = 'Name', align = 'left', min_width = 20, stretch = true },
+                        { header = 'Type', align = 'left', min_width = 14, stretch = false },
+                        { header = 'Value', align = 'left', min_width = 8, stretch = false },
+                        { header = 'Deity', align = 'left', min_width = 20, stretch = true },
                     },
-                    rows = temple_rows,
-                    max_rows = 20,
+                    rows = location_rows,
+                    max_rows = 25,
                 })
                 table.insert(content, "\n")
             end

@@ -37,7 +37,6 @@ Fully tested and implemented ideas are fully removed.
 
 * The location string can have more colors (forested/biome type things could be green etc, rivers/lakes blue and volcano red)
 * BUG: Building on mutliple rivers throws in WAY too many rivers. (Building on 1 river might also be broken at the moment - requires testing) 
-* Use the religion for civ here too, just add if there is a temple and what 'level' the temple is
 * Existing ##Headings should be populated
     * Economic links (maybe it's working and my current test fort just doesn't have it)
     * Infrastructure & Districts
