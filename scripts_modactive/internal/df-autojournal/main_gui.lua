@@ -481,6 +481,7 @@ function WikiScreen:init()
         end
     end)
     self.expanded = {}
+    self:expand_to_page(self.current_page_id)
     self.search_mode = false
     self.search_query = ''
 
@@ -537,6 +538,27 @@ function WikiScreen:displaySearchResults(query)
 
     if #flat > 0 then
         list:setSelected(1)
+    end
+end
+
+function WikiScreen:expand_to_page(page_id)
+    local membership = {}
+    pcall(function()
+        local data = dfhack.persistent.getSiteData('mfw_fort_members')
+        if data and data.members then membership = data.members end
+    end)
+    local seen = {}
+    local current = page_id
+    while current and not seen[current] do
+        seen[current] = true
+        local parent = membership[current]
+        if not parent then
+            parent = wiki_widgets.get_page_parent(current)
+        end
+        if parent then
+            self.expanded[parent] = true
+        end
+        current = parent
     end
 end
 

@@ -2,20 +2,16 @@
 
 This is just a list of ideas of things that might be of interest to users, and might make the world feel more alive.
 
+~~strikethrough ideas was implemented but needs testing~~
+Fully tested and implemented ideas are fully removed.
+
 # World
 
-* Gods / Religions? Should maybe live in Civ
-* Meta info:
-    * Maybe show the last 'save' human date?
-
-
-
+* BUG: Opening a new fort in an exising world didn't seem to 'load' the existing wiki (test in more depth)
 
 # Civilization Root Template
 
 * BUG: Population I think is all time 'records' and not population that is alive
-
-## Bugs
 
 # Civilization Template 
 
@@ -25,12 +21,16 @@ This is just a list of ideas of things that might be of interest to users, and m
 * Ruler
 * Most Goblin Settlements are not all listed (at all) - Pits I think is the main ones not listed
 * Elf Civs don't show all of their Retreats. (They seem to all be called Forest Retreats)
+* Major Gods & Religions?
+* (Magic when that comes soon(tm))
 
 ## Lower priority
 
 * Major History (we should probably remove this - though it could be cool?)
     * When we get here, we should probably brainstorm on what it would mean
-
+        * Wars that started
+        * Peace made
+        * Other civs 'destroyed' (I don't know if that is 'officially' a thing)
 
 # Forts Root Page
 
@@ -38,7 +38,7 @@ This is just a list of ideas of things that might be of interest to users, and m
 
 * The location string can have more colors (forested/biome type things could be green etc, rivers/lakes blue and volcano red)
 * BUG: Building on mutliple rivers throws in WAY too many rivers. (Building on 1 river might also be broken at the moment - requires testing) 
-* Existing Headings should work
+* Existing ##Headings should be populated
     * Economic links (maybe it's working and my current test fort just doesn't have it)
     * Infrastructure & Districts
         * A function for allocated bedrooms
@@ -53,7 +53,6 @@ This is just a list of ideas of things that might be of interest to users, and m
     * 'Visitors' like monster slayers / entertainers etc.
     * Sieges
 
-## Bugs
 
 # Citizen Root page
 
@@ -76,15 +75,10 @@ This is just a list of ideas of things that might be of interest to users, and m
 # Artifacts template
 
 * I asked on discord if there is a way to find the 'full item description' in dfhack, waiting on response
-* BUG: Creation date is not displayed
+* BUG: Creation date is not displayed (likely related to the artifact root page issue)
 
 
 # Events root page
-
-* We need to fully explore events
-    * Many events are not notable (most even)
-    * The game's own settings has an 'announcement' page, and many of those would be the 'events' we are looking for, but also most of those would not be considered notable
-* Events in general happen to 'the fort' or 'citizens'/'artifacts' etc. inside the fort
 
 # Events template
 
@@ -188,10 +182,6 @@ Current 12 event toggles might need:
 - ghost_events (new toggle for ghost attacks)
 
 # Code issues and other possible irritations and issues
-
-* ~~The UI should remember where you were last time you opened the wiki and reopen on that page~~
-    * This feature is implemented but the main ToC isn't 'expanded' to the level where the current page is if the last page was a lower level page
-* Searching the cursor doesn't 'move on' when typing a search. (minor)
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export

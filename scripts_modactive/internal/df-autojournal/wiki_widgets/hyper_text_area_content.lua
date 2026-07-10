@@ -264,6 +264,7 @@ function HyperTextAreaContent:_rerender_table_by_id(tb_id)
             for _, tb in ipairs(self.table_blocks) do
                 if tb.id == tb_id then
                     tr.table.search_query = tb.search_query or ''
+                    tr.entry.search_query = tb.search_query or ''
                     break
                 end
             end
