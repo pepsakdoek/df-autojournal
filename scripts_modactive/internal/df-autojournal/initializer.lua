@@ -528,7 +528,7 @@ function WikiInitializer:_step_citizens()
             table.insert(resident_rows, {
                 { text = name, pen = COLOR_LIGHTBLUE, link = is_citizen and id or nil },
                 { text = age_str, pen = age_pen },
-                { text = string.char(64 + happy_key) .. happiness },
+                    { text = tostring(happy_key) .. ". " .. happiness },
                 { text = race_name, pen = COLOR_LIGHTCYAN },
                 { text = is_citizen and "Citizen" or "Resident", pen = is_citizen and COLOR_LIGHTGREEN or COLOR_GREY },
             })
@@ -542,21 +542,6 @@ function WikiInitializer:_step_citizens()
     table.insert(citizen_root, { text = "# Citizens", pen = COLOR_YELLOW })
     table.insert(citizen_root, "\n\n")
     table.insert(citizen_root, { text = "Total Residents: ", pen = COLOR_LIGHTCYAN })
-    table.insert(citizen_root, { text = tostring(total_all), pen = COLOR_WHITE })
-    table.insert(citizen_root, "\n\n")
-
-    local citizen_root = {}
-    table.insert(citizen_root, { text = "# Citizens", pen = COLOR_YELLOW })
-    table.insert(citizen_root, "\n\n")
-    table.insert(citizen_root, { text = "Alive: ", pen = COLOR_LIGHTCYAN })
-    table.insert(citizen_root, { text = tostring(total_alive), pen = COLOR_LIGHTGREEN })
-    if total_fallen > 0 then
-        table.insert(citizen_root, "  |  ")
-        table.insert(citizen_root, { text = "Fallen: ", pen = COLOR_LIGHTCYAN })
-        table.insert(citizen_root, { text = tostring(total_fallen), pen = COLOR_LIGHTRED })
-    end
-    table.insert(citizen_root, "  |  ")
-    table.insert(citizen_root, { text = "Total: ", pen = COLOR_LIGHTCYAN })
     table.insert(citizen_root, { text = tostring(total_all), pen = COLOR_WHITE })
     table.insert(citizen_root, "\n\n")
     if #resident_rows > 0 then
