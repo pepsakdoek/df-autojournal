@@ -62,7 +62,7 @@ If you've been playing a fortress for a while and want to add DF Autojournal mid
 
 ### Step 1: Install the mod files
 
-Follow the installation steps above. You do **not** need to start a new fortress — the mod works with existing saves.
+Follow the **manual installation** steps above. You do **not** need to start a new fortress — the mod works with existing saves.
 
 ### Step 2: Load your save and run the mod
 
