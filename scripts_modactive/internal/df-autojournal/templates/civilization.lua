@@ -136,13 +136,10 @@ function render(civ_id, known_fort_set)
             end
             table.insert(content, "\n")
 
-            -- Total population
-            local pop = get_civ_population(civ_id)
-            if pop > 0 then
-                table.insert(content, { text = "Total Population: ", pen = COLOR_LIGHTCYAN })
-                table.insert(content, { text = tostring(pop), pen = COLOR_WHITE })
-                table.insert(content, "\n")
-            end
+            -- Total population (live via function block)
+            table.insert(content, { text = "Total Population: ", pen = COLOR_LIGHTCYAN })
+            table.insert(content, { type = 'function', fn_key = 'civ_population', args = { civ_id = civ_id } })
+            table.insert(content, "\n")
 
             -- Ruler(s)
             if settings.leadership then

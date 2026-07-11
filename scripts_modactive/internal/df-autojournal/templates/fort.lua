@@ -21,14 +21,12 @@ function render(site_id)
     table.insert(content, { text = "# Fort: " .. site_name, pen = COLOR_YELLOW })
     table.insert(content, "\n\n")
 
-    local citizens = 0
-    for _, unit in ipairs(df.global.world.units.active) do
-        if dfhack.units.isCitizen(unit) then
-            citizens = citizens + 1
-        end
-    end
     table.insert(content, { text = "Population: ", pen = COLOR_LIGHTCYAN })
-    table.insert(content, { text = tostring(citizens) .. " Citizens", pen = COLOR_WHITE })
+    table.insert(content, { type = 'function', fn_key = 'population_count', args = {} })
+    table.insert(content, "\n")
+
+    table.insert(content, { text = "Fort Wealth: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { type = 'function', fn_key = 'fort_wealth', args = {} })
     table.insert(content, "\n")
 
     -- Links to section pages

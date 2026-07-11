@@ -11,6 +11,12 @@ function register_function(fn_key, def)
     registry[fn_key] = def
 end
 
+local function to_text(v)
+    if type(v) == 'string' then return v end
+    if type(v) == 'table' and v.text then return v.text end
+    return tostring(v)
+end
+
 function evaluate(fn_block)
     if not fn_block then return '' end
     local def = registry[fn_block.fn_key]
@@ -19,7 +25,26 @@ function evaluate(fn_block)
     if not ok then
         return '[error: ' .. tostring(result) .. ']'
     end
-    return tostring(result)
+    return result
+end
+
+function result_char_count(result)
+    if type(result) == 'string' then
+        return #result
+    elseif type(result) == 'table' then
+        if result.type == 'table' then
+            return 0
+        elseif result.text then
+            return #(result.text or '')
+        else
+            local total = 0
+            for _, v in ipairs(result) do
+                total = total + #to_text(v)
+            end
+            return total
+        end
+    end
+    return #tostring(result)
 end
 
 function list_functions()
@@ -192,6 +217,39 @@ register_function('current_health', {
     end,
 })
 
+local HAPPY_RANKS = {
+    { label = "Euphoric",    min = -math.huge, max = -50001, rank = 1 },
+    { label = "Very Happy",  min = -50000,     max = -25001, rank = 2 },
+    { label = "Happy",       min = -25000,     max = -10001, rank = 3 },
+    { label = "Content",     min = -10000,     max = 9999,   rank = 4 },
+    { label = "Unhappy",     min = 10000,      max = 24999,  rank = 5 },
+    { label = "Very Unhappy",min = 25000,      max = 49999,  rank = 6 },
+    { label = "Miserable",   min = 50000,      max = math.huge, rank = 7 },
+}
+
+register_function('current_happiness', {
+    label = 'Current Happiness',
+    description = "Shows the dwarf's current happiness level with a sortable prefix (1.Euphoric..7.Miserable)",
+    args_schema = {
+        { key = 'unit_id', label = 'Unit ID', type = 'number', required = true },
+    },
+    handler = function(args)
+        local unit_id = tonumber(args.unit_id)
+        if not unit_id then return '[needs unit]' end
+        local unit = df.unit.find(unit_id)
+        if not unit then return 'Deceased' end
+        local soul = unit.status.current_soul
+        if not soul or not soul.personality then return 'Unknown' end
+        local stress = soul.personality.stress
+        for _, r in ipairs(HAPPY_RANKS) do
+            if stress >= r.min and stress <= r.max then
+                return tostring(r.rank) .. '. ' .. r.label
+            end
+        end
+        return 'Unknown'
+    end,
+})
+
 register_function('current_mood', {
     label = 'Current Mood',
     description = "Shows the dwarf's current mood and emotional state",
@@ -237,6 +295,32 @@ register_function('fort_wealth', {
         local wealth = plotinfo.tasks.wealth
         if not wealth then return 'Unknown' end
         return tostring(wealth.total or 0) .. CURRENCY_SYMBOL
+    end,
+})
+
+register_function('civ_population', {
+    label = 'Civilization Population',
+    description = "Total population of a civilization across all sites",
+    args_schema = {
+        { key = 'civ_id', label = 'Civilization ID', type = 'number', required = true },
+    },
+    handler = function(args)
+        local civ_id = tonumber(args.civ_id)
+        if not civ_id then return '[needs civ_id]' end
+        local total = 0
+        pcall(function()
+            local pops = df.global.world.entity_populations
+            if not pops then return end
+            for i = 0, #pops - 1 do
+                local pop = pops[i]
+                if pop.civ_id == civ_id then
+                    for j = 0, #pop.counts - 1 do
+                        total = total + pop.counts[j]
+                    end
+                end
+            end
+        end)
+        return tostring(total)
     end,
 })
 

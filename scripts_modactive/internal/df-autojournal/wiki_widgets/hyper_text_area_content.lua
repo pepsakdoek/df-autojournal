@@ -369,12 +369,34 @@ end
 
 --- Update fn_block lengths to match the number of chars their output
 -- occupies in char_list at their tracked positions.
+local function fn_block_char_count(result)
+    if type(result) == 'string' then
+        return #result
+    elseif type(result) == 'table' then
+        if result.type == 'table' then
+            return 0
+        elseif result.text then
+            return #(result.text or '')
+        else
+            local total = 0
+            for _, v in ipairs(result) do
+                if type(v) == 'string' then
+                    total = total + #v
+                elseif type(v) == 'table' and v.text then
+                    total = total + #v.text
+                end
+            end
+            return total
+        end
+    end
+    return #tostring(result)
+end
+
 function HyperTextAreaContent:_sync_fn_block_lengths()
     table.sort(self.fn_blocks, function(a, b) return a.pos < b.pos end)
     for _, fb in ipairs(self.fn_blocks) do
-        -- Evaluate to get current output length
         local result = self:_evaluate_fn_block({fn_key=fb.fn_key, args=fb.args}) or ''
-        fb.len = #result
+        fb.len = fn_block_char_count(result)
     end
 end
 

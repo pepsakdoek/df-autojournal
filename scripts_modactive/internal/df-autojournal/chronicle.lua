@@ -7,7 +7,7 @@ local CHRONICLE_KEY = 'mfw_chronicle_state'
 
 function Chronicle.get_state()
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(CHRONICLE_KEY)
+        return dfhack.persistent.getWorldData(CHRONICLE_KEY)
     end)
     if ok and data and data.val then
         return data.val
@@ -19,7 +19,7 @@ function Chronicle.get_state()
 end
 
 function Chronicle.save_state(state)
-    dfhack.persistent.saveSiteData(CHRONICLE_KEY, {val=state})
+    dfhack.persistent.saveWorldData(CHRONICLE_KEY, {val=state})
 end
 
 function Chronicle.append_to_page(context, page_id, section_title, text)
@@ -93,7 +93,7 @@ function Chronicle.start_background_task(context)
     local function tick()
         if not dfhack.isWorldLoaded() then return end
         
-        local data = dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
+        local data = dfhack.persistent.getWorldData('mfw_auto_journal_enabled')
         local enabled = data and data.val and data.val[1] == 1
         
         if enabled and dfhack.world.isFortressMode() then

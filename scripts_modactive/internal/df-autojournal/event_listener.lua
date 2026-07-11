@@ -52,7 +52,7 @@ local function append_to_page(page_id, section_title, entry_text)
 
     local key = 'mfw_p_' .. page_id
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(key) or {}
+        return dfhack.persistent.getWorldData(key) or {}
     end)
     if not ok then data = {} end
 
@@ -101,7 +101,7 @@ local function append_to_page(page_id, section_title, entry_text)
         table.insert(content, entry_text)
     end
 
-    local ok2, err2 = pcall(dfhack.persistent.saveSiteData, key, {content=content, cursor=data.cursor or {1}})
+    local ok2, err2 = pcall(dfhack.persistent.saveWorldData, key, {content=content, cursor=data.cursor or {1}})
     if not ok2 then
         logger.log_error("Failed to save page '" .. page_id .. "' - " .. tostring(err2))
     else
@@ -131,7 +131,7 @@ local function register_timeline_entry(parsed)
 
     local data = {}
     local ok_load = pcall(function()
-        local raw = dfhack.persistent.getSiteData(TIMELINE_KEY)
+        local raw = dfhack.persistent.getWorldData(TIMELINE_KEY)
         if raw and raw.entries then
             data.entries = raw.entries
         end
@@ -150,7 +150,7 @@ local function register_timeline_entry(parsed)
         end
     end
 
-    pcall(dfhack.persistent.saveSiteData, TIMELINE_KEY, {entries=data.entries})
+    pcall(dfhack.persistent.saveWorldData, TIMELINE_KEY, {entries=data.entries})
 end
 
 --- Register an enemy encounter in the enemies registry.
@@ -163,7 +163,7 @@ local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeat
 
     local data = {}
     local ok_load = pcall(function()
-        local raw = dfhack.persistent.getSiteData(ENEMIES_KEY)
+        local raw = dfhack.persistent.getWorldData(ENEMIES_KEY)
         if raw and raw.enemies then
             data.enemies = raw.enemies
         end
@@ -200,7 +200,7 @@ local function register_enemy_encounter(enemy_name, enemy_type, year, was_defeat
         data.enemies[key] = record
     end
 
-    pcall(dfhack.persistent.saveSiteData, ENEMIES_KEY, {enemies=data.enemies})
+    pcall(dfhack.persistent.saveWorldData, ENEMIES_KEY, {enemies=data.enemies})
 end
 
 local VISITORS_KEY = 'mfw_visitors'
@@ -210,7 +210,7 @@ local function register_visitor(visitor_name, visitor_type, year, season, has_de
 
     local data = {}
     local ok_load = pcall(function()
-        local raw = dfhack.persistent.getSiteData(VISITORS_KEY)
+        local raw = dfhack.persistent.getWorldData(VISITORS_KEY)
         if raw and raw.visitors then
             data.visitors = raw.visitors
         end
@@ -246,13 +246,13 @@ local function register_visitor(visitor_name, visitor_type, year, season, has_de
         data.visitors[key] = record
     end
 
-    pcall(dfhack.persistent.saveSiteData, VISITORS_KEY, {visitors=data.visitors})
+    pcall(dfhack.persistent.saveWorldData, VISITORS_KEY, {visitors=data.visitors})
 end
 
 local function load_visitors()
     local data = {}
     local ok = pcall(function()
-        local raw = dfhack.persistent.getSiteData(VISITORS_KEY)
+        local raw = dfhack.persistent.getWorldData(VISITORS_KEY)
         if raw and raw.visitors then
             local list = {}
             for _, rec in pairs(raw.visitors) do
@@ -283,7 +283,7 @@ end
 local function load_enemy_kills()
     local data = {}
     local ok = pcall(function()
-        local raw = dfhack.persistent.getSiteData(ENEMIES_KEY)
+        local raw = dfhack.persistent.getWorldData(ENEMIES_KEY)
         if raw and raw.enemies then
             for nkey, rec in pairs(raw.enemies) do
                 if rec.citizens_killed and rec.citizens_killed > 0 then
@@ -302,7 +302,7 @@ end
 local function load_enemies()
     local data = {}
     local ok = pcall(function()
-        local raw = dfhack.persistent.getSiteData(ENEMIES_KEY)
+        local raw = dfhack.persistent.getWorldData(ENEMIES_KEY)
         if raw and raw.enemies then
             local list = {}
             for _, rec in pairs(raw.enemies) do
@@ -402,7 +402,7 @@ end
 --- Load/save seen unit IDs to avoid duplicate events
 local function load_seen_units()
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(SEEN_UNITS_KEY)
+        return dfhack.persistent.getWorldData(SEEN_UNITS_KEY)
     end)
     if ok and data and data.val then
         local set = {}
@@ -419,7 +419,7 @@ local function save_seen_units(set)
     for id, _ in pairs(set) do
         table.insert(ids, id)
     end
-    pcall(dfhack.persistent.saveSiteData, SEEN_UNITS_KEY, {val=ids})
+    pcall(dfhack.persistent.saveWorldData, SEEN_UNITS_KEY, {val=ids})
 end
 
 ---------------------------------------------------------------------------
@@ -434,7 +434,7 @@ function EventListener.start()
     -- Set state and persist immediately so the overlay/toggle always reflect
     -- the correct status, even if hook registration fails.
     dfhack.mfw_state.listener_enabled = true
-    pcall(dfhack.persistent.saveSiteData, LISTENER_KEY, {val={1}})
+    pcall(dfhack.persistent.saveWorldData, LISTENER_KEY, {val={1}})
 
     -- Init seen units from persistent storage
     if not dfhack.mfw_state.seen_units then
@@ -472,7 +472,7 @@ function EventListener.stop()
     end
 
     dfhack.mfw_state.listener_enabled = false
-    pcall(dfhack.persistent.saveSiteData, LISTENER_KEY, {val={0}})
+    pcall(dfhack.persistent.saveWorldData, LISTENER_KEY, {val={0}})
 end
 
 function EventListener.is_running()
@@ -481,7 +481,7 @@ end
 
 function EventListener.load_state()
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(LISTENER_KEY)
+        return dfhack.persistent.getWorldData(LISTENER_KEY)
     end)
     if ok and data and data.val and data.val[1] == 1 then
         dfhack.mfw_state.listener_enabled = true

@@ -239,7 +239,7 @@ end
 
 function get_settings()
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(SETTINGS_KEY)
+        return dfhack.persistent.getWorldData(SETTINGS_KEY)
     end)
     if not ok then
         logger.log_error("LOAD: getSiteData threw error")
@@ -305,7 +305,7 @@ function save_settings(settings)
     end
     -- logger.log("SAVE: json OK length=" .. #encoded .. " preview=" .. encoded:sub(1, 250))
 
-    local ok2, result = pcall(dfhack.persistent.saveSiteData, SETTINGS_KEY, {val=encoded})
+    local ok2, result = pcall(dfhack.persistent.saveWorldData, SETTINGS_KEY, {val=encoded})
     -- logger.log("SAVE: saveSiteData ok=" .. tostring(ok2) .. " result=" .. tostring(result))
     if ok2 and result ~= false then
         -- logger.log("SAVE: success")

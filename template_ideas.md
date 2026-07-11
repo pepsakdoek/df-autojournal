@@ -7,8 +7,10 @@ Fully tested and implemented ideas are fully removed.
 
 # World
 
-* BUG: Opening a new fort in an exising world didn't seem to 'load' the existing wiki (test in more depth)
+* BUG: Opening a new fort in an exising world (with a retired previous fort) doesn't load the existing wiki
 * Peaks should say in which ranges they are
+* Whole module should optionally become openable before placing a FORT. So after world gen, but before placing the fort so you can learn more about the civs and the world
+
 
 # Civilization Root Template
 
@@ -180,8 +182,9 @@ Current 12 event toggles might need:
 
 # Code issues and other possible irritations and issues
 
-* Page history for quick navigation (breadcrumbs) - it should probably be 'above' the main wiki page, and we want to use a horizontal divider there.
-* We also want to compress the Options UI (Initialize wiki, Auto Journaling, Settings, Export to HTML and Show/Hide the TOC)
+* Page history for quick navigation (breadcrumbs) - it should probably be 'above' the main wiki page, and we want to use a horizontal divider there
+* We also want to compress the Options UI (Initialize wiki, Auto Journaling, Settings, Export to HTML and Show/Hide the TOC), also use a horizontal divider there between the main ToC and the Options UI
+* We might also optionally hide the Color, table and links editors
 
 -- Basically do this only once we are pretty much happy with the AutoJournal
 * Create the actual HTML export

@@ -64,7 +64,7 @@ AutoJournalButton = defclass(AutoJournalButton, overlay.OverlayWidget)
 AutoJournalButton.ATTRS{
     default_pos     = {x=-3, y=-4},
     default_enabled = true,
-    viewscreens     = {'dwarfmode', 'dwarfmode/'},
+    viewscreens     = {'dwarfmode', 'dwarfmode/', 'viewscreen_choose_start_sitest'},
     frame           = {w=LOGO_COLS, h=LOGO_ROWS},
     overlay_onupdate_max_freq_seconds = 0,
 }
@@ -82,13 +82,20 @@ function AutoJournalButton:overlay_onupdate()
     if dfhack.mfw_state.listener_enabled == nil then
         dfhack.mfw_state.listener_enabled = false
     end
-    local enabled = dfhack.mfw_state.listener_enabled
+    local in_fort = dfhack.isWorldLoaded() and dfhack.isMapLoaded()
+    local enabled = in_fort and dfhack.mfw_state.listener_enabled
+    local show_on = in_fort and enabled
     if self._btn_on and self._btn_off then
-        self._btn_on.visible  = enabled
-        self._btn_off.visible = not enabled
+        self._btn_on.visible  = show_on
+        self._btn_off.visible = not show_on
     elseif self._text then
-        self._text:setText(enabled and 'AJ:ON' or 'AJ:OFF')
-        self._text.text_pen = enabled and COLOR_GREEN or COLOR_RED
+        if in_fort then
+            self._text:setText(enabled and 'AJ:ON' or 'AJ:OFF')
+            self._text.text_pen = enabled and COLOR_GREEN or COLOR_RED
+        else
+            self._text:setText('WIKI')
+            self._text.text_pen = COLOR_LIGHTCYAN
+        end
     end
 end
 
@@ -96,11 +103,12 @@ function AutoJournalButton:init()
     if not dfhack.mfw_state then dfhack.mfw_state = {} end
     if dfhack.mfw_state.listener_enabled == nil then
         local ok, data = pcall(function()
-            return dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
+            return dfhack.persistent.getWorldData('mfw_auto_journal_enabled')
         end)
         dfhack.mfw_state.listener_enabled = ok and data and data.val and data.val[1] == 1 or false
     end
 
+    local in_fort = dfhack.isWorldLoaded() and dfhack.isMapLoaded()
     local has_png = on_normal and on_hover and off_normal and off_hover
 
     if has_png then
@@ -117,16 +125,19 @@ function AutoJournalButton:init()
             on_click    = function() dfhack.run_command('df-autojournal') end,
         }
         local enabled = dfhack.mfw_state.listener_enabled
-        self._btn_on.visible  = enabled
-        self._btn_off.visible = not enabled
+        local show_on = in_fort and enabled
+        self._btn_on.visible  = show_on
+        self._btn_off.visible = not show_on
         self:addviews{self._btn_on, self._btn_off}
     else
         local enabled = dfhack.mfw_state.listener_enabled
+        local label_text = in_fort and (enabled and 'AJ:ON' or 'AJ:OFF') or 'WIKI'
+        local label_pen = in_fort and (enabled and COLOR_GREEN or COLOR_RED) or COLOR_LIGHTCYAN
         self._text = widgets.TextButton{
             view_id     = 'aj_text',
             frame       = {l=0, t=0},
-            label       = enabled and 'AJ:ON' or 'AJ:OFF',
-            text_pen    = enabled and COLOR_GREEN or COLOR_RED,
+            label       = label_text,
+            text_pen    = label_pen,
             on_activate = function() dfhack.run_command('df-autojournal') end,
         }
         self:addviews{self._text}
@@ -140,7 +151,7 @@ end
 
 local function check_persisted()
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData('mfw_auto_journal_enabled')
+        return dfhack.persistent.getWorldData('mfw_auto_journal_enabled')
     end)
     return ok and data and data.val and data.val[1] == 1 or false
 end

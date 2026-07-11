@@ -110,7 +110,9 @@ WikiWindow.ATTRS {
     resizable=true,
     resize_min={w=56, h=26},
     frame_inset={l=0,r=0,t=0,b=0},
+    world_mode=DEFAULT_NIL,
     on_initialize=DEFAULT_NIL,
+    on_world_initialize=DEFAULT_NIL,
     on_page_change=DEFAULT_NIL,
     on_page_tree_toggle=DEFAULT_NIL,
     on_text_change=DEFAULT_NIL,
@@ -119,6 +121,62 @@ WikiWindow.ATTRS {
 }
 
 function WikiWindow:init()
+    local bottom_btns = {}
+    local btn_y = 8
+    if self.world_mode then
+        table.insert(bottom_btns, widgets.HotkeyLabel{
+            view_id='world_init_btn',
+            frame={b=btn_y, l=0},
+            label='Initialize World Wiki',
+            key='CUSTOM_ALT_I',
+            on_activate=self:callback('onWorldInitialize'),
+        })
+        btn_y = btn_y - 2
+    else
+        table.insert(bottom_btns, widgets.HotkeyLabel{
+            view_id='initialize_btn',
+            frame={b=btn_y, l=0},
+            label='Initialize Wiki',
+            key='CUSTOM_ALT_I',
+            on_activate=self:callback('onInitialize'),
+        })
+        btn_y = btn_y - 2
+        table.insert(bottom_btns, wiki_widgets.ToggleLabel{
+            view_id='toggle_auto',
+            frame={b=btn_y, l=0},
+            label='Auto-Journaling ',
+            key='CUSTOM_ALT_A',
+            initial_option=function()
+                return event_listener.is_running and event_listener.is_running() or false
+            end,
+            on_change=function(val)
+                if val == 'On' or val == true then
+                    if event_listener.start then
+                        pcall(event_listener.start)
+                    end
+                else
+                    if event_listener.stop then
+                        pcall(event_listener.stop)
+                    end
+                end
+            end,
+        })
+        btn_y = btn_y - 2
+        table.insert(bottom_btns, widgets.HotkeyLabel{
+            frame={b=btn_y, l=0},
+            label='Settings',
+            key='CUSTOM_ALT_S',
+            on_activate=function() wiki_settings.show_settings() end,
+        })
+        btn_y = btn_y - 2
+    end
+    table.insert(bottom_btns, widgets.HotkeyLabel{
+        frame={b=btn_y, l=0},
+        label='Export to HTML',
+        key='CUSTOM_ALT_X',
+        on_activate=function() logger.log("Export triggered") end,
+    })
+
     self:addviews{
         -- Wiki TOC Panel (Left)
         widgets.Panel{
@@ -152,46 +210,7 @@ function WikiWindow:init()
                     choices=PAGES,
                     on_submit=self:callback('onWikiPageSubmit'),
                 },
-                -- Buttons at the bottom of Wiki TOC
-                widgets.HotkeyLabel{
-                    view_id='initialize_btn',
-                    frame={b=8, l=0},
-                    label='Initialize Wiki',
-                    key='CUSTOM_ALT_I',
-                    on_activate=self:callback('onInitialize'),
-                },
-                wiki_widgets.ToggleLabel{
-                    view_id='toggle_auto',
-                    frame={b=6, l=0},
-                    label='Auto-Journaling ',
-                    key='CUSTOM_ALT_A',
-                    initial_option=function()
-                        return event_listener.is_running and event_listener.is_running() or false
-                    end,
-                    on_change=function(val)
-                        if val == 'On' or val == true then
-                            if event_listener.start then
-                                pcall(event_listener.start)
-                            end
-                        else
-                            if event_listener.stop then
-                                pcall(event_listener.stop)
-                            end
-                        end
-                    end,
-                },
-                widgets.HotkeyLabel{
-                    frame={b=4, l=0},
-                    label='Settings',
-                    key='CUSTOM_ALT_S',
-                    on_activate=function() wiki_settings.show_settings() end,
-                },
-                widgets.HotkeyLabel{
-                    frame={b=2, l=0},
-                    label='Export to HTML',
-                    key='CUSTOM_ALT_X',
-                    on_activate=function() logger.log("Export triggered") end,
-                },
+                table.unpack(bottom_btns),
             }
         },
         widgets.Divider{
@@ -274,6 +293,15 @@ function WikiWindow:onInitialize()
         self.on_initialize()
     else
         logger.log("WikiWindow:onInitialize - on_initialize is nil!")
+    end
+end
+
+function WikiWindow:onWorldInitialize()
+    logger.log("WikiWindow:onWorldInitialize called")
+    if self.on_world_initialize then
+        self.on_world_initialize()
+    else
+        logger.log("WikiWindow:onWorldInitialize - on_world_initialize is nil!")
     end
 end
 
@@ -376,7 +404,7 @@ function WikiContext:save_content(page_id, display_text, cursor)
     if dfhack.isWorldLoaded() then
         local key = self:get_key(page_id)
         -- logger.log("WikiContext: Saving page " .. page_id .. " (key: " .. key .. ")")
-        local ok, err = pcall(dfhack.persistent.saveSiteData, key, {content=display_text, cursor={cursor}})
+        local ok, err = pcall(dfhack.persistent.saveWorldData, key, {content=display_text, cursor={cursor}})
         if not ok then
             logger.log_error("WikiContext: Failed to persist page " .. page_id .. ": " .. tostring(err))
         end
@@ -387,7 +415,7 @@ function WikiContext:load_content(page_id)
     if dfhack.isWorldLoaded() then
         local key = self:get_key(page_id)
         local ok, data = pcall(function()
-            return dfhack.persistent.getSiteData(key) or {}
+            return dfhack.persistent.getWorldData(key) or {}
         end)
         if not ok or not data then
             logger.log_error("WikiContext: Failed to load page " .. page_id .. " or no data found.")
@@ -408,7 +436,7 @@ end
 function WikiContext:get_dynamic_pages()
     if not dfhack.isWorldLoaded() then return {} end
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(self.save_prefix .. 'dynamic_pages') or {}
+        return dfhack.persistent.getWorldData(self.save_prefix .. 'dynamic_pages') or {}
     end)
     if not ok or not data then return {} end
     local pages = data.pages or {}
@@ -419,14 +447,14 @@ end
 function WikiContext:save_dynamic_pages(pages)
     if dfhack.isWorldLoaded() then
         -- logger.log("WikiContext: Saving " .. #pages .. " dynamic pages.")
-        dfhack.persistent.saveSiteData(self.save_prefix .. 'dynamic_pages', {pages=pages})
+        dfhack.persistent.saveWorldData(self.save_prefix .. 'dynamic_pages', {pages=pages})
     end
 end
 
 function WikiContext:reset_all_data()
     if not dfhack.isWorldLoaded() then return end
     local function clear_key(key)
-        pcall(dfhack.persistent.saveSiteData, key, nil)
+        pcall(dfhack.persistent.deleteWorldData, key)
     end
     local keys_to_clear = {
         'initialized', 'catchup_last_id', 'event_timeline', 'enemies',
@@ -449,14 +477,14 @@ end
 
 function WikiContext:save_window_frame(frame)
     if dfhack.isWorldLoaded() then
-        dfhack.persistent.saveSiteData(self.save_prefix .. 'window_frame', frame)
+        dfhack.persistent.saveWorldData(self.save_prefix .. 'window_frame', frame)
     end
 end
 
 function WikiContext:load_window_frame()
     if not dfhack.isWorldLoaded() then return nil end
     local ok, data = pcall(function()
-        return dfhack.persistent.getSiteData(self.save_prefix .. 'window_frame') or {}
+        return dfhack.persistent.getWorldData(self.save_prefix .. 'window_frame') or {}
     end)
     if ok and data and data.w and data.h then
         return {w=data.w, h=data.h}
@@ -469,13 +497,62 @@ WikiScreen.ATTRS {
     focus_path='my-fort-wiki',
     force_pause=true,
     pass_pause=true,
+    world_mode=DEFAULT_NIL,
 }
+
+local MIGRATION_KEYS = {
+    'initialized', 'known_civs', 'known_forts', 'dynamic_pages', 'fort_members',
+    'event_timeline', 'enemies', 'seen_units', 'catchup_last_id', 'settings',
+    'auto_journal_enabled', 'window_frame', 'last_page',
+}
+
+function WikiScreen:maybe_migrate_persistent_data()
+    if not dfhack.isWorldLoaded() then return end
+    local migrated = dfhack.persistent.getWorldData(self.context.save_prefix .. '__migrated_v1')
+    if migrated then return end
+    local any = false
+    for _, suffix in ipairs(MIGRATION_KEYS) do
+        local site_key = self.context.save_prefix .. suffix
+        local world_key = site_key
+        local ok, site_data = pcall(function() return dfhack.persistent.getSiteData(site_key) end)
+        if ok and site_data then
+            local ok2 = pcall(dfhack.persistent.saveWorldData, world_key, site_data)
+            if ok2 then
+                pcall(dfhack.persistent.deleteSiteData, site_key)
+                logger.log("Migrated key: " .. site_key)
+                any = true
+            end
+        end
+    end
+    -- Also migrate wiki page content keys and dynamic pages
+    local dyn_ok, dyn_data = pcall(function()
+        return dfhack.persistent.getWorldData(self.context.save_prefix .. 'dynamic_pages')
+    end)
+    if dyn_ok and dyn_data and dyn_data.pages then
+        for _, page in ipairs(dyn_data.pages) do
+            local wiki_key = self.context:get_key(page.id)
+            local ok_site, site_content = pcall(function() return dfhack.persistent.getSiteData(wiki_key) end)
+            if ok_site and site_content then
+                pcall(dfhack.persistent.saveWorldData, wiki_key, site_content)
+                pcall(dfhack.persistent.deleteSiteData, wiki_key)
+                logger.log("Migrated page: " .. wiki_key)
+                any = true
+            end
+        end
+    end
+    if any then
+        logger.log("Persistent data migration (site->world) completed")
+    end
+    dfhack.persistent.saveWorldData(self.context.save_prefix .. '__migrated_v1', {val={1}})
+end
 
 function WikiScreen:init()
     self.context = WikiContext{}
+    self.world_mode = self.world_mode or (dfhack.isWorldLoaded() and not dfhack.isMapLoaded())
+    self:maybe_migrate_persistent_data()
     self.current_page_id = 'world'
     pcall(function()
-        local data = dfhack.persistent.getSiteData(self.context.save_prefix .. 'last_page')
+        local data = dfhack.persistent.getWorldData(self.context.save_prefix .. 'last_page')
         if data and data.val and type(data.val) == 'table' and #data.val > 0 then
             self.current_page_id = data.val[1]
         end
@@ -490,11 +567,15 @@ function WikiScreen:init()
 
     local win_frame = self.context:load_window_frame() or {w=100, h=50}
 
+    local title = self.world_mode and 'DF Autojournal (World View)' or 'My Fort Wiki'
     self:addviews{
         WikiWindow{
             view_id='wiki_window',
             frame=win_frame,
+            frame_title=title,
+            world_mode=self.world_mode,
             on_initialize=self:callback('onInitialize'),
+            on_world_initialize=self:callback('onWorldInitialize'),
             on_page_change=self:callback('onPageChange'),
             on_page_tree_toggle=self:callback('onPageTreeToggle'),
             on_text_change=self:callback('onTextChange'),
@@ -525,7 +606,7 @@ function WikiScreen:displaySearchResults(query)
 
     local membership = {}
     pcall(function()
-        local data = dfhack.persistent.getSiteData('mfw_fort_members')
+        local data = dfhack.persistent.getWorldData('mfw_fort_members')
         if data and data.members then membership = data.members end
     end)
 
@@ -544,7 +625,7 @@ end
 function WikiScreen:expand_to_page(page_id)
     local membership = {}
     pcall(function()
-        local data = dfhack.persistent.getSiteData('mfw_fort_members')
+        local data = dfhack.persistent.getWorldData('mfw_fort_members')
         if data and data.members then membership = data.members end
     end)
     local seen = {}
@@ -568,7 +649,7 @@ function WikiScreen:refreshPageList()
 
     local membership = {}
     pcall(function()
-        local data = dfhack.persistent.getSiteData('mfw_fort_members')
+        local data = dfhack.persistent.getWorldData('mfw_fort_members')
         if data and data.members then membership = data.members end
     end)
 
@@ -597,7 +678,7 @@ function WikiScreen:onPageTreeToggle(page_id)
 end
 
 function WikiScreen:onInitialize()
-    local initialized = dfhack.persistent.getSiteData(self.context.save_prefix .. 'initialized')
+    local initialized = dfhack.persistent.getWorldData(self.context.save_prefix .. 'initialized')
     logger.log("onInitialize: initialized=" .. tostring(initialized))
     if initialized then
         self._reinit_stage = 1
@@ -677,6 +758,53 @@ function WikiScreen:performInitialization()
     end)
 end
 
+function WikiScreen:onWorldInitialize()
+    logger.log("onWorldInitialize called")
+    self:performWorldInitialization()
+end
+
+function WikiScreen:performWorldInitialization()
+    if self.initializing then
+        logger.log("World initialization already in progress. Ignoring.")
+        return
+    end
+    self.initializing = true
+
+    local progress = wiki_widgets.ProgressBarScreen{
+        frame_title = 'Initializing World Wiki',
+        steps = {
+            'Scanning civilizations',
+            'Rendering civ pages',
+            'World page',
+            'Saving pages',
+        },
+    }
+    progress:show()
+
+    local initializer = wiki_initializer.WikiInitializer{
+        context = self.context,
+        on_complete = function()
+            progress:dismiss()
+            self:refreshPageList()
+            self:updateLinkPages()
+            self:onPageChange(self.current_page_id, true)
+            self.initializing = false
+        end,
+    }
+
+    initializer.on_step = function(idx, total, name)
+        progress:setCurrent(idx, 'Working on ' .. name .. '...')
+    end
+
+    gui_script.start(function()
+        local ok = initializer:perform_world_init()
+        if not ok then
+            progress:dismiss()
+            self.initializing = false
+        end
+    end)
+end
+
 function WikiScreen:onPageChange(page_id, no_save)
     -- Save current page before switching
     if not no_save then
@@ -744,7 +872,7 @@ end
 
 function WikiScreen:save_last_page(page_id)
     if dfhack.isWorldLoaded() then
-        dfhack.persistent.saveSiteData(self.context.save_prefix .. 'last_page', {val={page_id}})
+        dfhack.persistent.saveWorldData(self.context.save_prefix .. 'last_page', {val={page_id}})
     end
 end
 
@@ -767,11 +895,13 @@ function WikiScreen:onDismiss()
 end
 
 function show_wiki()
-    if not dfhack.isMapLoaded() or not dfhack.world.isFortressMode() then
-        qerror('wiki requires a fortress map to be loaded')
+    if dfhack.isWorldLoaded() and dfhack.isMapLoaded() then
+        view = view and view:raise() or WikiScreen{}:show()
+    elseif dfhack.isWorldLoaded() then
+        view = view and view:raise() or WikiScreen{world_mode=true}:show()
+    else
+        qerror('wiki requires a world to be loaded')
     end
-
-    view = view and view:raise() or WikiScreen{}:show()
 end
 
 function main()

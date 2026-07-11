@@ -6,7 +6,9 @@
 -- HyperTextArea's scrollable document.  No borders — columns are separated
 -- by fixed spacing and each cell is padded to its column width.
 --
--- Each cell is a standard HyperTextArea span: {text, pen, link}.
+-- Each cell is a standard HyperTextArea span: {text, pen, link},
+-- or a function block: {type='function', fn_key='...', args={...}}.
+-- Function blocks are evaluated at render time via fn_evaluator.
 -- Column headers are clickable to toggle ascending/descending sort.
 -- Sorting auto-detects numeric values when possible.
 
@@ -22,6 +24,7 @@ HyperTable.ATTRS {
     sort_asc     = true,
     max_rows     = DEFAULT_NIL,
     search_query = '',
+    fn_evaluator = DEFAULT_NIL,
 }
 
 function HyperTable:init()
@@ -41,7 +44,7 @@ function HyperTable:normalize()
         for j, cell in ipairs(row) do
             if type(cell) == 'string' then
                 row[j] = { text = cell, pen = nil, link = nil }
-            elseif not cell.text then
+            elseif not cell.text and cell.type ~= 'function' then
                 row[j] = { text = tostring(cell), pen = nil, link = nil }
             end
         end
@@ -54,6 +57,14 @@ end
 
 local CELL_GAP = 2
 
+local function cell_text(cell, fn_evaluator)
+    if not cell then return '' end
+    if cell.type == 'function' and fn_evaluator then
+        return fn_evaluator(cell) or ''
+    end
+    return cell.text or ''
+end
+
 function HyperTable:calc_column_widths(avail_width)
     local widths = {}
     for j, col in ipairs(self.columns) do
@@ -61,7 +72,8 @@ function HyperTable:calc_column_widths(avail_width)
         for _, row in ipairs(self.rows) do
             local cell = row[j]
             if cell then
-                local w = #(cell.text or '')
+                local text = cell_text(cell, self.fn_evaluator)
+                local w = #(text or '')
                 if w > max_w then max_w = w end
             end
         end
@@ -184,10 +196,6 @@ end
 -- Value extraction & comparison (auto-detect numeric)
 -- ---------------------------------------------------------------------------
 
-local function cell_text(cell)
-    return cell and cell.text or ''
-end
-
 local function try_tonumber(s)
     local trimmed = s:match('^%s*(.-)%s*$')
     if trimmed and tonumber(trimmed) then
@@ -196,8 +204,8 @@ local function try_tonumber(s)
     return nil
 end
 
-local function compare_cells(a, b)
-    local ta, tb = cell_text(a), cell_text(b)
+local function compare_cells(a, b, fn_eval)
+    local ta, tb = cell_text(a, fn_eval), cell_text(b, fn_eval)
     local na, nb = try_tonumber(ta), try_tonumber(tb)
     if na and nb then return na < nb end
     if na then return true  end
@@ -212,7 +220,7 @@ local function is_empty_row(row)
     return true
 end
 
-local function sort_with_empty_guard(rows, col, asc)
+local function sort_with_empty_guard(rows, col, asc, fn_eval)
     table.sort(rows, function(a, b)
         local ea, eb = is_empty_row(a), is_empty_row(b)
         if ea and eb then return false end
@@ -220,9 +228,9 @@ local function sort_with_empty_guard(rows, col, asc)
         if eb then return true end
         local ca, cb = a[col], b[col]
         if asc then
-            return compare_cells(ca, cb)
+            return compare_cells(ca, cb, fn_eval)
         else
-            return compare_cells(cb, ca)
+            return compare_cells(cb, ca, fn_eval)
         end
     end)
 end
@@ -234,7 +242,7 @@ end
 -- Apply the current sort_col/sort_asc state without toggling.
 function HyperTable:sort_column_internal()
     if self.sort_col and self.sort_col > 0 then
-        sort_with_empty_guard(self.rows, self.sort_col, self.sort_asc)
+        sort_with_empty_guard(self.rows, self.sort_col, self.sort_asc, self.fn_evaluator)
     end
 end
 
@@ -246,7 +254,7 @@ function HyperTable:sort_column(col_idx)
         self.sort_col = col_idx
         self.sort_asc = true
     end
-    sort_with_empty_guard(self.rows, col_idx, self.sort_asc)
+    sort_with_empty_guard(self.rows, col_idx, self.sort_asc, self.fn_evaluator)
 end
 
 -- ---------------------------------------------------------------------------
@@ -314,12 +322,25 @@ function HyperTable:render_row(row, col_widths)
     for j, col in ipairs(self.columns) do
         local cell = row[j] or { text = '' }
         local w = col_widths[j]
-        local padded = pad_text(cell.text or '', w, col.align)
+        local cell_text_str
+        local cell_pen
+        local cell_link
+        if cell.type == 'function' and self.fn_evaluator then
+            local result = self.fn_evaluator(cell) or ''
+            cell_text_str = result
+            cell_pen = COLOR_GREEN
+            cell_link = cell.link
+        else
+            cell_text_str = cell.text or ''
+            cell_pen = cell.pen
+            cell_link = cell.link
+        end
+        local padded = pad_text(cell_text_str, w, col.align)
         table.insert(line_parts, padded)
         table.insert(spans, {
             text = padded,
-            pen  = cell.pen,
-            link = cell.link,
+            pen  = cell_pen,
+            link = cell_link,
         })
         if j < #self.columns then
             add_gap_fragment(spans, line_parts)
@@ -337,7 +358,8 @@ function HyperTable:get_filtered_rows()
     for _, row in ipairs(self.rows) do
         local match = false
         for _, cell in ipairs(row) do
-            if cell and cell.text and cell.text:lower():find(lower, 1, true) then
+            local ct = cell_text(cell, self.fn_evaluator)
+            if ct and ct ~= '' and ct:lower():find(lower, 1, true) then
                 match = true
                 break
             end
@@ -454,8 +476,11 @@ function HyperTable:get_handler_at(local_y, x)
             if data_idx >= 1 and data_idx <= #data_rows then
                 local row = data_rows[data_idx]
                 local cell = row[j]
-                if cell and cell.link then
-                    return { type = 'link', data = cell.link }
+                if cell then
+                    local link = cell.type == 'function' and cell.link or cell.link
+                    if link then
+                        return { type = 'link', data = link }
+                    end
                 end
             end
             return nil

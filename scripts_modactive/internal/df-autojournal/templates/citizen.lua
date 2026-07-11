@@ -41,18 +41,39 @@ function render(unit, template_opts)
     table.insert(content, "\n\n")
 
     table.insert(content, { text = "Profession: ", pen = COLOR_LIGHTCYAN })
-    table.insert(content, { text = prof, pen = COLOR_WHITE })
+    table.insert(content, { type = 'function', fn_key = 'current_profession', args = { unit_id = unit.id } })
     table.insert(content, "\n")
 
     table.insert(content, { text = "Gender: ", pen = COLOR_LIGHTCYAN })
     table.insert(content, { text = sex, pen = COLOR_WHITE })
     table.insert(content, "\n")
 
-    -- Age (replaces raw birth year)
-    local age = df.global.cur_year - unit.birth_year
+    -- Age (live via function block)
     table.insert(content, { text = "Age: ", pen = COLOR_LIGHTCYAN })
-    table.insert(content, { text = tostring(age), pen = COLOR_WHITE })
+    table.insert(content, { type = 'function', fn_key = 'dwarf_age', args = { birth_year = unit.birth_year, unit_id = unit.id } })
     table.insert(content, "\n")
+
+    -- Happiness (live via function block)
+    table.insert(content, { text = "Happiness: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { type = 'function', fn_key = 'current_happiness', args = { unit_id = unit.id } })
+    table.insert(content, "\n")
+
+    -- Mood (live via function block, shows strange mood like fey/possessed or "Content")
+    table.insert(content, { text = "Mood: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { type = 'function', fn_key = 'current_mood', args = { unit_id = unit.id } })
+    table.insert(content, "\n")
+
+    -- Health (live via function block)
+    table.insert(content, { text = "Health: ", pen = COLOR_LIGHTCYAN })
+    table.insert(content, { type = 'function', fn_key = 'current_health', args = { unit_id = unit.id } })
+    table.insert(content, "\n")
+
+    -- Needs (live via function block)
+    if settings.needs then
+        table.insert(content, { text = "Needs: ", pen = COLOR_LIGHTCYAN })
+        table.insert(content, { type = 'function', fn_key = 'current_needs', args = { unit_id = unit.id } })
+        table.insert(content, "\n")
+    end
 
     -- Family & Relationships section
     if settings.relationships and unit.hist_figure_id ~= -1 then
@@ -94,28 +115,13 @@ function render(unit, template_opts)
         end
     end
 
-    -- Skills (master-level shown)
-    if settings.skills and unit.status.current_soul then
-        local soul = unit.status.current_soul
-        if soul.skills and #soul.skills > 0 then
-            local master_skills = {}
-            for _, skill in ipairs(soul.skills) do
-                local rate = skill.rating
-                if rate >= 10 then
-                    local sk_name = tostring(df.job_skill[skill.id]):gsub("_", " "):lower()
-                    table.insert(master_skills, { name = sk_name, rate = rate })
-                end
-            end
-            if #master_skills > 0 then
-                table.insert(content, "\n")
-                table.insert(content, { text = "## Skills", pen = COLOR_YELLOW })
-                table.insert(content, "\n")
-                for _, ms in ipairs(master_skills) do
-                    table.insert(content, "* " .. ms.name)
-                    table.insert(content, "\n")
-                end
-            end
-        end
+    -- Skills (live via function block)
+    if settings.skills then
+        table.insert(content, "\n")
+        table.insert(content, { text = "## Skills", pen = COLOR_YELLOW })
+        table.insert(content, "\n")
+        table.insert(content, { type = 'function', fn_key = 'current_skills', args = { unit_id = unit.id } })
+        table.insert(content, "\n")
     end
 
     -- Personal Journal

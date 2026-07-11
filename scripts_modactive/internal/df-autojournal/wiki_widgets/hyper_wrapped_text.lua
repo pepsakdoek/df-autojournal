@@ -98,6 +98,7 @@ function HyperWrappedText:update(display_text, wrap_width, fn_evaluator)
                 sort_asc     = (entry.sort_asc ~= false),
                 max_rows     = entry.max_rows,
                 search_query = entry.search_query or '',
+                fn_evaluator = fn_evaluator,
             }
             -- Do NOT sort here — sort only on explicit header click.
             -- Re-sorting on every render (including resize) causes dynamic
@@ -118,14 +119,46 @@ function HyperWrappedText:update(display_text, wrap_width, fn_evaluator)
                 entry      = entry,
             })
         elseif HUtils.is_function_block(entry) then
-            -- Evaluate the function block and insert its output as text
-            local result = ''
-            if fn_evaluator then
-                result = fn_evaluator(entry) or ''
+            -- Evaluate the function block
+            local result = fn_evaluator and fn_evaluator(entry) or ''
+            if type(result) == 'table' and result.type == 'table' then
+                -- Structured: return a table block
+                flush_text()
+                local tbl = HyperTable{
+                    columns      = result.columns or {},
+                    rows         = result.rows or {},
+                    sort_col     = result.sort_col,
+                    sort_asc     = result.sort_asc,
+                    max_rows     = result.max_rows,
+                    search_query = result.search_query or '',
+                    fn_evaluator = fn_evaluator,
+                }
+                local tbl_lines, tbl_spans = tbl:render(wrap_width)
+                local start_line = #self.lines + 1
+                for i, line in ipairs(tbl_lines) do
+                    table.insert(self.lines, line)
+                    table.insert(self.line_spans, tbl_spans[i])
+                end
+                local end_line = #self.lines
+                table.insert(self.table_ranges, {
+                    table      = tbl,
+                    start_line = start_line,
+                    end_line   = end_line,
+                    entry      = result,
+                })
+            elseif type(result) == 'table' and result.text then
+                -- Structured: single span
+                table.insert(text_entries, result)
+            elseif type(result) == 'table' then
+                -- Structured: array of spans
+                flush_text()
+                for _, span in ipairs(result) do
+                    table.insert(text_entries, span)
+                end
             else
-                result = '[' .. (entry.fn_key or '?') .. ']'
+                -- Plain text fallback
+                table.insert(text_entries, { text = tostring(result), pen = COLOR_GREEN })
             end
-            table.insert(text_entries, { text = result, pen = COLOR_GREEN })
         else
             table.insert(text_entries, entry)
         end

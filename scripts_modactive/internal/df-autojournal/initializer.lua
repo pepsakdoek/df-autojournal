@@ -36,40 +36,40 @@ end
 local function load_known_civs()
     local civs = {}
     pcall(function()
-        local raw = dfhack.persistent.getSiteData(KNOWN_CIVS_KEY)
+        local raw = dfhack.persistent.getWorldData(KNOWN_CIVS_KEY)
         if raw and raw.civs then civs = raw.civs end
     end)
     return civs
 end
 
 local function save_known_civs(civs)
-    pcall(dfhack.persistent.saveSiteData, KNOWN_CIVS_KEY, {civs=civs})
+    pcall(dfhack.persistent.saveWorldData, KNOWN_CIVS_KEY, {civs=civs})
 end
 
 local function load_known_forts()
     local forts = {}
     pcall(function()
-        local raw = dfhack.persistent.getSiteData(KNOWN_FORTS_KEY)
+        local raw = dfhack.persistent.getWorldData(KNOWN_FORTS_KEY)
         if raw and raw.forts then forts = raw.forts end
     end)
     return forts
 end
 
 local function save_known_forts(forts)
-    pcall(dfhack.persistent.saveSiteData, KNOWN_FORTS_KEY, {forts=forts})
+    pcall(dfhack.persistent.saveWorldData, KNOWN_FORTS_KEY, {forts=forts})
 end
 
 local function load_fort_members()
     local members = {}
     pcall(function()
-        local raw = dfhack.persistent.getSiteData(FORT_MEMBERS_KEY)
+        local raw = dfhack.persistent.getWorldData(FORT_MEMBERS_KEY)
         if raw and raw.members then members = raw.members end
     end)
     return members
 end
 
 local function save_fort_members(members)
-    pcall(dfhack.persistent.saveSiteData, FORT_MEMBERS_KEY, {members=members})
+    pcall(dfhack.persistent.saveWorldData, FORT_MEMBERS_KEY, {members=members})
 end
 
 WikiInitializer = defclass(WikiInitializer)
@@ -111,16 +111,25 @@ function WikiInitializer:_step_setup()
     self._site_id = utils.get_site_id()
     self._membership_map = {}
     logger.log("Current Site ID: " .. tostring(self._site_id))
-    if not self._site_id or self._site_id == -1 then
-        logger.log_error("No valid site ID found. Initialization aborted.")
-        return false
-    end
 
     self._civ_id = utils.get_civ_id()
     local settings = wiki_settings.get_settings()
     self._tracking_mode = settings.civ and settings.civ.init and settings.civ.init.tracking or 'diplomatic'
     self._current_civ = df.historical_entity.find(self._civ_id)
     self._current_site = dfhack.world.getCurrentSite()
+    return true
+end
+
+function WikiInitializer:_step_setup_world()
+    self._site_id = -1
+    self._membership_map = {}
+    logger.log("World-only setup (no active site)")
+
+    self._civ_id = utils.get_civ_id()
+    local settings = wiki_settings.get_settings()
+    self._tracking_mode = settings.civ and settings.civ.init and settings.civ.init.tracking or 'all_major'
+    self._current_civ = df.historical_entity.find(self._civ_id)
+    self._current_site = nil
     return true
 end
 
@@ -222,7 +231,7 @@ function WikiInitializer:_step_track_entities()
         fort_map[f.site_id] = true
     end
 
-    if not fort_map[self._site_id] then
+    if self._site_id and self._site_id ~= -1 and not fort_map[self._site_id] then
         local site_name = self._current_site and utils.get_readable_name(self._current_site.name) or "Unknown Fort"
         local civ_name = self._current_civ and utils.get_readable_name(self._current_civ.name) or "Unknown"
         table.insert(known_forts, {site_id=self._site_id, name=site_name, civ_id=self._civ_id, civ_name=civ_name, first_year=df.global.cur_year})
@@ -462,7 +471,7 @@ function WikiInitializer:_step_world()
 
     logger.log("Saving World page (" .. #world_content .. " spans)")
     world_content = utils.sanitize_content(world_content)
-    local w_ok, w_err = pcall(dfhack.persistent.saveSiteData, 'mfw_p_world', {content=world_content, cursor={1}})
+    local w_ok, w_err = pcall(dfhack.persistent.saveWorldData, 'mfw_p_world', {content=world_content, cursor={1}})
     if not w_ok then
         logger.log_error("Direct world save failed: " .. tostring(w_err))
     else
@@ -483,7 +492,6 @@ function WikiInitializer:_step_citizens()
     logger.log("Found " .. #all_units .. " total units in world.")
     local resident_rows = {}
     local dead_resident_rows = {}
-    local HAPPY_KEYS = { Euphoric = 1, ["Very Happy"] = 2, Happy = 3, Content = 4, Unhappy = 5, ["Very Unhappy"] = 6, Miserable = 7 }
     local civ_id = df.global.plotinfo.civ_id
 
     for i = 0, #all_units - 1 do
@@ -503,20 +511,6 @@ function WikiInitializer:_step_citizens()
             local content = citizen_template.render(unit)
             safe_save(self.context, id, utils.sanitize_content(content), 1)
 
-            local happiness = "Unknown"
-            local happy_key = 99
-            if unit and unit.status.current_soul and unit.status.current_soul.personality then
-                local stress = unit.status.current_soul.personality.stress
-                if stress < -50000 then happiness = "Euphoric"; happy_key = 1
-                elseif stress < -25000 then happiness = "Very Happy"; happy_key = 2
-                elseif stress < -10000 then happiness = "Happy"; happy_key = 3
-                elseif stress < 10000 then happiness = "Content"; happy_key = 4
-                elseif stress < 25000 then happiness = "Unhappy"; happy_key = 5
-                elseif stress < 50000 then happiness = "Very Unhappy"; happy_key = 6
-                else happiness = "Miserable"; happy_key = 7
-                end
-            end
-
             local race_name = "?"
             pcall(function()
                 local cr = df.creature_raw.find(unit.race)
@@ -529,7 +523,7 @@ function WikiInitializer:_step_citizens()
             table.insert(resident_rows, {
                 { text = name, pen = COLOR_LIGHTBLUE, link = is_citizen and id or nil },
                 { text = age_str, pen = age_pen },
-                    { text = tostring(happy_key) .. ". " .. happiness },
+                { type = 'function', fn_key = 'current_happiness', args = { unit_id = unit.id } },
                 { text = race_name, pen = COLOR_LIGHTCYAN },
                 { text = is_citizen and "Citizen" or "Resident", pen = is_citizen and COLOR_LIGHTGREEN or COLOR_GREY },
             })
@@ -731,8 +725,8 @@ end
 
 function WikiInitializer:_step_finalize()
     logger.log("Setting mfw_initialized flag")
-    dfhack.persistent.saveSiteData(self.context.save_prefix .. 'initialized', {val={1}})
-    local verify = dfhack.persistent.getSiteData(self.context.save_prefix .. 'initialized')
+    dfhack.persistent.saveWorldData(self.context.save_prefix .. 'initialized', {val={1}})
+    local verify = dfhack.persistent.getWorldData(self.context.save_prefix .. 'initialized')
     logger.log("Verified mfw_initialized: " .. tostring(verify))
 
     if self.on_complete then
@@ -792,6 +786,56 @@ function WikiInitializer:perform_async()
     return completed
 end
 
+function WikiInitializer:perform_world_init()
+    local completed = false
+    local ok, err = xpcall(function()
+        logger.log("Starting world-only Wiki initialization...")
+
+        self:_step_setup_world()
+        self._dynamic_pages = {}
+        self._known_fort_set = {}
+
+        local steps = {
+            {name='Scanning civilizations', fn=function() self:_step_track_entities() end},
+            {name='Rendering civ pages',    fn=function() self:_step_render_subpages() end},
+            {name='World page',             fn=function() self:_step_world() end},
+            {name='Saving pages',           fn=function() self:_step_save_dynamic() end},
+        }
+
+        gui_script.sleep(1, 'frames')
+
+        local total = #steps
+        for i, step in ipairs(steps) do
+            if self.on_step then self.on_step(i, total, step.name) end
+            local t0 = os.clock()
+            local ok_step, err_step = pcall(step.fn)
+            local elapsed_ms = (os.clock() - t0) * 1000
+            if ok_step then
+                logger.log(string.format("  ✓ Step '%s' completed in %.0f ms", step.name, elapsed_ms))
+            else
+                logger.log_error(string.format("  ✗ Step '%s' FAILED in %.0f ms: %s", step.name, elapsed_ms, tostring(err_step)))
+            end
+            gui_script.sleep(1, 'frames')
+        end
+
+        dfhack.persistent.saveWorldData('mfw_world_initialized', {val={1}})
+        logger.log("World init complete")
+
+        if self.on_complete then
+            self.on_complete()
+        end
+
+        completed = true
+    end, function(err)
+        return debug.traceback(err)
+    end)
+
+    if not ok then
+        logger.log_error("World init failed: " .. tostring(err))
+    end
+    return completed
+end
+
 ---------------------------------------------------------------------------
 --- Historical event catch-up: scan all past events for this site.
 --- Runs during initialization, after citizen/artifact pages are built.
@@ -812,7 +856,7 @@ function WikiInitializer:catchUpEvents(site_id)
     -- Read last caught-up event ID
     local last_done = 0
     local ok_load, data = pcall(function()
-        return dfhack.persistent.getSiteData(catchup_key)
+        return dfhack.persistent.getWorldData(catchup_key)
     end)
     if ok_load and data and data.val then
         last_done = data.val
@@ -901,7 +945,7 @@ function WikiInitializer:catchUpEvents(site_id)
 
         -- Save progress every batch and notify progress bar
         if total_scanned % batch_size == 0 then
-            pcall(dfhack.persistent.saveSiteData, catchup_key, {val=ev_id})
+            pcall(dfhack.persistent.saveWorldData, catchup_key, {val=ev_id})
             if self.on_batch then
                 self.on_batch(total_scanned, total_to_scan, total_matched)
             end
@@ -911,7 +955,7 @@ function WikiInitializer:catchUpEvents(site_id)
     end
 
     -- Save final marker
-    pcall(dfhack.persistent.saveSiteData, catchup_key, {val=current_max})
+    pcall(dfhack.persistent.saveWorldData, catchup_key, {val=current_max})
     logger.log("Catch-up complete: scanned " .. total_scanned .. " events, matched " .. total_matched)
 end
 
@@ -924,7 +968,7 @@ function WikiInitializer:renderEventsTimeline()
     -- Load timeline registry
     local entries = {}
     local ok_load = pcall(function()
-        local data = dfhack.persistent.getSiteData('mfw_event_timeline')
+        local data = dfhack.persistent.getWorldData('mfw_event_timeline')
         if data and data.entries then
             entries = data.entries
         end
@@ -1085,7 +1129,7 @@ function WikiInitializer:renderVisitorsPage()
             local key = (v.name or ""):lower():gsub("[^%w]", "_")
             save_data[key] = v
         end
-        dfhack.persistent.saveSiteData('mfw_visitors', {visitors=save_data})
+        dfhack.persistent.saveWorldData('mfw_visitors', {visitors=save_data})
     end)
 
     local settings = wiki_settings.get_settings().visitors or { init={registry=true, departed=true}, journal={} }

@@ -16,8 +16,8 @@ end
 function HTAContext:save_content(page_id, display_text, cursor)
     if not page_id or not dfhack.isWorldLoaded() then return end
     
-    -- Save to the current fortress/site data (strictly per-save)
-    dfhack.persistent.saveSiteData(
+    -- Save to world-level data (survives fort retirement)
+    dfhack.persistent.saveWorldData(
         self:get_page_key(page_id),
         { content = display_text, cursor = {cursor} }
     )
@@ -26,7 +26,7 @@ end
 function HTAContext:load_content(page_id)
     if not page_id or not dfhack.isWorldLoaded() then return nil end
     
-    local data = dfhack.persistent.getSiteData(self:get_page_key(page_id))
+    local data = dfhack.persistent.getWorldData(self:get_page_key(page_id))
     if data then
         return data.content, (data.cursor and data.cursor[1] or 1)
     end
@@ -35,7 +35,7 @@ end
 
 function HTAContext:delete_content(page_id)
     if dfhack.isWorldLoaded() then
-        dfhack.persistent.deleteSiteData(self:get_page_key(page_id))
+        dfhack.persistent.deleteWorldData(self:get_page_key(page_id))
     end
 end
 
